@@ -1,0 +1,12 @@
+{
+  "name": "ads-audit-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PDF renderer for the ads-audit skill deck",
+  "scripts": {
+    "render": "node render-pdf.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.0.0"
+  }
+}
