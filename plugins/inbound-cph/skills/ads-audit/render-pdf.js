@@ -35,8 +35,10 @@ const fs = require('fs');
   const slidePdfs = [];
   for (let i = 1; i <= totalSlides; i++) {
     await page.goto('file://' + src + '#' + i, { waitUntil: 'networkidle0' });
-    // Force the target slide active and strip UI chrome that does not belong in a PDF.
+    // Force the target slide active, add pdf-export class to kill transitions,
+    // ensure solid backgrounds, and strip UI chrome.
     await page.evaluate((n) => {
+      document.body.classList.add('pdf-export');
       const slides = document.querySelectorAll('.slide');
       slides.forEach((s, idx) => s.classList.toggle('active', idx === n - 1));
       const bar = document.getElementById('progressBar');
@@ -44,7 +46,8 @@ const fs = require('fs');
       document.querySelectorAll('.nav-hint').forEach((el) => el.remove());
     }, i);
     await page.evaluateHandle('document.fonts.ready');
-    await new Promise((r) => setTimeout(r, 200));
+    // Slightly longer wait to ensure background gradients and fonts are rendered.
+    await new Promise((r) => setTimeout(r, 350));
 
     const buf = await page.pdf({
       width: '13.333in',
