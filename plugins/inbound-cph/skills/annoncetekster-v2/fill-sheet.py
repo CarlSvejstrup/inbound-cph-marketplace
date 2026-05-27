@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Fill template.xlsx with generated RSA copy and save a new file.
+"""Fill template.xlsx with generated RSA ad text and save a new file.
 
-The skill calls this after it has generated and length-checked the copy. It
+The skill calls this after it has generated and length-checked the ad text. It
 loads the bundled template (which already holds the =LEN() formulas and the red
 over-length conditional formatting), writes only the text cells (never the LEN
 cells), and saves a fresh .xlsx. The formulas + formatting ride along untouched.
 
 Usage:
-  python3 fill-sheet.py --copy copy.json --out "/path/RSA - Client - 2026-05-27.xlsx"
+  python3 fill-sheet.py --ads ads.json --out "/path/RSA - Client - 2026-05-27.xlsx"
 
-copy.json shape (all keys optional except headlines/descriptions):
+The --copy flag is kept as an alias for backward compatibility with v1.
+
+ads.json shape (all keys optional except headlines/descriptions):
   {
     "campaign": "IC | GSN | Generic |",   # optional, default kept from template
     "ad_group": "",                          # optional
@@ -131,11 +133,13 @@ def fill(copy: dict, out: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--copy", required=True, help="path to copy.json")
+    # --ads is the canonical flag; --copy is the v1 alias.
+    ap.add_argument("--ads", "--copy", dest="ads", required=True,
+                    help="path to ads.json (the generated ad-text spec)")
     ap.add_argument("--out", required=True, help="output .xlsx path")
     args = ap.parse_args()
 
-    copy = json.loads(Path(args.copy).read_text())
+    copy = json.loads(Path(args.ads).read_text())
     errs = validate(copy)
     if errs:
         print("REFUSING TO WRITE - over-length fields:", file=sys.stderr)
