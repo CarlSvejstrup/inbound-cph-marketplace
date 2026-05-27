@@ -1,11 +1,11 @@
 ---
-name: rsa-copy
-description: Turn a client landing page into Google Ads Responsive Search Ad copy in an Editor-ready spreadsheet. Builds a fresh .xlsx from a bundled template that carries live char-count formulas and red over-length color rules, fills 15 headlines + 4 descriptions + 2 paths under Google's hard limits, and saves it to Drive (user picks the folder) or locally. Use when the user says "lav annoncetekster til [klient]", "RSA til [landingsside]", "lav et annonce-ark", "responsive search ad copy", or "tekster ud fra landingsside".
+name: annoncetekster
+description: Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside og aflever dem i et Google Ads Editor-klart regneark. Analyserer landingssiden, skriver 15 overskrifter + 4 beskrivelser + 2 stier inden for Googles tegngraenser, og bygger en frisk .xlsx fra en indbygget skabelon med live tegntaelling og roede advarsler naar en tekst bliver for lang. Gemmer i Drive (brugeren vaelger mappen) eller lokalt. Svarer altid paa dansk. Brug naar brugeren siger "lav annoncetekster til [kunde]", "RSA til [landingsside]", "lav et annonce-ark", "responsive search ad", eller "tekster ud fra landingsside".
 ---
 
-# rsa-copy
+# annoncetekster
 
-Generate Google Ads Responsive Search Ad (RSA) copy from a client landing page and deliver it in a spreadsheet that imports into Google Ads Editor.
+Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, og aflever dem i et regneark der kan importeres direkte i Google Ads Editor. Hele forloebet og alt output er paa dansk.
 
 ## Why this skill exists
 
@@ -51,6 +51,8 @@ Final URL | Final mobile URL
 
 Laes `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` foer noget andet. Den indeholder write-gate-reglerne og sprogpolitikken. At gemme filen (til Drive eller lokalt) er en ekstern write — gated bag eksplicit bekraeftelse.
 
+**Sprog: alt foregaar paa dansk** — spørgsmål i intake, statusbeskeder, output-tabellen og naeste-skridt. Skift kun til engelsk hvis brugeren skriver til dig paa engelsk eller udtrykkeligt beder om det. Selve annonceteksterne skrives ogsaa paa dansk (se Trin 3).
+
 ## Trin 1 — Intake (eet spoergsmaal ad gangen)
 
 1. **Klientnavn** — bruges i fil-titlen.
@@ -76,7 +78,7 @@ Variér headlines paa vinkel saa Google har reelt materiale at teste: USP, pris/
 
 **Regler:**
 - Kun claims der staar paa landingssiden. Ingen opfundne tal, garantier eller priser.
-- Dansk, medmindre landingssiden er paa et andet sprog.
+- **Annonceteksterne skrives paa dansk** (medmindre landingssiden tydeligt er paa et andet sprog — saa matcher du sidens sprog).
 - **Laengde-selvtjek:** for hver streng, taeel tegn. Skriv om enhver headline > 30, description > 90 eller path > 15 INDEN du gaar videre. `fill-sheet.py` afviser desuden at skrive hvis noget er for langt — men ret det her foerst.
 
 Skriv copy'en til en `copy.json`:

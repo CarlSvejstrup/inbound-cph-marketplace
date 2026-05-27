@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate template.xlsx for the rsa-copy skill.
+"""Generate template.xlsx for the annoncetekster skill.
 
 Builds Inbound's Google Ads Editor RSA import layout as a real .xlsx so that
 =LEN() formulas and red over-length conditional formatting are baked into the
