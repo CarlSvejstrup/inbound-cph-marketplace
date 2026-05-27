@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Generate template.xlsx for the rsa-copy skill.
+
+Builds Inbound's Google Ads Editor RSA import layout as a real .xlsx so that
+=LEN() formulas and red over-length conditional formatting are baked into the
+file. The skill fills a copy of this template and saves a new file each run;
+because formulas + formatting live in the xlsx layer (not in CSV values), they
+survive upload to Drive and stay live when the client edits the sheet.
+
+Layout (row 1 = headers, row 2 = single data row):
+  Campaign | Ad Group | Ad type | Labels |
+  Headline 1 | LEN | ... | Headline 15 | LEN |
+  Description 1 | LEN | ... | Description 4 | LEN |
+  Path 1 | LEN | Path 2 | LEN |
+  Final URL | Final mobile URL
+
+Every text column is followed by a LEN column holding =LEN(<text cell>).
+Conditional formatting turns a LEN cell red when it exceeds the field's limit
+(headline 30, description 90, path 15).
+
+Run: python3 build-template.py   ->  writes template.xlsx next to this script.
+Deterministic: re-running reproduces the same file.
+"""
+from pathlib import Path
+
+import openpyxl
+from openpyxl.formatting.rule import CellIsRule
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+RED_FILL = PatternFill(start_color="F4C7C3", end_color="F4C7C3", fill_type="solid")
+HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+HEADER_FONT = Font(bold=True)
+
+# Field spec: (header, limit-or-None). None = no LEN column (Campaign, Ad Group,
+# Ad type, Labels, Final URL, Final mobile URL). A limit means a LEN column with
+# a conditional-format rule follows.
+FIELDS = (
+    [("Campaign", None), ("Ad Group", None), ("Ad type", None), ("Labels", None)]
+    + [(f"Headline {i}", 30) for i in range(1, 16)]
+    + [(f"Description {i}", 90) for i in range(1, 5)]
+    + [("Path 1", 15), ("Path 2", 15)]
+    + [("Final URL", None), ("Final mobile URL", None)]
+)
+
+
+def build() -> dict:
+    """Build the workbook and return the field -> data-cell A1 map."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "RSA"
+
+    col = 1  # 1-based column index
+    cell_map: dict[str, str] = {}
+
+    for header, limit in FIELDS:
+        text_col = col
+        text_letter = get_column_letter(text_col)
+        # Header
+        hc = ws.cell(row=1, column=text_col, value=header)
+        hc.fill = HEADER_FILL
+        hc.font = HEADER_FONT
+        hc.alignment = Alignment(horizontal="center")
+        cell_map[header] = f"{text_letter}2"
+        col += 1
+
+        if limit is not None:
+            len_letter = get_column_letter(col)
+            lc = ws.cell(row=1, column=col, value="LEN")
+            lc.fill = HEADER_FILL
+            lc.font = HEADER_FONT
+            lc.alignment = Alignment(horizontal="center")
+            # Live length formula in the data row
+            ws[f"{len_letter}2"] = f"=LEN({text_letter}2)"
+            # Red when over the field's hard limit
+            ws.conditional_formatting.add(
+                f"{len_letter}2",
+                CellIsRule(operator="greaterThan", formula=[str(limit)], fill=RED_FILL),
+            )
+            col += 1
+
+    # Pre-seed the Inbound convention values
+    ws[cell_map["Campaign"]] = "IC | GSN | Generic |"
+    ws[cell_map["Ad type"]] = "Responsive search ad"
+
+    # Reasonable column widths
+    for c in range(1, col):
+        ws.column_dimensions[get_column_letter(c)].width = 18
+
+    out = Path(__file__).with_name("template.xlsx")
+    wb.save(out)
+    return cell_map
+
+
+if __name__ == "__main__":
+    cmap = build()
+    print("Wrote template.xlsx")
+    print("Data-cell map (field -> A1, row 2):")
+    for field, ref in cmap.items():
+        print(f"  {field:18s} {ref}")
