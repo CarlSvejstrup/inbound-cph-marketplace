@@ -55,52 +55,81 @@ Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` før noget andet. Den indeholder write-ga
 
 **Sprog: alt foregår på dansk** — spørgsmål i intake, statusbeskeder, output-tabellen og næste-skridt. Skift kun til engelsk hvis brugeren skriver til dig på engelsk eller udtrykkeligt beder om det. Selve annonceteksterne skrives også på dansk (se Trin 4).
 
-## Hard rule — brug ALTID AskUserQuestion til intake
+## Hard rule — brug ALTID AskUserQuestion til intake, men hold antal kald lavt
 
-Hvert intake-felt (klientnavn, landingsside, netværk/format, målretning, kampagnenavn, ad group, gem-destination) skal spørges via `AskUserQuestion` med konkrete forslag som options. Gæt aldrig værdier. Hvis du har et logisk default, vis det som **første option** med `(Anbefalet)` i label — brugeren kan altid vælge "Other" og skrive sin egen værdi.
+Hvert intake-felt skal spørges via `AskUserQuestion` med konkrete forslag som options. Gæt aldrig værdier. Hvis du har et logisk default, vis det som **første option** med `(Anbefalet)` i label — brugeren kan altid vælge "Other" og skrive sin egen værdi.
 
-Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fange afvigelser (fx pMax i stedet for GSN, brand-kampagne i stedet for generic) før arket genereres. Friform-input giver inkonsistente kampagnenavne som senere skal renses i Editor.
+**Saml relaterede felter i ÉT kald.** `AskUserQuestion` tager op til 4 spørgsmål ad gangen — udnyt det. Mål: hele intaken på 3-4 kald i alt, ikke 10+ separate.
 
-## Trin 1 — Intake (eet AskUserQuestion ad gangen)
+Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fange afvigelser (fx pMax i stedet for GSN, brand-kampagne i stedet for generic) før arket genereres — uden at trætte brugeren med en lang kæde af enkeltspørgsmål.
 
-Spørg i denne rækkefølge. Hvert trin er et separat `AskUserQuestion`-kald.
+## Trin 1 — Intake (få AskUserQuestion-kald, mange felter per kald)
 
-### A. Identitet og kampagne-navn
-1. **Klientnavn** — fri tekst via AskUserQuestion (én option `(Anbefalet)` hvis konteksten allerede har et klientnavn fra samtalen, ellers bare "Other"). Bruges i fil-titlen og som `Eventuelt`-feltet i kampagnenavnet.
-2. **Landingsside-URL** — fri tekst. Hvis brugeren har nævnt en URL tidligere i samtalen, foreslå den som første option.
-3. **Kampagnetype** — bestemmer hvilken navngivningsskabelon der bruges. Options:
-   - Search / Shopping / pMax  — skabelon: `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
-   - Display / YouTube / Demand Gen — skabelon: `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
-   - Audience — skabelon: `YYYY-MD - IC - Audience type - Audience navn`
-4. **Netværk / Format** — afhænger af kampagnetype (se "Navngivnings-skabelon" nedenfor).
-5. **Målretning** — afhænger af kampagnetype.
-6. **Kampagnenavn / produkt** — det specifikke produkt eller tema (fx "Alarmsystemer", "Bliv grønnere sammen", "Gratis introforløb").
-7. **Eventuelt** (kun Search/Shopping/pMax, valgfrit) — fx brandnavn "Securitas". Vis "(ingen)" som første option.
-8. **Foreslået kampagnenavn** — saml svarene til en streng efter den valgte skabelon, og vis den som første option `(Anbefalet)` i et sidste `AskUserQuestion`. Brugeren bekræfter eller skriver et frit alternativ via "Other".
-9. **Ad group-navn** (valgfrit) — default tom (første option: `(tom)`).
+`AskUserQuestion` tager op til 4 spørgsmål per kald — udnyt det. Saml relaterede felter i ét kald i stedet for at sende 8 separate kald. Mål: hele intaken på 3-4 kald i alt.
 
-### B. Tekst-inputs (v2 — driver headline-kvaliteten)
+Udled så meget som muligt fra samtalen og landingssiden FØR du spørger. Hvis Carl allerede har sagt klientnavn og URL i samme besked, behøver du ikke spørge om dem — bekræft dem som første option `(Anbefalet)` i det første kald, eller spring dem helt over og gå direkte til kampagnetype.
 
-Disse fem felter er årsagen til at v2 eksisterer. Spring dem ALDRIG over — de er forskellen mellem generiske annoncetekster og annoncetekster der konverterer.
+### Kald 1 — Identitet og kampagnetype (1 AskUserQuestion, 2-3 spørgsmål)
 
-10. **USP-hierarki** — bed brugeren rangere klientens top-3 differentiators. Foreslå options ud fra landingsside-scrape (Trin 2) hvis du allerede har scrapet den; ellers be brugeren skrive dem. Hvis kun een USP er klar: spørg om en sekundær og tertiær. Begrund: uden et rangeret USP-hierarki defaulter alle 15 headlines til generelle benefits.
+Saml i samme kald:
+1. **Klient + URL** — kun hvis ikke allerede klart fra samtalen. Ellers spring over.
+2. **Kampagnetype** (altid spørg):
+   - Search / Shopping / pMax  — `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
+   - Display / YouTube / Demand Gen — `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
+   - Audience — `YYYY-MD - IC - Audience type - Audience navn`
 
-11. **Aktivt tilbud + udløbsdato** — options:
-    - "Ja, der er et tilbud" → følg op med tilbudstekst + udløbsdato.
-    - "Nej, ingen aktiv promo" → skip urgency-angle i Trin 4.
-    Begrund: udløbne tilbud i annonceteksterne = auto-disapproval. Aktiv promo driver urgency-headline + evt. countdown customizer i Editor.
+### Kald 2 — Navngivnings-felter komprimeret (1 AskUserQuestion, 2-4 spørgsmål)
 
-12. **Trust-tal** — specifikke tal vi må bruge: kunde-antal, år i branchen, anmeldelses-score, certificeringer, awards. Options foreslået ud fra landingsside hvis muligt ("4.8 stjerner fra 2.300 anmeldelser", "Foretrukket af 50.000+ danskere", "Etableret 1998"). Hvis ingen tal: spørg om de findes på Trustpilot eller andetsteds — vi må IKKE finde på tal.
+Spørg i ét kald om de specifikke felter der hører til den valgte kampagnetype. Brug det kortest mulige feltsæt:
 
-13. **Brand voice + banned words** — to delspørgsmål:
-    - **Tone:** options som "Formel", "Venlig og direkte", "Teknisk og præcis", "Energisk og inspirerende".
-    - **Banned words:** ord vi IKKE må bruge (fx konkurrent-brands, juridisk problematiske ord, ord klienten har bedt om at undgå). Default option: "(ingen)".
+- **Search/Shopping/pMax:** netværk + målretning + produkt-/tema-navn + (valgfri) eventuelt-tilføjelse. 3-4 spørgsmål.
+- **Display/YT/DG:** format + kampagnenavn + målretning. 3 spørgsmål.
+- **Audience:** dato-format (med/uden ledende nul) + audience type + audience navn. 3 spørgsmål.
 
-14. **Top-keywords fra Google Ads MCP** — to scenarier:
-    - **MCP er tilgængelig** (brugeren har Google Ads MCP koblet på): spørg om Ads-konto-ID (eller foreslå konto baseret på klientnavn). Brug MCP til at hente top 10-20 keywords for kontoen, rangeret efter impressions eller conversions. Vis dem som options — brugeren vælger de 3-5 top-keywords der skal stå i annonceteksterne. Begrund: top-keyword skal stå i mindst 3 headlines for Google's relevans-score.
-    - **MCP er IKKE tilgængelig** på denne bruger: be brugeren manuelt skrive 3-5 top-keywords (eller liste fra et Search Terms-eksport). Vis "(brug landingssidens hovedtermer)" som default-option hvis brugeren ikke har keyword-data.
+Hvert spørgsmål har konkrete options fra "Navngivnings-skabelon"-sektionen nedenfor — brugeren kan altid vælge "Other".
 
-Bekræft det samlede scope (klient, URL, kampagnenavn, USP-hierarki, tilbud, trust-tal, voice, keywords) i én tekstbesked før du går til Trin 2.
+### Kald 3 — Bekræft samlet kampagnenavn (1 AskUserQuestion, 1 spørgsmål)
+
+Saml svarene fra kald 1-2 til en streng efter den valgte skabelon. Vis den som første option `(Anbefalet)` — brugeren bekræfter eller skriver et frit alternativ via "Other".
+
+Eksempel:
+> Forslag: `IC | GSN | Generic | Alarmsystemer`. Bekræft, eller skriv en anden.
+
+Ad group-navnet spørges IKKE — default er tom. Hvis Carl vil sætte en, kan han sige det i bekræftelses-svaret eller efterfølgende.
+
+### Mellemtrin — scrape landingssiden FØR kald 4
+
+Kør Trin 2 (Firecrawl-scrape af landingssiden) NU, før du sender kald 4. Det er hele pointen med v2: vi vil vise konkrete options fra siden i stedet for friform-tekst. Uden scrape bliver kald 4 til 4 friform-spørgsmål, og brugeroplevelsen bliver dårligere end v1.
+
+### Kald 4 — Tekst-inputs (1 AskUserQuestion, 4 spørgsmål)
+
+Dette er det tunge kald — det henter alt der driver kvaliteten af annonceteksterne. Hvert spørgsmål skal vise 3-4 konkrete options fra scrape som første options, "Other" som sidste.
+
+Disse felter er årsagen til at v2 eksisterer — de er forskellen mellem generiske annoncetekster og annoncetekster der konverterer.
+
+**Spørg om dem i ÉT `AskUserQuestion`-kald med 4 spørgsmål.** Scrape landingssiden FØR du sender kaldet, så du kan foreslå konkrete options fra siden i hvert spørgsmål (det er hele pointen med v2 — brugeren skal kunne klikke sig igennem, ikke skrive fritekst).
+
+De 4 spørgsmål i samme kald:
+
+1. **USP + tilbud** — top USP fra landingssiden + om der er et aktivt tilbud. Foreslå konkrete USP'er fra scrape som options. Hvis tilbud: brugeren skriver tilbudstekst + udløbsdato i "Other". Begrund: uden USP defaulter headlines til generisk; udløbne tilbud i annonceteksterne giver auto-disapproval.
+
+2. **Trust-tal** — vælg fra options foreslået ud fra scrape ("4.8 stjerner fra 2.300 anmeldelser", "Foretrukket af 50.000+ danskere", "Etableret 1998", "(ingen tal tilgængelige)"). Vi må IKKE finde på tal — kun det der står på siden eller brugeren bekræfter.
+
+3. **Brand voice + banned words** — vælg tone (`Formel`, `Venlig og direkte`, `Teknisk og præcis`, `Energisk og inspirerende`) og om der er ord vi IKKE må bruge. Default banned words: `(ingen)`.
+
+4. **Top-keywords** — to scenarier:
+   - **Google Ads MCP tilgængelig:** hent top 10-20 keywords for klientens konto (rangeret efter impressions/conversions) FØR du sender kaldet, og vis dem som options. Brugeren vælger 3-5.
+   - **MCP IKKE tilgængelig** på denne bruger: vis "(brug landingssidens hovedtermer)" som første option, og lad brugeren skrive 3-5 keywords manuelt via "Other" hvis hen har en Search Terms-eksport.
+
+Begrund overordnet: top-keyword skal stå i mindst 3 headlines for Google's relevans-score (se `references/headline-craft.md`).
+
+### Bekræft scope (1 tekstbesked, ingen AskUserQuestion)
+
+Saml svarene og vis dem som en kort liste til brugeren før du går til Trin 2:
+- Klient, URL, kampagnenavn
+- Top-USP, tilbud, trust-tal, voice, banned words, top-keywords
+
+Vent på "OK" / "go" / lignende kort bekræftelse. Hvis brugeren retter noget: opdater og bekræft igen.
 
 **Gem-destination spørges IKKE.** Skillet leverer ALTID begge formater:
 1. Skriver `.xlsx` lokalt i cwd (eller den sti brugeren har implicit i kontexten).
