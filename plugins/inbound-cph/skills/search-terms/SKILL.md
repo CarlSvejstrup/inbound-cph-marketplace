@@ -43,7 +43,7 @@ Ask each, wait for the answer before the next.
 
 **1a. Klientnavn.** Match against `list_accessible_accounts` by account name. Present the match for confirmation: "Fandt [Kontonavn] (ID: XXXXXXXXXX) - er det den rigtige konto?" If no match, ask for the ID manually.
 
-**1b. Datointerval.** Offer "Sidste 3 maaneder (standard)", "Sidste 30 dage", or custom. **Default LAST_90_DAYS** - search-term patterns need volume; the user's template used a 3-month window for good reason.
+**1b. Datointerval.** Offer "Sidste 3 maaneder (standard)", "Sidste 30 dage", or custom. **Default = last 90 days.** Search-term patterns need volume; the user's template used a 3-month window for good reason. Note: GAQL has no `LAST_90_DAYS` literal (only 7/14/30), so for the 90-day window use an explicit `segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` computed as today minus 90 days. The 30-day option can use `DURING LAST_30_DAYS`.
 
 **1c. Landingsside / website.** Ask for the client's main URL. Used to ground classification in what the client actually offers (Trin 2c). If the user does not have it, fall back to asking them to describe the offering.
 
@@ -72,8 +72,9 @@ SELECT
   metrics.cost_micros, metrics.clicks, metrics.conversions,
   metrics.conversions_value, metrics.impressions, metrics.ctr
 FROM search_term_view
-WHERE segments.date DURING LAST_90_DAYS
+WHERE segments.date BETWEEN '<start>' AND '<end>'   -- 90-day window; or DURING LAST_30_DAYS
   AND campaign.status = 'ENABLED'
+  AND metrics.cost_micros > 5000000                 -- SPEND_FLOOR (5 DKK) in micros
 ORDER BY metrics.cost_micros DESC
 LIMIT 500
 ```
@@ -90,7 +91,7 @@ FROM keyword_view
 WHERE campaign.status = 'ENABLED' AND ad_group_criterion.status = 'ENABLED'
 ```
 
-Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`. This is what makes FORKERT_PLACERET detectable.
+Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`, **excluding test/duplicate campaigns** (names matching `/w2m|test|vol 2/i` - confirm against the actual campaign list). This is what makes FORKERT_PLACERET detectable without false-positiving on parallel test campaigns.
 
 **2c. Client offering via Firecrawl.** Scrape the landing page / website from intake (same pattern as `ads-audit`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
 
@@ -98,7 +99,7 @@ Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`. This is
 
 ```sql
 SELECT metrics.cost_micros FROM campaign
-WHERE segments.date DURING LAST_90_DAYS
+WHERE segments.date BETWEEN '<start>' AND '<end>'   -- same window as 2a
   AND campaign.status = 'ENABLED'
   AND campaign.advertising_channel_type = 'SEARCH'
 ```
@@ -122,7 +123,10 @@ Account references (compute once):
 
 Classify each term into exactly one bucket, in this priority order:
 
-1. **FORKERT_PLACERET** - the term (normalised) exists as an ENABLED keyword in a **different** ad group than the one it served in here (from the 2b map). It is pulling traffic away from its correct home. Begrundelse names the other ad group(s) + match type, e.g. "Eksisterer allerede som keyword i [Kampagne > Ad group] (EXACT). Boer tilfoejes som negativ i den nuvaerende ad group." Suggested negative level = ad group.
+1. **FORKERT_PLACERET** - the term (normalised) exists as an ENABLED keyword in **2+ ad groups**, or in a **different** ad group than the one it served here (from the 2b map). It is pulling traffic away from its canonical home. **Two rules learned from the live DSC test:**
+   - **Filter test/duplicate campaigns out of the keyword map first.** DSC had parallel `W2M ...`, `... TEST`, `Own Brand ... vol 2` campaigns. A keyword's presence in a *test* campaign is not a legitimate "correct home" - only count production campaigns (heuristic: exclude names matching `/w2m|test|vol 2/i`; confirm the prod set by listing campaign names once at the start). Without this filter you false-positive on correctly-placed terms.
+   - **The biggest cases have the keyword in BOTH the served ad group and another one** (e.g. "grupperejser" is an EXACT keyword in both `2 > Grupperejser` and `3 > Grupperejser`). The structural check only *nominates* these; the LLM picks the canonical home (the conventional call: Destination over Generisk, Brand over non-Brand, exact-intent ad group over catch-all) and recommends a negative in the others. Do not auto-pick.
+   Begrundelse names the other ad group(s) + match type, e.g. "Eksisterer ogsaa som keyword i [Kampagne > Ad group] (EXACT); kanonisk hjem er X. Tilfoej negativ i [den forkerte gruppe]." Suggested negative level = ad group.
 
 2. **IRRELEVANT** - the term does not fit the client's offering (from 2c) or is clear off-intent (gratis, selv/DIY, jobs/stilling, brugt, wikipedia/forum, competitor). This is the LLM judgement, grounded in the scraped offering. Begrundelse names the offending token, e.g. "Indeholder 'studierejse' som DSC ikke tilbyder." Suggested level = account-shared list if generic, else campaign.
 
