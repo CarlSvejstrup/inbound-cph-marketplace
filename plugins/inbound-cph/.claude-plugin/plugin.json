@@ -1,7 +1,7 @@
 {
   "name": "inbound-cph",
-  "description": "Kunde Specialist skills for Inbound CPH: client briefs, proactivity scans, weekly pulses, voice checks, onboarding (Danish-default)",
-  "version": "0.4.0",
+  "description": "Kunde Specialist skills for Inbound CPH: client briefs, proactivity scans, weekly pulses, voice checks, onboarding, Google Ads audit, and RSA ad-copy generation (Danish-default)",
+  "version": "0.5.0",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

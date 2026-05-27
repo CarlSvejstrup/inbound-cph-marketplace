@@ -2,7 +2,7 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-04-27, after v0.4.0.
+Last updated: 2026-05-27, after v0.5.0.
 
 ## Milestones
 
@@ -13,16 +13,18 @@ Last updated: 2026-04-27, after v0.4.0.
 - `.claude-plugin/marketplace.json` valid
 - `plugins/inbound-cph/.claude-plugin/plugin.json` valid
 - Installable via `/plugin marketplace add CarlSvejstrup/inbound-cph-demo`
-- Versioning: explicit semver, currently v0.4.0
+- Versioning: explicit semver, currently v0.5.0
 
 ### M2 — Core skills
-**Status:** Done (5 skills shipped)
+**Status:** Done (7 skills shipped)
 
 - `client-brief` — synthesised one-page brief
 - `proactivity-scan` — three ranked recommendations
 - `weekly-pulse` — two-minute status delta
 - `voice-check` — severity-ranked draft review
 - `onboard` — guided Danish setup writing local CLAUDE.md + guide.docx
+- `ads-audit` — full Google Ads paid search audit, outputs HTML slide deck + PDF (v0.4.0)
+- `rsa-copy` — landing page to Editor-ready RSA ad-copy sheet; clones Inbound's RSA template (preserving LEN formulas + red over-length color rules), fills 15 headlines + 4 descriptions + 2 paths under Google's hard limits via `gws` CLI (v0.5.0). Local-run skill; mechanics verified end-to-end (clone-equivalent write + LEN formula + conditional-format trigger). Caveat: `gws` must be authed to an account that can write the cloned sheet (Inbound template owned by csc@inboundcph.dk; personal Gmail gets 403 — fallback is paste-ready block).
 
 ### M3 — Operating contract
 **Status:** Done
