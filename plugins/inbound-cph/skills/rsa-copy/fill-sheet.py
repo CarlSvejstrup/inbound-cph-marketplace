@@ -25,10 +25,28 @@ limit, so the skill never writes an over-length sheet.
 """
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
-import openpyxl
+
+def _ensure_openpyxl():
+    """Import openpyxl, pip-installing it if missing. Lets the skill run on any
+    machine with Python 3 + pip without a manual setup step."""
+    try:
+        import openpyxl  # noqa: F401
+        return
+    except ImportError:
+        pass
+    print("openpyxl not found - installing...", file=sys.stderr)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--quiet", "openpyxl>=3.1"],
+        check=True,
+    )
+
+
+_ensure_openpyxl()
+import openpyxl  # noqa: E402
 
 TEMPLATE = Path(__file__).with_name("template.xlsx")
 

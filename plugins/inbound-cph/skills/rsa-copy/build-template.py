@@ -21,12 +21,31 @@ Conditional formatting turns a LEN cell red when it exceeds the field's limit
 Run: python3 build-template.py   ->  writes template.xlsx next to this script.
 Deterministic: re-running reproduces the same file.
 """
+import subprocess
+import sys
 from pathlib import Path
 
-import openpyxl
-from openpyxl.formatting.rule import CellIsRule
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
+
+def _ensure_openpyxl():
+    """Import openpyxl, pip-installing it if missing, so this runs on any
+    machine with Python 3 + pip."""
+    try:
+        import openpyxl  # noqa: F401
+        return
+    except ImportError:
+        pass
+    print("openpyxl not found - installing...", file=sys.stderr)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--quiet", "openpyxl>=3.1"],
+        check=True,
+    )
+
+
+_ensure_openpyxl()
+import openpyxl  # noqa: E402
+from openpyxl.formatting.rule import CellIsRule  # noqa: E402
+from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
+from openpyxl.utils import get_column_letter  # noqa: E402
 
 RED_FILL = PatternFill(start_color="F4C7C3", end_color="F4C7C3", fill_type="solid")
 HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")

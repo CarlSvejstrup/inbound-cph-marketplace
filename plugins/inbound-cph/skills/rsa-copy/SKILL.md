@@ -25,6 +25,8 @@ A **new file is built from scratch every run** from a bundled `.xlsx` template â
 
 This runs in **Cowork** (Drive connector) and **locally** (write file to disk) â€” no `gws` CLI, no Sheets API.
 
+**Runs on any machine.** The only prerequisite is Python 3 with `pip`. Both scripts self-bootstrap: if `openpyxl` is missing they `pip install` it on first run, so there is no manual setup step. No checked-in virtualenv, no machine-specific paths, no external account auth. If saving to Drive, the Drive connector must be available (Cowork has it); if saving locally, nothing beyond Python is needed.
+
 ## Hard limits (Google rejects over-length, it does not truncate)
 
 | Field | Max chars |
