@@ -47,6 +47,7 @@ def _ensure_openpyxl():
 
 _ensure_openpyxl()
 import openpyxl  # noqa: E402
+from openpyxl.utils import get_column_letter  # noqa: E402
 
 TEMPLATE = Path(__file__).with_name("template.xlsx")
 
@@ -76,6 +77,32 @@ def validate(copy: dict) -> list[str]:
     return errs
 
 
+def _autosize_columns(ws, min_width: int = 6, max_width: int = 60, padding: int = 2) -> None:
+    """Set each column's width to fit its widest cell (header or data).
+
+    LEN cells holding =LEN(...) formulas would be measured as the formula string
+    (long) instead of the rendered number (short). We skip those by giving any
+    LEN-header column a fixed narrow width.
+    """
+    for col_idx, col_cells in enumerate(ws.iter_cols(min_row=1, max_row=ws.max_row), start=1):
+        header = col_cells[0].value
+        letter = get_column_letter(col_idx)
+        if header == "LEN":
+            ws.column_dimensions[letter].width = 6
+            continue
+        widest = 0
+        for cell in col_cells:
+            v = cell.value
+            if v is None:
+                continue
+            text = str(v)
+            if text.startswith("="):
+                continue
+            widest = max(widest, len(text))
+        width = max(min_width, min(max_width, widest + padding))
+        ws.column_dimensions[letter].width = width
+
+
 def fill(copy: dict, out: Path) -> None:
     wb = openpyxl.load_workbook(TEMPLATE)
     ws = wb["RSA"]
@@ -95,6 +122,8 @@ def fill(copy: dict, out: Path) -> None:
         ws[FINAL_URL_CELL] = copy["final_url"]
     if copy.get("final_mobile_url"):
         ws[FINAL_MOBILE_URL_CELL] = copy["final_mobile_url"]
+
+    _autosize_columns(ws)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     wb.save(out)

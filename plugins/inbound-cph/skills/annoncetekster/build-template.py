@@ -98,13 +98,17 @@ def build() -> dict:
             )
             col += 1
 
-    # Pre-seed the Inbound convention values
-    ws[cell_map["Campaign"]] = "IC | GSN | Generic |"
+    # Pre-seed only the constant value. Campaign is built per-run from
+    # AskUserQuestion intake; fill-sheet.py overwrites cell A2.
     ws[cell_map["Ad type"]] = "Responsive search ad"
 
-    # Reasonable column widths
+    # Column widths: narrow for LEN cells, wider for text. fill-sheet.py
+    # auto-resizes again after writing the actual copy, so these are just
+    # sensible defaults for an empty template.
     for c in range(1, col):
-        ws.column_dimensions[get_column_letter(c)].width = 18
+        letter = get_column_letter(c)
+        header = ws.cell(row=1, column=c).value
+        ws.column_dimensions[letter].width = 6 if header == "LEN" else 18
 
     out = Path(__file__).with_name("template.xlsx")
     wb.save(out)
