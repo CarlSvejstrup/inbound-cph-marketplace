@@ -1,6 +1,6 @@
 ---
 name: annoncetekster-v2
-description: Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake (USP-hierarki, aktivt tilbud, trust-tal, brand voice, banned words) og keyword-data fra Google Ads MCP. Bygger 20-25 headline-kandidater, vaelger de 15 bedste efter en fast angle-taxonomi (brand+keyword, keyword-led, benefit, feature, social proof, urgency, CTA, garanti, location), haandhaever Sentence case, varieret laengde og Google's 2026 disapproval-regler. Aflever et Google Ads Editor-klart regneark med live tegntaelling, roede advarsler og kampagnenavn bygget efter Inbounds navngivningskonvention (IC | NETVÆRK | Maalretning | Kampagnenavn | Eventuelt for Search/Shopping/pMax, IC | FORMAT | KAMPAGNENAVN | MÅLRETNING for Display/YT/DG, YYYY-MD - IC - Audience type - Audience navn for Audiences). Bruger ALTID AskUserQuestion til intake med forslag — brugeren kan overstyre. Gemmer i Drive eller lokalt. Svarer altid paa dansk. Brug naar brugeren siger "lav annoncetekster v2", "RSA v2", "annoncetekster med keyword-data", "RSA med Google Ads MCP", "annoncer paa landingsside + keywords", eller naar de vil have hoejere copy-kvalitet end den oprindelige annoncetekster-skill.
+description: Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake (USP-hierarki, aktivt tilbud, trust-tal, brand voice, banned words) og keyword-data fra Google Ads MCP. Bygger 20-25 headline-kandidater, vaelger de 15 bedste efter en fast angle-taxonomi (brand+keyword, keyword-led, benefit, feature, social proof, urgency, CTA, garanti, location), haandhaever Sentence case, varieret laengde og Google's 2026 disapproval-regler. Aflever et Google Ads Editor-klart regneark med live tegntaelling, roede advarsler og kampagnenavn bygget efter Inbounds navngivningskonvention (IC | NETVÆRK | Maalretning | Kampagnenavn | Eventuelt for Search/Shopping/pMax, IC | FORMAT | KAMPAGNENAVN | MÅLRETNING for Display/YT/DG, YYYY-MD - IC - Audience type - Audience navn for Audiences). Bruger ALTID AskUserQuestion til intake med forslag — brugeren kan overstyre. Leverer ALTID baade lokal `.xlsx` og Drive-upload uden at spoerge. Svarer altid paa dansk. Brug naar brugeren siger "lav annoncetekster v2", "RSA v2", "annoncetekster med keyword-data", "RSA med Google Ads MCP", "annoncer paa landingsside + keywords", eller naar de vil have hoejere copy-kvalitet end den oprindelige annoncetekster-skill.
 ---
 
 # annoncetekster-v2
@@ -100,12 +100,13 @@ Disse fem felter er aarsagen til at v2 eksisterer. Spring dem ALDRIG over — de
     - **MCP er tilgaengelig** (brugeren har Google Ads MCP koblet paa): spoerg om Ads-konto-ID (eller foreslå konto baseret paa klientnavn). Brug MCP til at hente top 10-20 keywords for kontoen, rangeret efter impressions eller conversions. Vis dem som options — brugeren vaelger de 3-5 top-keywords der skal staa i copy. Begrund: top-keyword skal staa i mindst 3 headlines for Google's relevans-score.
     - **MCP er IKKE tilgaengelig** paa denne bruger: be brugeren manuelt skrive 3-5 top-keywords (eller liste fra et Search Terms-eksport). Vis "(brug landingssidens hovedtermer)" som default-option hvis brugeren ikke har keyword-data.
 
-### C. Gem-destination
-15. **Gem hvor?** — to options:
-    - **Drive** — efterfoelgende `AskUserQuestion` om destinationsmappe (foreslå klientnavn → kendt mappe under `${user_config.inbound_root_folder_id}` hvis muligt).
-    - **Lokalt** — efterfoelgende `AskUserQuestion` om sti (default cwd som foerste option).
+Bekraeft det samlede scope (klient, URL, kampagnenavn, USP-hierarki, tilbud, trust-tal, voice, keywords) i én tekstbesked foer du gaar til Trin 2.
 
-Bekraeft det samlede scope (klient, URL, kampagnenavn, USP-hierarki, tilbud, trust-tal, voice, keywords, gem-destination) i én tekstbesked foer du gaar til Trin 2.
+**Gem-destination spoerges IKKE.** Skillet leverer ALTID begge formater:
+1. Skriver `.xlsx` lokalt i cwd (eller den sti brugeren har implicit i kontexten).
+2. Uploader samme fil til Drive via connector — destinationen er klientens kendte mappe under `${user_config.inbound_root_folder_id}` hvis den kan resolves fra klientnavnet, ellers brugerens Drive-rod med en kommentar om at den kan flyttes.
+
+Begge gemninger er stadig eksterne writes — bed om eksplicit bekraeftelse en gang foer du skriver dem (det daekker begge).
 
 ## Navngivnings-skabelon — byg kampagnenavnet
 
@@ -228,24 +229,25 @@ Hvis scriptet afviser pga. for lange felter: ret copy'en og koer igen. Output er
 
 ## Trin 6 — Gem (write — gated)
 
-Foreslaa gem-handlingen, vent paa bekraeftelse.
+Skillet leverer ALTID begge formater. Bed om eksplicit bekraeftelse en gang foer du skriver — den daekker baade lokal-fil og Drive-upload.
 
-**Drive:** upload `.xlsx` via Drive-connector `create_file`:
+**Lokal:** `fill-sheet.py` har allerede skrevet `.xlsx` til disk i Trin 5 (default cwd). Det er den ene af de to leverancer — ingen ekstra handling.
+
+**Drive:** upload samme `.xlsx` via Drive-connector `create_file`:
 - `title`: `RSA - <klient> - <YYYY-MM-DD>`
-- `parentId`: mappen fra intake
+- `parentId`: klientens kendte mappe under `${user_config.inbound_root_folder_id}` hvis den kan resolves fra klientnavnet; ellers brugerens Drive-rod (naevn det i output saa brugeren ved at filen kan flyttes).
 - `contentMimeType`: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
 - `base64Content`: base64 af `.xlsx`-filen
 
 Filen lander som en redigerbar Office-mode-fil i Drive. `=LEN()`-formler regner live, og farvereglerne virker — bekraeftet ved test.
 
-**Lokalt:** filen er allerede skrevet af `fill-sheet.py` til den valgte sti. Bekraeft stien.
-
 ## Trin 7 — Output
 
 Lever:
-1. **Link til Drive-filen** (eller den lokale sti).
-2. **En tabel** med alle 19 strenge + tegnantal, saa brugeren ser alt er sikkert.
-3. **Naeste skridt (manuelt, human-in-the-loop):** del filen med kunden til review (skillen deler IKKE selv), og efter kundens rettelser: importer arket i Google Ads Editor.
+1. **Lokal sti** til `.xlsx`-filen paa disken.
+2. **Drive-link** til samme fil uploadet via connector.
+3. **En tabel** med alle 19 strenge + tegnantal, saa brugeren ser alt er sikkert.
+4. **Naeste skridt (manuelt, human-in-the-loop):** del filen med kunden til review (skillen deler IKKE selv), og efter kundens rettelser: importer arket i Google Ads Editor.
 
 Del aldrig filen med kunden automatisk. Send aldrig nogen mail. Praesenter linket — Carl/brugeren videresender.
 
@@ -253,7 +255,8 @@ Del aldrig filen med kunden automatisk. Send aldrig nogen mail. Praesenter linke
 
 ```
 Annonce-ark klar: RSA - Nordkap Friluft - 2026-05-27
-Gemt i Drive: https://docs.google.com/.../<file id>
+Lokal: /Users/carl/work/RSA - Nordkap Friluft - 2026-05-27.xlsx
+Drive: https://docs.google.com/.../<file id>
 
 | # | Headline | Tegn |
 |---|---|---|
