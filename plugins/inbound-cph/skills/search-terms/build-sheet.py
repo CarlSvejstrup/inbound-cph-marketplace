@@ -4,7 +4,7 @@
 Layout follows the field-tested template a user produced for Dansk Studie Center,
 with one addition: a dedicated Vindere tab (converting terms not yet exact keywords).
 Eight sheets:
-  Oversigt | Alle search terms | Relevante (tilfoej keyword) | Vindere (promover til exact)
+  Oversigt | Alle search terms | Godt placeret (ingen handling) | Vindere (promover til exact)
   | Forkert placeret | Irrelevante (tilfoej negativ) | Graensetilfaelde | Anbefalede negatives
 
 Colours, header style, classification row-fills, and freeze panes are baked into the
@@ -28,7 +28,7 @@ Input JSON schema (lists may be empty; missing keys render blank):
   "offering": ["Grupperejser for unge ...", "Destinationer: ...", ...],  // landing-page grounded
   "method_notes": ["Data hentet via GAQL ...", "Cost konverteret fra micros ...", ...],
   "distribution": [                       // Oversigt fordelingstabel; order as you want shown
-     {"kategori":"RELEVANT (tilfoej som keyword)","antal":123,"spend":10419.44},
+     {"kategori":"GODT PLACERET (ingen handling)","antal":123,"spend":10419.44},
      {"kategori":"VINDER (promover til exact)","antal":12,"spend":4200.0},
      ...
   ],
@@ -206,7 +206,7 @@ def build(data, out_path):
     _write_term_tab(wb, "Alle search terms", rows)
 
     # --- Per-class tabs ---
-    _write_term_tab(wb, "Relevante (tilfoej keyword)", by_class("RELEVANT"))
+    _write_term_tab(wb, "Godt placeret (ingen handling)", by_class("RELEVANT"))
     _write_term_tab(wb, "Vindere (promover til exact)", by_class("VINDER"))
     _write_term_tab(wb, "Forkert placeret", by_class("FORKERT_PLACERET"))
     _write_term_tab(wb, "Irrelevante (tilfoej negativ)", by_class("IRRELEVANT"))

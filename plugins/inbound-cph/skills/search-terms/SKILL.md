@@ -19,7 +19,7 @@ Trigger phrases: "search term analyse", "soegetermer for [klient]", "find spild"
 
 A **keyword** is what you bid on. A **search term** is what the user actually typed, matched to a keyword via match types and Google close variants (`NEAR_PHRASE`, `NEAR_EXACT`, `BROAD`). The search terms report is where spend leaks. We sort every term into one of five classifications (taxonomy field-tested by an Inbound user, plus VINDER):
 
-1. **RELEVANT** - matches the client's offering, sitting in the right place -> keep, and consider adding as an explicit keyword.
+1. **RELEVANT (godt placeret)** - matches the client's offering and is already correctly served, typically because it is already its own exact keyword -> **no action**, this is a health signal. Do NOT tell the user to "add as keyword" here: if the triggering keyword equals the term at EXACT match, it already is a keyword. The "add as keyword" action belongs in VINDER, not here.
 2. **VINDER** - converts well and is not yet its own exact keyword -> promote to an exact keyword so we control bid and quality. (The one action the user's original template did not separate out.)
 3. **FORKERT_PLACERET** - the term already exists as a keyword in a *different* ad group, so it is stealing traffic from where it should land -> add as a negative in the current ad group and let the right keyword serve it.
 4. **IRRELEVANT** - wrong intent for this client (a service/word the client does not offer, competitor, off-category) -> add as a negative keyword.
@@ -132,7 +132,7 @@ Classify each term into exactly one bucket, in this priority order:
 
 3. **VINDER** - converts well and is **not already its own exact keyword** for the ad group it served in: `conversions >= 1` AND `cpa <= account_cpa * WINNER_CPA_MULT` (reliable account_cpa) else `conversions >= WINNER_MIN_CONV`. Begrundelse: "Konverterer godt (X konv, CPA Y kr), ikke eget exact keyword - promover til exact." Record "Eksisterer som keyword?" (Nej / Ja, broad-phrase).
 
-4. **RELEVANT** - matches the offering and is correctly placed (already an exact keyword, or simply on-intent and well-located). Begrundelse: "Core-soegning der matcher udbuddet, godt placeret."
+4. **RELEVANT (godt placeret)** - matches the offering and is correctly placed: already an exact keyword, or on-intent and well-located. **No action.** Begrundelse: "Core-soegning der matcher udbuddet, godt placeret." Never write "tilfoej som keyword" for a term that already triggers via an EXACT keyword equal to itself - that is a contradiction the live test exposed.
 
 5. **GRAENSE** - generic/ambiguous, cannot be confidently assigned (e.g. a broad head term that could be relevant or not). Begrundelse: "Generisk soegning - vurder manuelt." Honest bucket; do not force these.
 
@@ -183,7 +183,7 @@ Note column widths, header style, and classification fills come from `build-shee
 |---|---|
 | Oversigt | konto-ID, periode, scope, filter, fordelingstabel (antal + spend pr. bucket + TOTAL), klientens udbud, metode-noter |
 | Alle search terms | hver term een gang, klassificerings-kolonne farvet pr. bucket |
-| Relevante (tilfoej keyword) | RELEVANT-termer |
+| Godt placeret (ingen handling) | RELEVANT-termer (allerede korrekt placeret, intet at goere) |
 | Vindere (promover til exact) | VINDER-termer |
 | Forkert placeret | FORKERT_PLACERET-termer |
 | Irrelevante (tilfoej negativ) | IRRELEVANT-termer |
