@@ -1,10 +1,22 @@
 # search-terms skill spec
 
-Design doc for the search-terms analysis skill. The SKILL.md is built from this. This file is the source of truth for the logic; if they ever disagree, fix the SKILL.md to match this, not the other way around.
+Design doc for the search-terms analysis skill. **As of v0.7.0, SKILL.md + build-sheet.py are the source of truth**; this file is the original design rationale (the GAQL/micros/grain verification and threshold reasoning below still hold). Where this file's *taxonomy* disagrees with SKILL.md, SKILL.md wins.
+
+## v0.7.0 revision (read this first)
+
+The original taxonomy below (Spild / Vinder / Irrelevant / Nyt emne) was superseded after a user produced a field-tested template (Dansk Studie Center). The shipped taxonomy is now five buckets, grounded in the client's scraped offering:
+
+- **RELEVANT** - matches offering, correctly placed.
+- **VINDER** - converts well, not yet an exact keyword -> promote (our addition to the user's template).
+- **FORKERT_PLACERET** - already a keyword in a *different* ad group, stealing traffic -> negative in current ad group (the user's insight; we had missed it).
+- **IRRELEVANT** - not part of the client's offering / off-intent -> negative.
+- **GRAENSE** - generic/ambiguous -> manual review.
+
+Output is an eight-tab `.xlsx` (Oversigt, Alle search terms, the five per-bucket tabs, Anbefalede negatives) built by `build-sheet.py`, matching the user's layout + colours. The "Anbefalede negatives" tab is an import-ready list. Default window is 90 days. The kept-from-our-version pieces: aggregation per term, ENABLED-only filter, CPA + low-confidence handling. See SKILL.md for the runnable contract.
 
 ## Purpose
 
-Run a focused, action-oriented search terms analysis for one Google Ads client and deliver a colour-coded Google Sheet that tells the ads team exactly what to do: which search terms to block, which to promote to keywords, and which themes to expand into.
+Run a focused, action-oriented search terms analysis for one Google Ads client and deliver a colour-coded spreadsheet that tells the ads team exactly what to do: which terms to keep, promote, re-place, or block.
 
 This is the deep, single-purpose version of the "Keywords & negative keywords" module in `ads-audit`. ads-audit gives a broad diagnosis across 12 modules; this skill does one thing thoroughly and hands back a worklist, not a slide deck.
 
