@@ -1,6 +1,6 @@
 ---
 name: annoncetekster
-description: Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside og aflever dem i et Google Ads Editor-klart regneark. Analyserer landingssiden, skriver 15 overskrifter + 4 beskrivelser + 2 stier inden for Googles tegngraenser, og bygger en frisk .xlsx fra en indbygget skabelon med live tegntaelling og roede advarsler naar en tekst bliver for lang. Gemmer i Drive (brugeren vaelger mappen) eller lokalt. Svarer altid paa dansk. Brug naar brugeren siger "lav annoncetekster til [kunde]", "RSA til [landingsside]", "lav et annonce-ark", "responsive search ad", eller "tekster ud fra landingsside".
+description: Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside og aflever dem i et Google Ads Editor-klart regneark, med kampagnenavn bygget efter Inbounds navngivningskonvention (IC | NETVÆRK | Maalretning | Kampagnenavn | Eventuelt for Search/Shopping/pMax, IC | FORMAT | KAMPAGNENAVN | MÅLRETNING for Display/YT/DG, YYYY-MD - IC - Audience type - Audience navn for Audiences). Analyserer landingssiden, skriver 15 overskrifter + 4 beskrivelser + 2 stier inden for Googles tegngraenser, og bygger en frisk .xlsx fra en indbygget skabelon med live tegntaelling og roede advarsler naar en tekst bliver for lang. Bruger ALTID AskUserQuestion til intake med forslag baseret paa konventionen — brugeren kan overstyre. Gemmer i Drive (brugeren vaelger mappen) eller lokalt. Svarer altid paa dansk. Brug naar brugeren siger "lav annoncetekster til [kunde]", "RSA til [landingsside]", "lav et annonce-ark", "responsive search ad", eller "tekster ud fra landingsside".
 ---
 
 # annoncetekster
@@ -37,7 +37,7 @@ This runs in **Cowork** (Drive connector) and **locally** (write file to disk) �
 
 ## Column contract (baked into template.xlsx)
 
-This IS the Google Ads Editor import schema. Header row 1, single data row 2. Every text column is followed by a `LEN` column. Pre-seeded: `Campaign = "IC | GSN | Generic |"`, `Ad type = "Responsive search ad"`.
+This IS the Google Ads Editor import schema. Header row 1, single data row 2. Every text column is followed by a `LEN` column. Pre-seeded: `Ad type = "Responsive search ad"`. `Campaign`-cellen overskrives ved hver koersel med det navn brugeren bekraefter i Trin 1.
 
 ```
 Campaign | Ad Group | Ad type | Labels |
@@ -53,17 +53,82 @@ Laes `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` foer noget andet. Den indeholder write-ga
 
 **Sprog: alt foregaar paa dansk** — spørgsmål i intake, statusbeskeder, output-tabellen og naeste-skridt. Skift kun til engelsk hvis brugeren skriver til dig paa engelsk eller udtrykkeligt beder om det. Selve annonceteksterne skrives ogsaa paa dansk (se Trin 3).
 
-## Trin 1 — Intake (eet spoergsmaal ad gangen)
+## Hard rule — brug ALTID AskUserQuestion til intake
 
-1. **Klientnavn** — bruges i fil-titlen.
-2. **Landingsside-URL** — den side teksterne skal afspejle.
-3. **Kampagnenavn** — default `IC | GSN | Generic |`. Tilbyd default, lad brugeren overstyre.
-4. **Ad group-navn** (valgfrit) — default tom.
-5. **Gem hvor?** — to valg:
-   - **Drive** — spoerg om destinationsmappe (mappenavn eller -ID, eller klientnavn der mapper til en kendt klientmappe under `${user_config.inbound_root_folder_id}`). Brug det som `parentId`.
-   - **Lokalt** — spoerg om sti (default cwd). Filen skrives til disk.
+Hvert intake-felt (klientnavn, landingsside, netvaerk/format, maalretning, kampagnenavn, ad group, gem-destination) skal spoerges via `AskUserQuestion` med konkrete forslag som options. Gaet aldrig vaerdier. Hvis du har et logisk default, vis det som **foerste option** med `(Anbefalet)` i label — brugeren kan altid vaelge "Other" og skrive sin egen vaerdi.
 
-Bekraeft scope foer du fortsaetter.
+Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fange afvigelser (fx pMax i stedet for GSN, brand-kampagne i stedet for generic) foer arket genereres. Friform-input giver inkonsistente kampagnenavne som senere skal renses i Editor.
+
+## Trin 1 — Intake (eet AskUserQuestion ad gangen)
+
+Spoerg i denne raekkefoelge. Hvert trin er et separat `AskUserQuestion`-kald.
+
+1. **Klientnavn** — fri tekst via AskUserQuestion (én option `(Anbefalet)` hvis konteksten allerede har et klientnavn fra samtalen, ellers bare "Other"). Bruges i fil-titlen og som `Eventuelt`-feltet i kampagnenavnet.
+2. **Landingsside-URL** — fri tekst. Hvis brugeren har naevnt en URL tidligere i samtalen, foreslå den som første option.
+3. **Kampagnetype** — bestemmer hvilken navngivningsskabelon der bruges. Options:
+   - Search / Shopping / pMax  — skabelon: `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
+   - Display / YouTube / Demand Gen — skabelon: `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
+   - Audience — skabelon: `YYYY-MD - IC - Audience type - Audience navn`
+4. **Netvaerk / Format** — afhaenger af kampagnetype (se "Navngivnings-skabelon" nedenfor).
+5. **Maalretning** — afhaenger af kampagnetype.
+6. **Kampagnenavn / produkt** — det specifikke produkt eller tema (fx "Alarmsystemer", "Bliv groennere sammen", "Gratis introforloeb").
+7. **Eventuelt** (kun Search/Shopping/pMax, valgfrit) — fx brandnavn "Securitas". Vis "(ingen)" som første option.
+8. **Foreslået kampagnenavn** — saml svarene til en streng efter den valgte skabelon, og vis den som første option `(Anbefalet)` i et sidste `AskUserQuestion`. Brugeren bekraefter eller skriver et frit alternativ via "Other".
+9. **Ad group-navn** (valgfrit) — default tom (foerste option: `(tom)`).
+10. **Gem hvor?** — to options:
+    - **Drive** — efterfoelgende `AskUserQuestion` om destinationsmappe (foreslå klientnavn → kendt mappe under `${user_config.inbound_root_folder_id}` hvis muligt).
+    - **Lokalt** — efterfoelgende `AskUserQuestion` om sti (default cwd som foerste option).
+
+Bekraeft det samlede scope (klient, URL, kampagnenavn, gem-destination) i én tekstbesked foer du gaar til Trin 2.
+
+## Navngivnings-skabelon — byg kampagnenavnet
+
+Saml svarene efter den skabelon som matcher kampagnetypen. Vis ALTID resultatet til brugeren via et `AskUserQuestion` med strengen som foerste option `(Anbefalet)` — brugeren kan overstyre.
+
+### Search / Shopping / pMax
+Skabelon: `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
+
+| Felt | Mulige vaerdier (vis som options) |
+|---|---|
+| NETVÆRK | `GSN` (Google Search Network), `Shopping`, `pMax` |
+| Målretning | `Brand`, `Product`, `Generic`, `brand products` (kun Shopping) |
+| Kampagnenavn | fri tekst (produkt/tema) |
+| Eventuelt | fri tekst eller `(ingen)` — typisk brandnavn |
+
+Eksempler:
+- `IC | GSN | Brand | Securitas`
+- `IC | GSN | Product | Alarmsystemer`
+- `IC | GSN | Generic | Alarmsystemer`
+- `IC | Shopping | Generic | Alarmsystemer`
+- `IC | Shopping | brand products | Alarmsystemer`
+- `IC | pMax | Generic | Alarmsystemer`
+
+### Display / YouTube / Demand Gen
+Skabelon: `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
+
+| Felt | Mulige vaerdier |
+|---|---|
+| FORMAT | `GDN` (Google Display Network), `YT` (YouTube), `DG` (Demand Gen) |
+| KAMPAGNENAVN | fri tekst (kampagne/tema) |
+| MÅLRETNING | `Reach`, `Retargeting`, `Awareness`, `Consideration`, `Conversion` (eller fri tekst via "Other") |
+
+Eksempler:
+- `IC | GDN | Webinarer | Reach`
+- `IC | YT | Bliv groennere sammen | Retargeting`
+- `IC | DG | Gratis introforloeb | Retargeting`
+
+### Audience
+Skabelon: `YYYY-MD - IC - Audience type - Audience navn`
+
+| Felt | Vaerdi |
+|---|---|
+| YYYY-MD | Indeværende år + maaned uden ledende nul (fx `2025-1`, ikke `2025-01`). Brug dagens dato som default. **Bemærk:** eksemplerne fra Inbound bruger `2025-01` med ledende nul — spoerg brugeren om begge varianter via AskUserQuestion. |
+| Audience type | `Custom Intent`, `Retargeting`, `Affinity`, `In-Market`, `Similar`, `Lookalike` (eller fri tekst) |
+| Audience navn | fri tekst (fx "Søgninger paa HR system", "Alle besøgende") |
+
+Eksempler:
+- `2025-01 - IC - Custom Intent - Søgninger paa HR system`
+- `2025-01 - IC - Retargeting - Alle besøgende`
 
 ## Trin 2 — Analyser landingssiden
 
@@ -81,10 +146,10 @@ Variér headlines paa vinkel saa Google har reelt materiale at teste: USP, pris/
 - **Annonceteksterne skrives paa dansk** (medmindre landingssiden tydeligt er paa et andet sprog — saa matcher du sidens sprog).
 - **Laengde-selvtjek:** for hver streng, taeel tegn. Skriv om enhver headline > 30, description > 90 eller path > 15 INDEN du gaar videre. `fill-sheet.py` afviser desuden at skrive hvis noget er for langt — men ret det her foerst.
 
-Skriv copy'en til en `copy.json`:
+Skriv copy'en til en `copy.json`. Brug det kampagnenavn brugeren bekraeftede i intake (Trin 1, punkt 8):
 ```json
 {
-  "campaign": "IC | GSN | Generic |",
+  "campaign": "IC | GSN | Generic | Alarmsystemer",
   "ad_group": "",
   "headlines": ["...", "... (op til 15)"],
   "descriptions": ["...", "... (op til 4)"],
