@@ -1,21 +1,21 @@
 ---
-name: annoncetekster-v2
-description: Lav Google Ads Responsive Search Ad-tekster i høj kvalitet fra en kundes landingsside, med keyword-data fra Google Ads MCP og udvidet intake (USP, tilbud, trust-tal, brand voice). Aflever et Google Ads Editor-klart regneark navngivet efter Inbounds konvention. Brug når brugeren siger "lav annoncetekster", "RSA til [klient]", "annonce-ark", "responsive search ad", "tekster ud fra landingsside", eller beder om højere kvalitet end annoncetekster v1. Svarer på dansk.
+name: responsive-search-ads
+description: Lav Google Ads Responsive Search Ad-tekster i høj kvalitet fra en kundes landingsside, med keyword-data fra Google Ads MCP og udvidet intake (USP, tilbud, trust-tal, brand voice). Kan lave 1 eller flere RSA'er per ad group i ét Editor-klart regneark, navngivet efter Inbounds konvention. Brug når brugeren siger "lav annoncetekster", "RSA til [klient]", "annonce-ark", "responsive search ad", "tekster ud fra landingsside", eller beder om annoncetekster til en Google Ads-kampagne. Svarer på dansk.
 ---
 
-# annoncetekster-v2
+# responsive-search-ads
 
 Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake og keyword-data fra Google Ads MCP, og aflever dem i et regneark der kan importeres direkte i Google Ads Editor. Hele forløbet og alt output er på dansk.
-
-**v2 vs v1:** v1 (`annoncetekster`) skriver annoncetekster ud fra landingsside + kampagnenavn. v2 tilføjer fem ekstra intake-felter (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP), et valgfrit trin der **lærer af kundens egne top-performende annoncer** (Trin 2.5 — kun aktive annoncer, kun budskabs-mønstre), og håndhæver skrive-reglerne fra `references/headline-craft.md` (angle-taxonomi, Sentence case, længde-variation, 2026 disapproval-policy). Bruges når kvaliteten af annonceteksterne skal være højere end v1's generiske default.
 
 ## Why this skill exists
 
 The ads team turns a client's landing page into RSA ad copy, fills a sheet, sends it to the client for review, then imports the corrected sheet into Google Ads Editor. The slow, skilled part is the landing-page analysis + copywriting under hard character limits. The risky part is the client editing a headline too long and it sneaking back over-length. This skill automates the copywriting and ships a sheet with live char-count + red color-code so over-length text is caught the moment the client types it.
 
+Det er bygget op om en udvidet intake (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP), et valgfrit trin der **lærer budskab af kundens egne top-performende annoncer** (Trin 2.5 — kun aktive annoncer), og de testede skrive-regler i `references/headline-craft.md` (angle-taxonomi, Sentence case, længde-variation, 2026 disapproval-policy).
+
 ## When to use
 
-Trigger phrases: "lav annoncetekster", "RSA til", "annonce-ark", "responsive search ad", "tekster til [klient]", "annoncetekster ud fra landingsside".
+Trigger-fraser: "lav annoncetekster", "RSA til", "annonce-ark", "responsive search ad", "tekster til [klient]", "annoncetekster ud fra landingsside".
 
 ## How it works (architecture — read once)
 
@@ -73,7 +73,7 @@ Google Ads Editor importerer **én række per annonce**. Gentager man `Campaign`
 
 Hårde grænser og kvalitets-gates køres **per RSA**; fejl labelles med "RSA 2, Headline 4: …" så du ved hvilken annonce der skal rettes.
 
-**Hvor mange RSA'er?** Default er **1**. Spørg kun om flere når brugeren beder om det, eller ad group'et tydeligt mangler annonce-diversitet. Best practice har drevet mod **1-2 RSA'er med høj Ad Strength** frem for 3 tynde — så 2 stærke slår 3 svage. Lav aldrig 3 bare for at lave 3.
+*Antallet af RSA'er og deres vinkler vælges af brugeren i intake (Trin 1, Kald 1, spørgsmål 4) — default 1. Selve vinkel-strategien står i Trin 4.*
 
 ## Trin 0 — Kontekst
 
@@ -91,9 +91,7 @@ Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fan
 
 ## Trin 1 — Intake (få AskUserQuestion-kald, mange felter per kald)
 
-`AskUserQuestion` tager op til 4 spørgsmål per kald — udnyt det. Saml relaterede felter i ét kald i stedet for at sende 8 separate kald. Mål: hele intaken på 3-4 kald i alt.
-
-Udled så meget som muligt fra samtalen og landingssiden FØR du spørger. Hvis Carl allerede har sagt klientnavn og URL i samme besked, behøver du ikke spørge om dem — bekræft dem som første option `(Anbefalet)` i det første kald, eller spring dem helt over og gå direkte til kampagnetype.
+Følg "Hard rule" ovenfor: saml relaterede felter, hold dig til 3-4 kald i alt. Udled så meget som muligt fra samtalen og landingssiden FØR du spørger. Hvis Carl allerede har sagt klientnavn og URL i samme besked, behøver du ikke spørge om dem — bekræft dem som første option `(Anbefalet)` i det første kald, eller spring dem helt over og gå direkte til kampagnetype.
 
 ### Kald 1 — Identitet, kampagnetype, sprog og antal RSA'er (1 AskUserQuestion, op til 4 spørgsmål)
 
@@ -135,15 +133,11 @@ Ad group-navnet spørges IKKE — default er tom. Hvis Carl vil sætte en, kan h
 
 ### Mellemtrin — scrape landingssiden FØR kald 4
 
-Kør Trin 2 (Firecrawl-scrape af landingssiden) NU, før du sender kald 4. Det er hele pointen med v2: vi vil vise konkrete options fra siden i stedet for friform-tekst. Uden scrape bliver kald 4 til 4 friform-spørgsmål, og brugeroplevelsen bliver dårligere end v1.
+Kør Trin 2 (Firecrawl-scrape af landingssiden) NU, før du sender kald 4. Pointen: vi vil vise konkrete options fra siden i stedet for friform-tekst, så brugeren kan klikke sig igennem. Uden scrape bliver kald 4 til 4 friform-spørgsmål og en dårligere oplevelse.
 
 ### Kald 4 — Tekst-inputs (1 AskUserQuestion, 4 spørgsmål)
 
-Dette er det tunge kald — det henter alt der driver kvaliteten af annonceteksterne. Hvert spørgsmål skal vise 3-4 konkrete options fra scrape som første options, "Other" som sidste.
-
-Disse felter er årsagen til at v2 eksisterer — de er forskellen mellem generiske annoncetekster og annoncetekster der konverterer.
-
-**Spørg om dem i ÉT `AskUserQuestion`-kald med 4 spørgsmål.** Scrape landingssiden FØR du sender kaldet, så du kan foreslå konkrete options fra siden i hvert spørgsmål (det er hele pointen med v2 — brugeren skal kunne klikke sig igennem, ikke skrive fritekst).
+Dette er det tunge kald — det henter alt der driver kvaliteten af annonceteksterne, og er forskellen mellem generiske annoncetekster og annoncetekster der konverterer. Spørg om alle fire i ÉT kald. Hvert spørgsmål viser 3-4 konkrete options fra scrapen som første options, "Other" som sidste.
 
 De 4 spørgsmål i samme kald:
 
@@ -227,19 +221,17 @@ Eksempler:
 
 ## Trin 2 — Analyser landingssiden
 
-Scrape URL'en med Firecrawl. Udtræk konkret:
+Scrape URL'en med Firecrawl. Udtræk konkret (hver linje fodrer et option-sæt i Kald 4):
 - **Produkt/ydelse** — hvad sælger de.
-- **USP-kandidater** — hvad gør de anderledes (bruges til intake-spørgsmål 10).
-- **Tone of voice** — formel, venlig, teknisk, energisk (bruges til intake-spørgsmål 13).
+- **USP-kandidater** — hvad gør de anderledes.
+- **Tone of voice** — formel, venlig, teknisk, energisk.
 - **CTA'er på siden** — hvilke handlinger styrer de mod ("Få et tilbud", "Bestil demo", "Køb nu").
-- **Trust-signaler med tal** — anmeldelses-score + antal, kunde-antal, år etableret, certificeringer, awards (bruges til intake-spørgsmål 12).
-- **Pris/tilbud** — hvis et aktivt tilbud står på siden (bruges til intake-spørgsmål 11).
+- **Trust-signaler med tal** — anmeldelses-score + antal, kunde-antal, år etableret, certificeringer, awards.
+- **Pris/tilbud** — hvis et aktivt tilbud står på siden.
 - **Brandnavn og logo-tekst.**
 - **Sidens sprog** — det sprog brugeren valgte i Kald 1 styrer annonceteksterne. Hvis sidens sprog afviger fra det valgte: nævn det for brugeren før du skriver teksterne — gæt ikke, og skift ikke sprog på egen hånd.
 
 Hvis siden ikke kan hentes: sig det og stop. Vi opfinder ikke claims.
-
-Hvis du allerede har scrapet siden FØR Trin 1's USP/trust/tilbud-spørgsmål: brug scrapen til at foreslå konkrete options i `AskUserQuestion` i stedet for friform-svar. Det er hele pointen med v2.
 
 ## Trin 2.5 — Lær af kundens top-annoncer (valgfrit — kun hvis konto + MCP)
 
@@ -303,26 +295,14 @@ Tilføj senere i output (Trin 7) at top-annonce-analysen brugte Google Ads MCP (
 
 ## Trin 3 — Læs skrive-reglerne
 
-**FØR du skriver annonceteksterne:** læs `${CLAUDE_PLUGIN_ROOT}/skills/annoncetekster-v2/references/headline-craft.md`. Den indeholder:
-
-- Den faste 15-headline angle-fordeling (brand+keyword, keyword-led, benefit, feature, social proof, urgency, CTA, garanti, location).
-- Længde-variation-mål (4-5 korte, 6-7 mellem, 3-4 lange).
-- Sentence case-reglen (3.7× CPA-forskel — det er ikke smag).
-- Keyword-tilstedeværelse-kravet (top-keyword i ≥3 headlines).
-- 2026 disapproval-forbud (emojis, superlativer uden bevis, "klik her", konkurrent-brands).
-- Description-fordelingen (benefit+CTA / feature+proof / trust+garanti / urgency+benefit).
-- Kvalitets-check-listen du gennemgår før arket bygges.
-
-Disse regler er testet på millioner af annoncer. Følg dem.
+**FØR du skriver annonceteksterne:** læs `${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/references/headline-craft.md`. Den indeholder angle-fordelingen, længde-variation-målene, Sentence case-reglen, keyword-tilstedeværelse, 2026 disapproval-forbud, description-fordelingen og kvalitets-check-listen — testet på millioner af annoncer. Trin 4 nedenfor er den korte huskeliste; reference-filen er den fulde begrundelse, og den vinder ved enhver konflikt.
 
 ## Trin 4 — Generer annoncetekster
 
-Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder angle-fordelingen fra reference-filen. Plus **4 descriptions** og **2 paths**.
-
-Hårde grænser: headlines ≤ 30 tegn, descriptions ≤ 90, paths ≤ 15.
+Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder angle-fordelingen fra reference-filen. Plus **4 descriptions** og **2 paths**. (Hårde grænser: se tabellen øverst — 30/90/15.)
 
 **Regler (uddybet i `references/headline-craft.md`):**
-- **Kunde-stilguide fra Trin 2.5 (hvis den blev kørt):** læn dig på de budskaber, USP'er, hooks og CTA-formuleringer du udledte af kundens top-annoncer. Men kun det semantiske lag — formatering (casing, længde, struktur) følger ALTID `headline-craft.md`, aldrig kundens annoncer. Ved enhver konflikt vinder reference-filen og scriptets gates. (Se firewall-reglen i Trin 2.5.)
+- **Kunde-stilguide fra Trin 2.5 (hvis den blev kørt):** læn dig på de budskaber, USP'er, hooks og CTA-formuleringer du udledte — men kun det semantiske lag. Formatering følger headline-craft.md, ikke kundens annoncer (se firewall-reglen i Trin 2.5).
 - Kun claims der står på landingssiden eller blev bekræftet i intake (USP-hierarki, trust-tal). Ingen opfundne tal, garantier eller priser.
 - **Sentence case overalt** — ikke Title Case.
 - **Top-keyword** (fra Google Ads MCP eller manuelt intake) skal stå i **mindst 3 headlines**.
@@ -404,7 +384,7 @@ Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i in
 ## Trin 5 — Byg arket
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/annoncetekster-v2/fill-sheet.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/fill-sheet.py \
   --ads ads.json \
   --out "RSA - <klient> - <YYYY-MM-DD>.xlsx"
 ```
@@ -467,5 +447,5 @@ Næste: del med kunden til review, importer derefter i Google Ads Editor.
 ## Maintenance
 
 - Layoutet bor ÉT sted: `sheet_layout.py` (`FIELDS`, `COLUMNS`, `build_sheet`, `text_cell`, `autosize_columns`). `build-template.py` og `fill-sheet.py` importerer begge derfra — ret kun `sheet_layout.py`, så følger begge med automatisk. Ingen hardcodede celle-lister at holde i sync længere.
-- Regenerer det committede single-RSA `template.xlsx` (reference + smoke test): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/annoncetekster-v2/build-template.py` (kun når layoutet ændrer sig). Skillen loader IKKE filen ved kørsel — `fill-sheet.py` bygger layoutet friskt for N rækker.
+- Regenerer det committede single-RSA `template.xlsx` (reference + smoke test): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/build-template.py` (kun når layoutet ændrer sig). Skillen loader IKKE filen ved kørsel — `fill-sheet.py` bygger layoutet friskt for N rækker.
 - Skrive-reglerne i `references/headline-craft.md` skal re-checkes hvis Google ændrer disapproval-policy eller Ad Strength-vægtning. Kilder med tal-driven evidens (Optmyzr-studiet) må ikke være over 12 måneder gamle uden ny verifikation.

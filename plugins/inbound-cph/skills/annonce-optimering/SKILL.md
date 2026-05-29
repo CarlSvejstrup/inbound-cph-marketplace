@@ -1,11 +1,11 @@
 ---
 name: annonce-optimering
-description: Diagnosticer en kundes LIVE Google Ads RSA-opsætning efter annoncerne har kørt - asset-hygiejne, ikke profit-dom. Tjekker RSA-dækning per ad group (champion-challenger), finder dødvægt-assets der aldrig serveres, og udleder vinkel-huller der fødes tilbage i annoncetekster-v2 som gap-brief. Læser kun aktive kampagner via Google Ads MCP, anbefaler kun (skriver aldrig til kontoen). Aflever en farvekodet .xlsx. Brug når brugeren siger "optimer annoncer", "annonce-optimering", "tjek RSA-opsætning", "asset-hygiejne", "hvilke headlines virker", "post-launch RSA-tjek", eller vil lukke loopet efter annoncetekster. Svarer på dansk.
+description: Diagnosticer en kundes LIVE Google Ads RSA-opsætning efter annoncerne har kørt - asset-hygiejne, ikke profit-dom. Tjekker RSA-dækning per ad group (champion-challenger), finder dødvægt-assets der aldrig serveres, og udleder vinkel-huller der fødes tilbage i responsive-search-ads som gap-brief. Læser kun aktive kampagner via Google Ads MCP, anbefaler kun (skriver aldrig til kontoen). Aflever en farvekodet .xlsx. Brug når brugeren siger "optimer annoncer", "annonce-optimering", "tjek RSA-opsætning", "asset-hygiejne", "hvilke headlines virker", "post-launch RSA-tjek", eller vil lukke loopet efter annoncetekster. Svarer på dansk.
 ---
 
 # annonce-optimering
 
-Diagnosticer en kundes **live** Google Ads RSA-opsætning efter annoncerne er importeret og har kørt. Skillet er bevidst en **asset-hygiejne-diagnose**, ikke en profit-klassifikator: det rapporterer strukturelle fakta (RSA-dækning, dødvægt-assets, vinkel-huller) der er sande uden statistisk signifikans, og det udleder et **gap-brief** der fødes direkte tilbage i `annoncetekster-v2`. Hele forløbet og alt output er på dansk.
+Diagnosticer en kundes **live** Google Ads RSA-opsætning efter annoncerne er importeret og har kørt. Skillet er bevidst en **asset-hygiejne-diagnose**, ikke en profit-klassifikator: det rapporterer strukturelle fakta (RSA-dækning, dødvægt-assets, vinkel-huller) der er sande uden statistisk signifikans, og det udleder et **gap-brief** der fødes direkte tilbage i `responsive-search-ads`. Hele forløbet og alt output er på dansk.
 
 ## Hvorfor skillet er formet sådan (læs én gang — det er ikke til forhandling)
 
@@ -21,7 +21,7 @@ Derfor: skillet dømmer **aldrig** en asset på dens konverteringsrate. Det rapp
 **Det gør:**
 - Tæller aktive RSA per ad group → flag ad groups med <2 (byg en challenger).
 - Finder dødvægt-assets (aldrig serveret / næsten-nul impressions) → kandidater til at skære.
-- Klassificerer serverede assets på vinkel-type og finder vinkler uden serveret asset → **gap-brief** til `annoncetekster-v2`.
+- Klassificerer serverede assets på vinkel-type og finder vinkler uden serveret asset → **gap-brief** til `responsive-search-ads`.
 - Klassificerer hver asset som DØDVÆGT / FOR NY / AKTIV ud fra `MIN_IMPRESSIONS`.
 
 **Det gør IKKE:**
@@ -99,7 +99,7 @@ For hver asset, beregn `status` (skriv ASCII-enummet i JSON; arket viser den dan
 
 Tærsklen er bevidst en ren impression-grænse (ikke konvertering), fordi CVR-data er upålidelig på disse konti.
 
-For hver asset, udled `vinkel` (benefit / trust / urgency / CTA / feature / keyword-led / brand / location / garanti — samme taksonomi som `annoncetekster-v2/references/headline-craft.md`). Brug asset-teksten.
+For hver asset, udled `vinkel` (benefit / trust / urgency / CTA / feature / keyword-led / brand / location / garanti — samme taksonomi som `responsive-search-ads/references/headline-craft.md`). Brug asset-teksten.
 
 Per ad group: hvilke vinkler har INGEN serveret asset? Det er `manglende_vinkler` → fødes til gap-brief.
 
@@ -109,7 +109,7 @@ Per ad group: hvilke vinkler har INGEN serveret asset? Det er `manglende_vinkler
 
 ## Trin 4 — Byg gap-brief'et (det der lukker loopet)
 
-Saml `manglende_vinkler` per ad group til en `gap_brief`-liste. For hver: et konkret `forslag` til hvilke challenger-headlines `annoncetekster-v2` skal skrive. Det er her build→operate→iterate-loopet lukkes: outputtet fra dette skill er inputtet til næste `annoncetekster-v2`-kørsel.
+Saml `manglende_vinkler` per ad group til en `gap_brief`-liste. For hver: et konkret `forslag` til hvilke challenger-headlines `responsive-search-ads` skal skrive. Det er her build→operate→iterate-loopet lukkes: outputtet fra dette skill er inputtet til næste `responsive-search-ads`-kørsel.
 
 ## Trin 5 — Skriv analysis.json og byg arket
 
@@ -121,7 +121,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/annonce-optimering/build-sheet.py \
   --out "Annonce-optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Output: en `.xlsx` med fanerne — **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler på tværs af alle grupper), **én fane pr. ad group**, og **Gap-brief** (til annoncetekster-v2).
+Output: en `.xlsx` med fanerne — **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler på tværs af alle grupper), **én fane pr. ad group**, og **Gap-brief** (til responsive-search-ads).
 
 Hver ad group-fane åbner med et **overblik** øverst, så man ser gruppens tilstand på et øjeblik før selve tabellen:
 - Ad group + Kampagne (fulde navne — fanenavnet kan være afkortet til Excels 31-tegns-grænse)
@@ -149,7 +149,7 @@ Lever:
 1. **Lokal sti** + **Drive-link** (hvis uploadet).
 2. **Kort opsummering:** antal ad groups uden challenger, antal dødvægt-assets, og de vigtigste vinkel-huller.
 3. **Det ærlige forbehold:** "Rapporten er strukturel hygiejne — den dømmer ikke assets på konverteringsrate, fordi Google-data på disse konti er for tyndt og per-asset-metrics er konfunderede."
-4. **Loop-tilbagekobling:** "Gap-brief'et kan fødes direkte ind i `annoncetekster-v2` til at skrive challenger-headlines."
+4. **Loop-tilbagekobling:** "Gap-brief'et kan fødes direkte ind i `responsive-search-ads` til at skrive challenger-headlines."
 5. **Næste skridt (manuelt, human-in-the-loop):** brugeren beslutter hvilke assets der skæres/bygges; skillet rører aldrig kontoen.
 6. **Datakilder:** Google Ads MCP (`run_custom_gaql`, `ad_group_ad_asset_view` + `ad_group_ad`), vindue brugt.
 
@@ -167,7 +167,7 @@ Drive: https://docs.google.com/.../<file id>
 Forbehold: strukturel hygiejne. Ingen CVR-dom - Google-label er PENDING/NOT_APPLICABLE
 på kontoen, og per-asset-metrics er konfunderede.
 
-Gap-brief'et er klar til at fodre annoncetekster-v2's næste challenger-runde.
+Gap-brief'et er klar til at fodre responsive-search-ads's næste challenger-runde.
 Næste: du beslutter hvad der skæres/bygges. Skillet rører aldrig kontoen.
 ```
 

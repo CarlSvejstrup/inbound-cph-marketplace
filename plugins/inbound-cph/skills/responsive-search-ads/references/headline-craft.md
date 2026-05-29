@@ -6,9 +6,13 @@ Læs denne før du skriver annonceteksterne i Trin 4. Reglerne her er ikke smag 
 
 Generer 20-25 kandidater, vælg de 15 bedste. Det giver bedre variation end at presse præcis 15 ud i første forsøg.
 
-## Headline-fordelingen (lås denne)
+## Headline-fordelingen (consumer-default — counts bøjer pr. branche)
 
-Brug denne fordeling for hver 15-headline-sæt. Det sikrer at Google's algoritme har råt materiale at teste på tværs af forskellige search-intentioner.
+Brug denne fordeling som udgangspunkt for hvert 15-headline-sæt. Den sikrer at Google's algoritme har råt materiale at teste på tværs af forskellige search-intentioner.
+
+**Hvad der er låst vs. hvad der bøjer:**
+- **Låst (gælder altid):** dæk flere *distinkte* vinkler — saml ikke 4 næsten-ens linjer. Og længde-variation (mindst 4 korte <20 tegn). Disse to håndhæves hårdt af `fill-sheet.py`.
+- **Bøjer (pr. branche):** de præcise *antal* pr. vinkel. Tallene nedenfor er kalibreret til et **consumer-produkt** (alarm-eksemplet). De er ikke en universel lov — se "Vinkel-mix pr. branche" nedenfor.
 
 | Angle | Antal | Hvad det er | Dansk eksempel |
 |---|---|---|---|
@@ -25,6 +29,20 @@ Brug denne fordeling for hver 15-headline-sæt. Det sikrer at Google's algoritme
 Hvis brugeren ikke har et aktivt tilbud → drop urgency, erstat med en ekstra benefit eller feature.
 
 Hvis klienten ikke har et stort brand → drop den ene brand+keyword og læg den i benefit-bunken.
+
+### Vinkel-mix pr. branche (afvigelser der ER rigtige)
+
+Køberen bestemmer mixet. En afvigelse fra consumer-defaulten er ikke en fejl — den er forkert *uden grund*. I den obligatoriske vinkel-audit (se SKILL.md Trin 4) skriver du grunden på én linje.
+
+| Branche / købstype | Skru OP | Skru NED / drop | Hvorfor |
+|---|---|---|---|
+| **Consumer-produkt** (default) | — | — | Alarm-eksemplet ovenfor. |
+| **B2B compliance / certificering** (testinstitut, akkreditering, audit) | Social proof / trust **til 3** (akkrediteringer, anerkendelser, antal års erfaring) | Urgency (drop), Garanti (drop) | Akkrediteringen ER købsargumentet — DANAK, ISO 17025, ILAC, US Coast Guard er præcis hvad en compliance-køber søger på. Men stadig *distinkte* trust-linjer, ikke 4 omskrivninger af det samme. |
+| **B2B lead-gen / SaaS** | Benefit/udbytte, Feature | Urgency (sjældent ægte tilbud) | Lang salgscyklus, beslutningen er rationel. |
+| **E-commerce / tilbudsdrevet** | Urgency, CTA, Offer | — | Pris og tidsbegrænsning driver klikket. |
+| **Lokal service** (håndværker, klinik) | Location/segment **til 2-3**, CTA | Feature/spec | "i København", "døgnvagt", telefon-CTA vinder. |
+
+Reglen bag tabellen: **dæk altid flere distinkte vinkler og hold længde-variationen** (det er låst). Hvor *vægten* ligger, følger køberen.
 
 ## Længde-variation
 
@@ -72,6 +90,17 @@ Default fordeling for 4 descriptions:
 3. Trust + risiko-fjerner (garanti, returret)
 4. Urgency eller sekundær benefit
 
+### Længde-styring — sigt efter 61-70 tegn, ikke maks
+
+90 tegn er den hårde grænse, IKKE målet. Optmyzr's 20.000-konto-studie (2026): descriptions på **61-70 tegn** rammer højeste CTR (12,33%), bedste CPA ($11,49) og bedste ROAS (307,58%). Descriptions i **81-90-bunken** straffes: CPA stiger til $20,11 — filler-tekst hæver CPC uden proportionel løft i konvertering.
+
+Mål-fordeling for de 4 descriptions:
+- **Mindst 2-3 af de 4** i 61-70-tegn-zonen (sweet spot).
+- Den sidste må gerne være kortere (en skarp CTA eller urgency-linje virker fint under 60).
+- **Undgå at presse en description op til 85-90 tegn bare fordi der er plads.** Hvis en linje rammer 80+ tegn: spørg om der er fyld der kan skæres, eller om indholdet hører til i to separate descriptions.
+
+Tæl tegn på hver description i selvtjekket (se nedenfor). Dette er en kvalitets-rettesnor, ikke en hård grænse — `fill-sheet.py` afviser kun ved >90, men teksten skrives bevidst mod 61-70.
+
 ## Forbud — auto-disapproval i 2026
 
 Hvis teksten indeholder noget af det her, afviser Google annoncen.
@@ -101,14 +130,16 @@ Før du kører `fill-sheet.py`, gennemgå selv teksten:
 4. **Nogen forbudte ord?** Scan for "bedst", "klik her", emojis, konkurrent-brands.
 5. **Brand i position 1 eller 2** hvis brandet betyder noget?
 6. **Hver description står alene?** Læs dem i tilfældig rækkefølge.
-7. **Alle claims på landingssiden?** Ingen opfundne priser, garantier eller statistikker.
+7. **Description-længde?** Mindst 2-3 af de 4 i 61-70-tegn-zonen; ingen presset op til 85-90 bare for at fylde.
+8. **Alle claims på landingssiden?** Ingen opfundne priser, garantier eller statistikker.
 
 ## Maintenance
 
 Hvis Google ændrer disapproval-policy eller Ad Strength-vægtning, opdater denne fil. Kilder løbende re-checkes hvis CTR/CPA-ændringer er mere end 12 måneder gamle:
 
 - [Google official: Your guide to RSAs](https://support.google.com/google-ads/answer/12159142?hl=en)
-- [Optmyzr 1M-ad RSA performance study](https://www.optmyzr.com/blog/google-rsa-performance-study/)
+- [Optmyzr RSA performance study (20.000 konti, 2026)](https://www.optmyzr.com/blog/google-rsa-performance-study/) — length, pinning, casing, description-sweet-spot tal
+- [Optmyzr Ad Strength & Creative study (1M+ annoncer)](https://www.optmyzr.com/blog/google-ad-strength-study/) — creative-trends, Ad-Strength-completeness
 - [ATTN Agency 15-headline framework](https://www.attnagency.com/blog/google-ads-responsive-search)
 - [Google policy: punctuation and symbols](https://support.google.com/adspolicy/answer/14847994?hl=en)
 - [Stub Group: 2026 trademark policy](https://stubgroup.com/blog/google-ads-new-trademark-policy/)

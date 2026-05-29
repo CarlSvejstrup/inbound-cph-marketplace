@@ -23,7 +23,7 @@ Google's performance_label and a per-asset CVR hint are NOT rendered: on
 Inbound's accounts every row was identical ("ikke nok data endnu" /
 "utilstrækkelig data"), so the columns carried no information and were removed.
 
-The angle-gap output is the gap-brief fed back into annoncetekster-v2 to write
+The angle-gap output is the gap-brief fed back into responsive-search-ads to write
 the next challenger headlines - that is where the build->operate->iterate loop
 closes.
 
@@ -60,7 +60,7 @@ Input JSON schema (lists may be empty; missing keys render blank):
      "anbefaling"}            // recommend-only text
   ],
 
-  // Synthesised gap-brief for annoncetekster-v2 (angles missing a served asset, per ad group).
+  // Synthesised gap-brief for responsive-search-ads (angles missing a served asset, per ad group).
   "gap_brief": [
     {"kampagne","ad_group","manglende_vinkler","forslag"}
   ]

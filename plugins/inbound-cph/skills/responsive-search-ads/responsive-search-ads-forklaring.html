@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>annoncetekster v2 — hvad skillen gør og hvilken strategi den følger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f3eee2;
+    --paper-2: #efe8d8;
+    --card: #fbf8f1;
+    --ink: #1c1a16;
+    --ink-soft: #4a4539;
+    --ink-faint: #837c6b;
+    --line: #d9d0bd;
+    --line-strong: #c4b89f;
+    --accent: #c8472b;       /* Inbound warm red — mirrors the "over limit" red */
+    --accent-deep: #9c3115;
+    --green: #2f6b3f;
+    --gold: #b9892f;
+    --blue: #2d5066;
+    --shadow: 24px 24px 0 rgba(28,26,22,0.04);
+    --r: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Hanken Grotesk", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(200,71,43,0.05), transparent 42%),
+      radial-gradient(circle at 88% 2%, rgba(45,80,102,0.05), transparent 38%);
+  }
+
+  /* paper grain */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 9999;
+    opacity: 0.4;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  ::selection { background: var(--accent); color: var(--paper); }
+
+  a { color: inherit; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    border-bottom: 1.5px solid var(--ink);
+    background: var(--paper);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar .wrap {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 14px; padding-bottom: 14px;
+  }
+  .brand {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    font-weight: 700;
+  }
+  .brand .dot { color: var(--accent); }
+  .topbar nav {
+    display: flex; gap: 26px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+  }
+  .topbar nav a {
+    text-decoration: none; color: var(--ink-soft);
+    padding-bottom: 2px; border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+  }
+  .topbar nav a:hover { color: var(--accent); border-color: var(--accent); }
+  @media (max-width: 720px){ .topbar nav { display:none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 78px 0 56px; position: relative; }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent-deep); font-weight: 700;
+    margin-bottom: 26px;
+  }
+  .kicker::before {
+    content: ""; width: 34px; height: 1.5px; background: var(--accent);
+  }
+  .hero h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 600;
+    font-size: clamp(40px, 6.6vw, 82px);
+    line-height: 0.99;
+    letter-spacing: -0.02em;
+    max-width: 16ch;
+  }
+  .hero h1 em {
+    font-style: italic; color: var(--accent);
+    font-weight: 500;
+  }
+  .hero .lede {
+    margin-top: 30px; max-width: 60ch;
+    font-size: clamp(17px, 2vw, 20px);
+    color: var(--ink-soft); font-weight: 400;
+  }
+  .hero .lede strong { color: var(--ink); font-weight: 600; }
+
+  .hero-meta {
+    margin-top: 40px;
+    display: flex; flex-wrap: wrap; gap: 14px;
+  }
+  .pill {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px; font-weight: 500;
+    padding: 8px 14px; border: 1.5px solid var(--line-strong);
+    border-radius: 100px; background: var(--card);
+    color: var(--ink-soft);
+  }
+  .pill b { color: var(--ink); }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- section frame ---------- */
+  section { padding: 30px 0; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 30px; }
+  .sec-num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    border: 1.5px solid var(--accent); border-radius: 6px;
+    padding: 3px 8px; flex: none;
+  }
+  .sec-head h2 {
+    font-family: "Fraunces", serif; font-weight: 600;
+    font-size: clamp(26px, 3.6vw, 40px); line-height: 1.05;
+    letter-spacing: -0.015em;
+  }
+  .sec-head p { color: var(--ink-faint); font-size: 15px; margin-top: 4px; }
+
+  .divider { border: none; border-top: 1.5px solid var(--ink); margin: 8px 0; }
+  .divider.soft { border-top: 1px solid var(--line); }
+
+  /* ---------- "what it does" cards ---------- */
+  .does-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+  }
+  @media (max-width: 720px){ .does-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1.5px solid var(--line-strong);
+    border-radius: var(--r); padding: 26px 26px 28px;
+    position: relative; overflow: hidden;
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--ink); box-shadow: 10px 12px 0 rgba(28,26,22,0.05); }
+  .card .ix {
+    font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.12em;
+  }
+  .card h3 {
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 22px;
+    margin: 8px 0 10px; letter-spacing: -0.01em;
+  }
+  .card p { font-size: 15px; color: var(--ink-soft); }
+  .card .big-glyph {
+    position: absolute; right: -10px; bottom: -28px;
+    font-family: "Fraunces", serif; font-size: 130px; font-weight: 700;
+    color: rgba(28,26,22,0.035); line-height: 1; pointer-events: none;
+  }
+
+  /* ---------- limits banner ---------- */
+  .limits {
+    background: var(--ink); color: var(--paper);
+    border-radius: var(--r); padding: 34px 30px;
+    display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px;
+    position: relative; overflow: hidden;
+  }
+  @media (max-width: 720px){ .limits { grid-template-columns: 1fr; gap: 22px; } }
+  .limits .intro { padding-right: 18px; }
+  .limits .intro .t {
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent);
+    font-weight: 700;
+  }
+  .limits .intro h3 {
+    font-family: "Fraunces", serif; font-weight: 500; font-size: 24px;
+    margin-top: 8px; color: var(--paper);
+  }
+  .limits .intro p { font-size: 13.5px; color: #cabfa9; margin-top: 8px; }
+  .limit-num { text-align: left; padding-left: 18px; border-left: 1px solid rgba(255,255,255,0.14); }
+  .limit-num .n {
+    font-family: "Fraunces", serif; font-size: 56px; font-weight: 600;
+    line-height: 1; color: var(--paper);
+  }
+  .limit-num .n span { color: var(--accent); }
+  .limit-num .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 12px;
+    color: #cabfa9; margin-top: 8px; letter-spacing: 0.04em;
+  }
+
+  /* ---------- angle grid (the showpiece) ---------- */
+  .angle-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: end; margin-bottom: 26px; }
+  @media (max-width: 720px){ .angle-intro { grid-template-columns: 1fr; gap: 14px; } }
+  .angle-intro p { font-size: 15px; color: var(--ink-soft); }
+
+  .headlines {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  }
+  @media (max-width: 720px){ .headlines { grid-template-columns: 1fr; } }
+  .hl {
+    background: var(--card); border: 1.5px solid var(--line-strong);
+    border-radius: 11px; padding: 16px 16px 14px;
+    display: flex; flex-direction: column; gap: 9px;
+    transition: border-color .2s, transform .2s;
+  }
+  .hl:hover { border-color: var(--ink); transform: translateX(3px); }
+  .hl .meta { display: flex; align-items: center; justify-content: space-between; }
+  .hl .angle {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent-deep);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .hl .angle::before { content:""; width: 7px; height: 7px; border-radius: 2px; background: var(--accent); }
+  .hl .count {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700;
+    color: var(--green);
+    background: rgba(47,107,63,0.1); border-radius: 100px;
+    padding: 2px 9px;
+  }
+  .hl .count.warn { color: var(--accent); background: rgba(200,71,43,0.12); }
+  .hl .text {
+    font-family: "Fraunces", serif; font-size: 19px; font-weight: 500;
+    line-height: 1.2; letter-spacing: -0.005em;
+  }
+  .hl .qty {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--ink-faint);
+  }
+
+  .angle-foot {
+    margin-top: 16px; font-size: 13.5px; color: var(--ink-faint);
+    font-style: italic; font-family: "Fraunces", serif;
+  }
+
+  /* ---------- strategy ledger ---------- */
+  .ledger { display: grid; gap: 0; border: 1.5px solid var(--ink); border-radius: var(--r); overflow: hidden; background: var(--card); }
+  .ledger-row {
+    display: grid; grid-template-columns: 220px 1fr; gap: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .ledger-row:last-child { border-bottom: none; }
+  @media (max-width: 720px){ .ledger-row { grid-template-columns: 1fr; } }
+  .ledger-row .k {
+    padding: 20px 22px; border-right: 1.5px solid var(--line);
+    background: var(--paper-2);
+    font-family: "Fraunces", serif; font-weight: 600; font-size: 18px;
+    letter-spacing: -0.01em;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  @media (max-width: 720px){ .ledger-row .k { border-right: none; border-bottom: 1px solid var(--line); } }
+  .ledger-row .k .tag {
+    font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-deep);
+  }
+  .ledger-row .v { padding: 20px 24px; font-size: 15px; color: var(--ink-soft); }
+  .ledger-row .v b { color: var(--ink); }
+  .stat {
+    display: inline-block; font-family: "JetBrains Mono", monospace;
+    font-weight: 700; color: var(--ink); background: rgba(185,137,47,0.15);
+    padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+
+  /* ---------- pipeline ---------- */
+  .pipe { display: grid; gap: 14px; }
+  .step {
+    display: grid; grid-template-columns: 64px 1fr; gap: 22px;
+    align-items: start; padding: 4px 0;
+    position: relative;
+  }
+  .step .num {
+    font-family: "Fraunces", serif; font-size: 40px; font-weight: 600;
+    color: var(--accent); line-height: 1;
+    grid-row: 1; position: relative;
+  }
+  .step .body h4 {
+    font-family: "Hanken Grotesk", sans-serif; font-weight: 700; font-size: 17px;
+    margin-bottom: 4px;
+  }
+  .step .body p { font-size: 14.5px; color: var(--ink-soft); max-width: 70ch; }
+  .step .body code, .mono-inline {
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+    background: var(--paper-2); border: 1px solid var(--line);
+    padding: 1px 6px; border-radius: 5px; color: var(--ink);
+  }
+  .step:not(:last-child) .num::after {
+    content: ""; position: absolute; left: 50%; top: 48px; bottom: -26px;
+    width: 1.5px; background: var(--line-strong); transform: translateX(-50%);
+  }
+
+  .gate {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent-deep); background: rgba(200,71,43,0.1);
+    border: 1px solid rgba(200,71,43,0.3); border-radius: 100px;
+    padding: 3px 10px; margin-top: 8px;
+  }
+  .gate::before { content: "🔒"; font-size: 11px; }
+
+  /* ---------- forbud list ---------- */
+  .forbud { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px){ .forbud { grid-template-columns: 1fr; } }
+  .forbud .item {
+    background: var(--card); border: 1.5px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 9px; padding: 14px 16px;
+    font-size: 14.5px; color: var(--ink-soft);
+  }
+  .forbud .item b { color: var(--ink); font-weight: 700; }
+
+  /* ---------- column contract ---------- */
+  .contract {
+    background: var(--ink); color: #e9e0cd; border-radius: var(--r);
+    padding: 26px 28px; font-family: "JetBrains Mono", monospace;
+    font-size: 13px; line-height: 1.9; overflow-x: auto;
+  }
+  .contract .c-accent { color: var(--accent); }
+  .contract .c-gold { color: #e0ba6e; }
+  .contract .c-dim { color: #8d846f; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    background: var(--paper-2); border: 1.5px solid var(--line-strong);
+    border-radius: var(--r); padding: 26px 28px;
+    display: flex; gap: 20px; align-items: flex-start;
+  }
+  .callout .mark {
+    font-family: "Fraunces", serif; font-size: 48px; font-weight: 700;
+    color: var(--accent); line-height: 0.8; flex: none;
+  }
+  .callout p { font-size: 16px; color: var(--ink-soft); }
+  .callout p b { color: var(--ink); }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1.5px solid var(--ink); margin-top: 60px;
+    padding: 40px 0 56px;
+  }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+  footer .l { font-family: "Fraunces", serif; font-size: 20px; font-weight: 500; }
+  footer .l span { color: var(--accent); }
+  footer .r { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-faint); text-align: right; line-height: 1.8; }
+
+  .lead-quote {
+    font-family: "Fraunces", serif; font-style: italic; font-weight: 400;
+    font-size: clamp(20px, 3vw, 30px); line-height: 1.35;
+    color: var(--ink); max-width: 26ch; letter-spacing: -0.01em;
+  }
+  .lead-quote .by {
+    display: block; margin-top: 16px; font-style: normal; font-family: "JetBrains Mono", monospace;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="wrap">
+      <div class="brand">INBOUND<span class="dot">.</span>CPH &nbsp;/&nbsp; SKILLS</div>
+      <nav>
+        <a href="#hvad">Hvad den gør</a>
+        <a href="#vinkler">Vinkel-strategi</a>
+        <a href="#regler">Skrive-reglerne</a>
+        <a href="#flow">Forløbet</a>
+      </nav>
+    </div>
+  </div>
+
+  <header class="hero">
+    <div class="wrap">
+      <div class="kicker reveal">Google Ads · Responsive Search Ads · skill v2</div>
+      <h1 class="reveal">annoncetekster <em>v2</em><br />— annonceteksten, sat i system.</h1>
+      <p class="lede reveal">
+        Skillen tager en kundes landingsside, læser den, og skriver et helt sæt
+        Google Ads-annoncetekster efter en <strong>fast, dokumenteret strategi</strong>. Resultatet er
+        et regneark der kan importeres direkte i Google Ads Editor, med live tegntælling
+        så kundens for lange rettelser fanges med det samme.
+      </p>
+      <div class="hero-meta reveal">
+        <span class="pill"><b>15</b> headlines</span>
+        <span class="pill"><b>4</b> beskrivelser</span>
+        <span class="pill"><b>2</b> paths</span>
+        <span class="pill">100% på <b>dansk</b></span>
+        <span class="pill">klar til <b>Editor-import</b></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+  <!-- ====================== WHAT IT DOES ====================== -->
+  <section id="hvad">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">01</span>
+        <div>
+          <h2>Hvad skillen gør</h2>
+          <p>Det samme arbejde Rikke laver i hånden, kørt efter en fast opskrift, hver gang.</p>
+        </div>
+      </div>
+
+      <div class="does-grid">
+        <div class="card reveal">
+          <div class="ix">→ INPUT</div>
+          <h3>Læser landingssiden</h3>
+          <p>Skillen scraper kundens side og trækker det ud der driver gode tekster: produktet, USP'er, tone of voice, CTA'er, og trust-tal (anmeldelser, kundeantal, år etableret). Den opfinder aldrig claims — alt skal stå på siden eller bekræftes.</p>
+          <div class="big-glyph">A</div>
+        </div>
+        <div class="card reveal">
+          <div class="ix">→ INTAKE</div>
+          <h3>Spørger ind til 5 ting</h3>
+          <p>Ud over v1 spørger v2 om USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice + forbudte ord, og top-keywords fra Google Ads-kontoen. Det er forskellen mellem generiske og konverterende tekster.</p>
+          <div class="big-glyph">B</div>
+        </div>
+        <div class="card reveal">
+          <div class="ix">→ TEKST</div>
+          <h3>Skriver 20-25, vælger 15</h3>
+          <p>Den genererer 20-25 headline-kandidater og udvælger de 15 bedste der rammer en fast vinkel-fordeling. Plus 4 beskrivelser og 2 paths — alle indenfor Googles hårde tegngrænser.</p>
+          <div class="big-glyph">C</div>
+        </div>
+        <div class="card reveal">
+          <div class="ix">→ OUTPUT</div>
+          <h3>Bygger Editor-arket</h3>
+          <p>Teksterne lægges i et regneark med live <span class="mono-inline">=LEN()</span>-tegntælling og røde advarsler ved overskridelse. Leveres både lokalt og på Drive — klar til kunde-review og derefter bulk-import i Google Ads Editor.</p>
+          <div class="big-glyph">D</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== HARD LIMITS ====================== -->
+  <section>
+    <div class="wrap">
+      <div class="limits reveal">
+        <div class="intro">
+          <div class="t">Spilleregler · ufravigelige</div>
+          <h3>Google afviser for lange felter. De bliver ikke afkortet.</h3>
+          <p>Derfor er tegntælling ikke pynt — det er et valideringskrav. Arket farver feltet rødt i det sekund teksten bliver for lang.</p>
+        </div>
+        <div class="limit-num">
+          <div class="n">30<span>·</span></div>
+          <div class="lbl">tegn / headline<br />(op til 15 stk)</div>
+        </div>
+        <div class="limit-num">
+          <div class="n">90<span>·</span></div>
+          <div class="lbl">tegn / beskrivelse<br />(op til 4 stk)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== ANGLE STRATEGY (showpiece) ====================== -->
+  <section id="vinkler">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">02</span>
+        <div>
+          <h2>Strategien: de 15 headlines er ikke tilfældige</h2>
+          <p>Hver headline har en rolle. Skillen låser denne vinkel-fordeling, så Googles algoritme får råmateriale til alle slags søgninger.</p>
+        </div>
+      </div>
+
+      <div class="angle-intro reveal">
+        <p>En RSA er ikke én færdig annonce — du leverer byggeklodser, og Google blander dem per søgning for at finde den bedste kombination. Hvis alle 15 headlines siger det samme, har Google intet at teste på. Derfor dækker skillen <b>ni forskellige vinkler</b> bevidst.</p>
+        <p style="font-family:'Fraunces',serif; font-size:17px; font-style:italic; color:var(--ink);">Nedenfor: et eksempel-sæt for en alarm-kunde. Tallet til højre er live tegntælling — grøn = sikker, rød = for lang.</p>
+      </div>
+
+      <div class="headlines">
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Brand + keyword <span class="qty">×2</span></span><span class="count">21</span></div>
+          <div class="text">Securitas alarmsystemer</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Keyword-led <span class="qty">×3</span></span><span class="count">19</span></div>
+          <div class="text">Køb alarmsystem i dag</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Benefit / udbytte <span class="qty">×3</span></span><span class="count">18</span></div>
+          <div class="text">Sov trygt om natten</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Feature / spec <span class="qty">×2</span></span><span class="count">23</span></div>
+          <div class="text">24/7 overvågning og app</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Social proof <span class="qty">×1</span></span><span class="count">25</span></div>
+          <div class="text">Valgt af 50.000+ danskere</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Urgency <span class="qty">×1</span></span><span class="count">19</span></div>
+          <div class="text">Tilbud slutter søndag</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">CTA (specifik) <span class="qty">×1</span></span><span class="count">24</span></div>
+          <div class="text">Gratis fragt over 500 kr</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Garanti / risiko <span class="qty">×1</span></span><span class="count">17</span></div>
+          <div class="text">30 dages returret</div>
+        </div>
+        <div class="hl reveal">
+          <div class="meta"><span class="angle">Location / segment <span class="qty">×1</span></span><span class="count">26</span></div>
+          <div class="text">Alarmsystem i København</div>
+        </div>
+        <div class="hl reveal" style="border-style:dashed; background:transparent;">
+          <div class="meta"><span class="angle" style="color:var(--ink-faint);"><span style="background:var(--ink-faint);"></span>For lang? Fanges live</span><span class="count warn">34</span></div>
+          <div class="text" style="color:var(--accent);">Danmarks bedste alarm til hjemmet</div>
+        </div>
+      </div>
+
+      <p class="angle-foot reveal">Mangler kunden et tilbud, dropper skillen urgency og erstatter med en ekstra benefit. Mangler kunden et stærkt brand, flyttes den ene brand-headline over i benefit-bunken. Reglen bøjer sig efter kunden — ikke omvendt.</p>
+    </div>
+  </section>
+
+  <!-- ====================== STRATEGY LEDGER ====================== -->
+  <section id="regler">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">03</span>
+        <div>
+          <h2>Skrive-reglerne den følger</h2>
+          <p>Ikke smag. Testet på millioner af annoncer, koblet til Googles Ad Strength, disapproval-policy og dokumenterede CTR/CPA-forskelle.</p>
+        </div>
+      </div>
+
+      <div class="ledger reveal">
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Skrivemåde</span>Sentence case — altid</div>
+          <div class="v">"Køb alarmsystem i dag", ikke "Køb Alarmsystem I Dag". Optmyzr måler en <span class="stat">3,7×</span> forskel i CPA mellem sentence og title case. Undtagelser: brandnavne, egennavne, forkortelser.</div>
+        </div>
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Relevans</span>Keyword i ≥ 3 headlines</div>
+          <div class="v">Top-keywordet (fra Google Ads-kontoen eller manuelt) skal stå i <b>mindst tre</b> headlines. Det løfter Ad Strength fra "Average" til "Good". Men det stuffes ikke ind hvor det er akavet — Google straffer også over-optimering.</div>
+        </div>
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Variation</span>Bland korte og lange</div>
+          <div class="v">Mål-mix per 15: <b>4-5 korte</b> (&lt;20 tegn), <b>6-7 mellem</b> (20-26), <b>3-4 lange</b> (27-30). Korte headlines ramte <span class="stat">$9,35</span> CPA mod <span class="stat">$18,27</span> for lange — men det er <i>variationen</i>, ikke kun korte, der vinder.</div>
+        </div>
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Pinning</span>Pin intet (som default)</div>
+          <div class="v">Lad Google teste alle kombinationer. Skal noget juridisk/brand stå først: pin <b>2-3 varianter</b> til position 1 — aldrig kun én. Partial pinning slog både no-pin og full-pin. Full pinning skærer 75% af kombinations-rummet væk.</div>
+        </div>
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Beskrivelser</span>4 stk, hver står alene</div>
+          <div class="v">Google reorderer beskrivelserne, så de skrives aldrig som sammenhængende sætninger. Fast fordeling: <b>benefit + CTA</b> · <b>feature/proof</b> · <b>trust + garanti</b> · <b>urgency/sekundær benefit</b>.</div>
+        </div>
+        <div class="ledger-row">
+          <div class="k"><span class="tag">Sandhed</span>Kun claims fra siden</div>
+          <div class="v">Ingen opfundne tal, priser eller garantier. Lover landingssiden ikke "gratis fragt", må headline ikke heller. Specifikke tal slår altid vage claims: <b>"Valgt af 50.000+"</b> &gt; "tusindvis af tilfredse kunder".</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== FORBUD ====================== -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">04</span>
+        <div>
+          <h2>Hvad den aldrig skriver</h2>
+          <p>Indeholder teksten noget af det her, afviser Google annoncen automatisk i 2026.</p>
+        </div>
+      </div>
+      <div class="forbud">
+        <div class="item reveal"><b>Emojis & symboler.</b> Stjerner, pile, decorativ Unicode. Kun ren tekst og standardtegn.</div>
+        <div class="item reveal"><b>Superlativer uden bevis.</b> "bedst", "#1", "garanteret", "billigst" — medmindre det dokumenterbart står på siden.</div>
+        <div class="item reveal"><b>"Klik her".</b> Generiske CTA'er uden kontekst afvises af Googles editorial policy.</div>
+        <div class="item reveal"><b>Konkurrent-brands.</b> Konkurrenters navne i headline-teksten = auto-disapproval (2026 trademark-policy).</div>
+        <div class="item reveal"><b>RÅB & gentaget tegnsætning.</b> "BUY NOW", "!!!" — afvist.</div>
+        <div class="item reveal"><b>Næsten-identiske headlines.</b> Svækker Ad Strength og dækker ikke nye søge-intentioner.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== PIPELINE ====================== -->
+  <section id="flow">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">05</span>
+        <div>
+          <h2>Forløbet, trin for trin</h2>
+          <p>Fra landingsside til Editor-klart ark — med et menneske i loopet før noget gemmes.</p>
+        </div>
+      </div>
+
+      <div class="pipe">
+        <div class="step reveal">
+          <div class="num">1</div>
+          <div class="body">
+            <h4>Intake på dansk</h4>
+            <p>Skillen udleder så meget som muligt fra samtalen først, og spørger så ind via få samlede spørgsmål: klient + URL, kampagnetype og -navn efter Inbounds konvention (<code>IC | GSN | Generic | …</code>), USP, tilbud, trust-tal, voice og top-keywords. Den gætter aldrig.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">2</div>
+          <div class="body">
+            <h4>Analyser landingssiden</h4>
+            <p>Scraper URL'en og trækker produkt, USP-kandidater, tone, CTA'er, trust-tal og evt. aktivt tilbud ud — som konkrete valgmuligheder i intaken. Kan siden ikke hentes, stopper den. Vi opfinder ikke claims.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">3</div>
+          <div class="body">
+            <h4>Læs skrive-reglerne</h4>
+            <p>Inden en eneste headline skrives, indlæser skillen sin egen <code>headline-craft.md</code> — vinkel-fordeling, sentence case, længde-mix, keyword-krav og forbud. Reglerne fra afsnit 02-04 herover.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">4</div>
+          <div class="body">
+            <h4>Generér teksterne</h4>
+            <p>20-25 kandidater, udvælg de 15 bedste efter vinkel-fordelingen. 4 beskrivelser, 2 paths. Selvtjek af tegnantal og forbudte ord før den går videre.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">5</div>
+          <div class="body">
+            <h4>Byg arket</h4>
+            <p>Et nyt regneark bygges fra en skabelon med live <code>=LEN()</code>-formler og røde farveregler. Scriptet <b>nægter at skrive arket</b> hvis bare ét felt er for langt — så et ugyldigt ark aldrig forlader skillen.</p>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">6</div>
+          <div class="body">
+            <h4>Gem — lokalt og på Drive</h4>
+            <p>Leverer altid begge dele: en <code>.xlsx</code> på disken og samme fil på Drive via connector. Tegntælling og farveregler regner live, også efter upload.</p>
+            <span class="gate">Ekstern write — kræver bekræftelse</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="num">7</div>
+          <div class="body">
+            <h4>Output + næste skridt</h4>
+            <p>En tabel med alle 19 strenge + tegnantal, lokal sti og Drive-link. Næste skridt sker manuelt: del filen med kunden til review, og importér derefter i Google Ads Editor. <b>Skillen deler aldrig selv filen og sender aldrig mail.</b></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== COLUMN CONTRACT ====================== -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">06</span>
+        <div>
+          <h2>Hvorfor arket bare virker i Editor</h2>
+          <p>Kolonnerne i arket ER præcis det format Google Ads Editor forventer ved import. Ét dokument — både kundens arbejdsark og importfilen.</p>
+        </div>
+      </div>
+      <div class="contract reveal">
+        <span class="c-dim"># Google Ads Editor import-skema (række 1 = headers, række 2 = data)</span><br />
+        <span class="c-gold">Campaign</span> │ <span class="c-gold">Ad Group</span> │ <span class="c-gold">Ad type</span> = <span class="c-accent">"Responsive search ad"</span> │ Labels<br />
+        <span class="c-gold">Headline 1</span> │ <span class="c-accent">LEN</span> │ <span class="c-gold">Headline 2</span> │ <span class="c-accent">LEN</span> │ … │ <span class="c-gold">Headline 15</span> │ <span class="c-accent">LEN</span><br />
+        <span class="c-gold">Description 1</span> │ <span class="c-accent">LEN</span> │ … │ <span class="c-gold">Description 4</span> │ <span class="c-accent">LEN</span><br />
+        <span class="c-gold">Path 1</span> │ <span class="c-accent">LEN</span> │ <span class="c-gold">Path 2</span> │ <span class="c-accent">LEN</span><br />
+        <span class="c-gold">Final URL</span> │ Final mobile URL<br />
+        <br />
+        <span class="c-dim"># Hvert tekstfelt har en LEN-kolonne ved siden af. Den lyser rødt live når kunden overskrider grænsen.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== CLOSING ====================== -->
+  <section>
+    <div class="wrap">
+      <div class="callout reveal">
+        <div class="mark">“</div>
+        <p><b>Kort fortalt:</b> skillen tager det dygtige, langsomme stykke arbejde — at læse en landingsside og skrive 15 skarpe headlines under hårde tegngrænser — og gør det ens hver gang, efter en strategi vi kan stå inde for. Det risikable led, hvor kunden skriver en headline for lang, fanges automatisk af arket. Resultatet er hurtigere, mere konsistente annoncetekster, klar til Editor.</p>
+      </div>
+    </div>
+  </section>
+
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div class="l">annoncetekster <span>v2</span> — en Inbound CPH skill</div>
+      <div class="r">
+        Google Ads · Responsive Search Ads<br />
+        Cowork-native · Drive-connector · Google Ads MCP<br />
+        Kilder: Google RSA-docs · Optmyzr (1M annoncer) · ATTN Agency
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // staggered reveal on scroll
+    const items = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          const el = e.target;
+          const sibs = Array.from(el.parentElement.children).filter(c => c.classList.contains('reveal'));
+          const idx = sibs.indexOf(el);
+          el.style.transitionDelay = (Math.max(0, idx) * 70) + 'ms';
+          el.classList.add('in');
+          io.unobserve(el);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    items.forEach(el => io.observe(el));
+
+    // hero items reveal immediately, staggered
+    window.addEventListener('load', () => {
+      document.querySelectorAll('.hero .reveal').forEach((el, i) => {
+        el.style.transitionDelay = (i * 110) + 'ms';
+        el.classList.add('in');
+      });
+    });
+  </script>
+
+</body>
+</html>
