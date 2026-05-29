@@ -17,10 +17,11 @@ It was deliberately reshaped after a live test against real Inbound accounts
 So this workbook reports STRUCTURAL FACTS that hold without significance:
   - champion-challenger coverage (RSAs per ad group; <2 = build a challenger),
   - dead-weight assets (never-served / near-zero impressions = a coverage fact),
-  - angle-coverage gaps per ad group (which angles have no served asset),
-  - Google's label ONLY when it is BEST/GOOD/LOW (else "ikke nok data endnu"),
-  - an optional CVR hint gated behind a hard significance floor (else
-    "utilstraekkelig data").
+  - angle-coverage gaps per ad group (which angles have no served asset).
+
+Google's performance_label and a per-asset CVR hint are NOT rendered: on
+Inbound's accounts every row was identical ("ikke nok data endnu" /
+"utilstrækkelig data"), so the columns carried no information and were removed.
 
 The angle-gap output is the gap-brief fed back into annoncetekster-v2 to write
 the next challenger headlines - that is where the build->operate->iterate loop
@@ -49,7 +50,7 @@ Input JSON schema (lists may be empty; missing keys render blank):
   // Per asset row (headline/description). Grouped into ONE TAB PER AD GROUP by
   // (kampagne, ad_group). The Google-label and CVR columns were intentionally
   // dropped from the sheet: on Inbound's accounts every row is identical
-  // ("ikke nok data endnu" / "utilstraekkelig data"), so they were noise. The
+  // ("ikke nok data endnu" / "utilstrækkelig data"), so they were noise. The
   // skill may still compute cvr_hint internally for the significance gate, but
   // it is not rendered.
   "assets": [
