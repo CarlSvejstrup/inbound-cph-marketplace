@@ -7,7 +7,7 @@ description: Lav Google Ads Responsive Search Ad-tekster i høj kvalitet fra en 
 
 Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake og keyword-data fra Google Ads MCP, og aflever dem i et regneark der kan importeres direkte i Google Ads Editor. Hele forløbet og alt output er på dansk.
 
-**v2 vs v1:** v1 (`annoncetekster`) skriver annoncetekster ud fra landingsside + kampagnenavn. v2 tilføjer fem ekstra intake-felter (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP) og håndhæver skrive-reglerne fra `references/headline-craft.md` (angle-taxonomi, Sentence case, længde-variation, 2026 disapproval-policy). Bruges når kvaliteten af annonceteksterne skal være højere end v1's generiske default.
+**v2 vs v1:** v1 (`annoncetekster`) skriver annoncetekster ud fra landingsside + kampagnenavn. v2 tilføjer fem ekstra intake-felter (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP), et valgfrit trin der **lærer af kundens egne top-performende annoncer** (Trin 2.5 — kun aktive annoncer, kun budskabs-mønstre), og håndhæver skrive-reglerne fra `references/headline-craft.md` (angle-taxonomi, Sentence case, længde-variation, 2026 disapproval-policy). Bruges når kvaliteten af annonceteksterne skal være højere end v1's generiske default.
 
 ## Why this skill exists
 
@@ -69,7 +69,7 @@ Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fan
 
 Udled så meget som muligt fra samtalen og landingssiden FØR du spørger. Hvis Carl allerede har sagt klientnavn og URL i samme besked, behøver du ikke spørge om dem — bekræft dem som første option `(Anbefalet)` i det første kald, eller spring dem helt over og gå direkte til kampagnetype.
 
-### Kald 1 — Identitet og kampagnetype (1 AskUserQuestion, 2-3 spørgsmål)
+### Kald 1 — Identitet, kampagnetype og sprog (1 AskUserQuestion, 2-4 spørgsmål)
 
 Saml i samme kald:
 1. **Klient + URL** — kun hvis ikke allerede klart fra samtalen. Ellers spring over.
@@ -77,6 +77,7 @@ Saml i samme kald:
    - Search / Shopping / pMax  — `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
    - Display / YouTube / Demand Gen — `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
    - Audience — `YYYY-MD - IC - Audience type - Audience navn`
+3. **Annoncetekst-sprog** (altid spørg): hvilket sprog skal selve annonceteksterne skrives på? Vis som options med `Dansk (Anbefalet)` som første, derefter `Engelsk`, `Svensk`, `Norsk` — og "Other" til alt andet. Default er **dansk**. Dette styrer KUN annonceteksterne; samtalen/intaken kører fortsat på dansk medmindre brugeren skriver på engelsk (se Trin 0). Hvis landingssiden senere viser sig at være på et andet sprog end det valgte, så nævn uoverensstemmelsen for brugeren før du skriver teksterne — gæt ikke.
 
 ### Kald 2 — Navngivnings-felter komprimeret (1 AskUserQuestion, 2-4 spørgsmål)
 
@@ -117,11 +118,13 @@ De 4 spørgsmål i samme kald:
 
 3. **Brand voice + banned words** — vælg tone (`Formel`, `Venlig og direkte`, `Teknisk og præcis`, `Energisk og inspirerende`) og om der er ord vi IKKE må bruge. Default banned words: `(ingen)`.
 
-4. **Top-keywords** — to scenarier:
-   - **Google Ads MCP tilgængelig:** hent top 10-20 keywords for klientens konto (rangeret efter impressions/conversions) FØR du sender kaldet, og vis dem som options. Brugeren vælger 3-5.
-   - **MCP IKKE tilgængelig** på denne bruger: vis "(brug landingssidens hovedtermer)" som første option, og lad brugeren skrive 3-5 keywords manuelt via "Other" hvis hen har en Search Terms-eksport.
+4. **Top-keywords + kontoadgang** — to scenarier:
+   - **Google Ads MCP tilgængelig:** spørg om (eller udled fra konteksten) klientens `customer_id`. Hent top 10-20 keywords for kontoen (rangeret efter impressions/conversions) FØR du sender kaldet, og vis dem som options. Brugeren vælger 3-5. **Samme `customer_id` genbruges i Trin 2.5** til at lære af kundens top-annoncer — spørg kun én gang.
+   - **MCP IKKE tilgængelig** på denne bruger: vis "(brug landingssidens hovedtermer)" som første option, og lad brugeren skrive 3-5 keywords manuelt via "Other" hvis hen har en Search Terms-eksport. Trin 2.5 springes da også over.
 
 Begrund overordnet: top-keyword skal stå i mindst 3 headlines for Google's relevans-score (se `references/headline-craft.md`).
+
+**Bemærk:** kontoadgangs-checket her (MCP + `customer_id`) er det samme der afgør om Trin 2.5 (lær af top-annoncer) kører. Ét check, én konto, ét spørgsmål — ikke to parallelle stier.
 
 ### Bekræft scope (1 tekstbesked, ingen AskUserQuestion)
 
@@ -196,11 +199,71 @@ Scrape URL'en med Firecrawl. Udtræk konkret:
 - **Trust-signaler med tal** — anmeldelses-score + antal, kunde-antal, år etableret, certificeringer, awards (bruges til intake-spørgsmål 12).
 - **Pris/tilbud** — hvis et aktivt tilbud står på siden (bruges til intake-spørgsmål 11).
 - **Brandnavn og logo-tekst.**
-- **Sidens sprog** — hvis ikke dansk, matcher annonceteksterne sidens sprog.
+- **Sidens sprog** — det sprog brugeren valgte i Kald 1 styrer annonceteksterne. Hvis sidens sprog afviger fra det valgte: nævn det for brugeren før du skriver teksterne — gæt ikke, og skift ikke sprog på egen hånd.
 
 Hvis siden ikke kan hentes: sig det og stop. Vi opfinder ikke claims.
 
 Hvis du allerede har scrapet siden FØR Trin 1's USP/trust/tilbud-spørgsmål: brug scrapen til at foreslå konkrete options i `AskUserQuestion` i stedet for friform-svar. Det er hele pointen med v2.
+
+## Trin 2.5 — Lær af kundens top-annoncer (valgfrit — kun hvis konto + MCP)
+
+**Kør kun dette trin hvis Google Ads MCP er tilgængelig OG du har et `customer_id`** (samme check som Kald 4, spørgsmål 4). Hvis ikke — ny kunde uden historik, eller ingen MCP — **spring trinet over** og gå direkte til Trin 3. Landingssiden + branchestudierne i `references/headline-craft.md` bærer da teksterne. Det er det normale for nye kunder, og det er helt fint.
+
+### Hvorfor dette trin findes
+
+Keyword-data (Kald 4) fortæller dig *hvilke ord* der søges på. Dette trin fortæller dig noget andet: *hvordan netop denne kunde formulerer sig når annoncerne faktisk virker.* Branchestudierne i reference-filen er generiske; kundens egne vindere er kunde-specifikke. De to lag supplerer hinanden.
+
+### Hent kun de vindende, aktive annoncer (GAQL — ikke get_ad_performance)
+
+Brug `run_custom_gaql`, ikke `get_ad_performance`. Grunden: `get_ad_performance` har ingen status-filter og kan blande **pausede** annoncer ind. Inbounds hårde regel er at pausede kampagner/annoncer er bevidste og **aldrig** må vurderes på performance. GAQL giver ENABLED-filter + sortering i ét kald:
+
+```sql
+SELECT
+  campaign.name,
+  ad_group.name,
+  ad_group_ad.ad.responsive_search_ad.headlines,
+  ad_group_ad.ad.responsive_search_ad.descriptions,
+  metrics.ctr,
+  metrics.conversions,
+  metrics.cost_micros
+FROM ad_group_ad
+WHERE campaign.status = 'ENABLED'
+  AND ad_group_ad.status = 'ENABLED'
+  AND ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
+  AND segments.date DURING LAST_90_DAYS
+ORDER BY metrics.conversions DESC, metrics.ctr DESC
+LIMIT 15
+```
+
+- Sorter på `conversions` først, så `ctr` — vinderne er dem der konverterer, ikke bare dem der får klik.
+- Hvis kontoen har for få konverteringer til at sortere meningsfuldt (lav-volumen konto), fald tilbage til `ORDER BY metrics.ctr DESC`. Nævn det i dit svar.
+- Hvis forespørgslen intet returnerer (ny konto, ingen RSA-historik): spring resten af trinet over, sig det til brugeren, og kør på landingssiden alene.
+
+### Udled en kunde-specifik stilguide — kun BUDSKAB, aldrig formatering
+
+Læs de hentede top-annoncers headlines + descriptions og udled **det semantiske lag**:
+- Hvilke **USP'er og hooks** går igen i vinderne? (fx "gratis levering", "døgnvagt", "30 års erfaring")
+- Hvilken **benefit-framing** bruger de? (resultat-orienteret vs. feature-orienteret)
+- Hvilket **CTA-sprog** virker? (fx "Bestil tilbud" vs. "Se priser")
+- Hvilke **emner/temaer** vender kunden tilbage til?
+
+Skriv det op som en kort kunde-stilguide (4-6 bullets) i dit svar, så brugeren ser hvad du lærte.
+
+### FIREWALL — budskab supplerer, formatering arver du ALDRIG
+
+Dette er den vigtigste regel i trinnet. Kundens top-annoncer er valgt på performance, ikke på håndværk. De kan udmærket være skrevet i Title Case, presset alle op i 27-30 tegn, keyword-stuffede, eller bruge superlativer der i dag giver disapproval — og **stadig** være top-performere historisk.
+
+Derfor, med hård præcedens:
+
+- Du arver kundens **budskaber, USP-vægtning, hooks, tone og CTA-formuleringer** (det semantiske lag).
+- Du arver **ALDRIG** kundens casing, længde-fordeling, keyword-tæthed, struktur eller eventuelle forbudte ord.
+- **`references/headline-craft.md` og scriptets gates vinder hver eneste konflikt.** Sentence case, mindst 4 korte headlines, ingen næsten-ens linjer, ingen banned words, descriptions mod 61-70 tegn, hårde tegngrænser — alt det står over kundens stilguide. Hvis kundens vindere er Title Case, skriver du stadig Sentence case. Hvis deres vindere alle er 30 tegn, skriver du stadig 4-5 korte.
+
+Skriv eksplicit i dit svar: "Lærte budskab fra X top-annoncer; formatering følger headline-craft.md (ikke kundens)." Så er det dokumenteret at firewall'en holdt.
+
+### Datakilde
+
+Tilføj senere i output (Trin 7) at top-annonce-analysen brugte Google Ads MCP (`run_custom_gaql`) på `customer_id`, og hvor mange annoncer den lærte fra.
 
 ## Trin 3 — Læs skrive-reglerne
 
@@ -223,13 +286,33 @@ Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder
 Hårde grænser: headlines ≤ 30 tegn, descriptions ≤ 90, paths ≤ 15.
 
 **Regler (uddybet i `references/headline-craft.md`):**
+- **Kunde-stilguide fra Trin 2.5 (hvis den blev kørt):** læn dig på de budskaber, USP'er, hooks og CTA-formuleringer du udledte af kundens top-annoncer. Men kun det semantiske lag — formatering (casing, længde, struktur) følger ALTID `headline-craft.md`, aldrig kundens annoncer. Ved enhver konflikt vinder reference-filen og scriptets gates. (Se firewall-reglen i Trin 2.5.)
 - Kun claims der står på landingssiden eller blev bekræftet i intake (USP-hierarki, trust-tal). Ingen opfundne tal, garantier eller priser.
 - **Sentence case overalt** — ikke Title Case.
 - **Top-keyword** (fra Google Ads MCP eller manuelt intake) skal stå i **mindst 3 headlines**.
-- **Længde-variation:** bland korte (<20), mellem (20-26) og lange (27-30).
+- **Længde-variation (HÅRD gate):** mindst **4 af de 15 headlines under 20 tegn**. `fill-sheet.py` afviser arket hvis ikke. Bland korte (<20), mellem (20-26) og lange (27-30). Dette er den hyppigste fejl — sættet ender med alt presset op i 21-30. Skriv bevidst 4-5 korte.
+- **Ingen næsten-ens headlines:** to headlines må ikke sige det samme med andre ord. Tre+ der deler samme åbning afvises af scriptet. Trust/akkreditering er særligt udsat — saml ikke fire varianter af "akkrediteret af X".
 - **Banned words** fra intake: scan teksten — ingen optræden.
-- **Sproget:** dansk medmindre landingssiden er på et andet sprog.
+- **Sproget:** det sprog brugeren valgte i Kald 1 (default dansk). Skift ikke sprog ud fra landingssiden — hvis der er uoverensstemmelse, spurgte du allerede i Trin 2.
 - **Længde-selvtjek:** for hver streng, tæl tegn. Ret over-længde INDEN du går videre. `fill-sheet.py` afviser også, men det er hurtigere at fange her.
+
+### Obligatorisk vinkel-audit — udfyld FØR du skriver `ads.json`
+
+Vinkel-mixet kan ikke tjekkes mekanisk af scriptet (det er semantisk), så **du** skal selv dokumentere det. Skriv denne tabel ud i dit svar før arket bygges. Mål-kolonnen er fra reference-filen; "Faktisk" er dit sæt. **Enhver afvigelse skal have en grund på én linje** — ellers retter du sættet.
+
+| Vinkel | Mål | Faktisk | Grund hvis afvigelse |
+|---|---|---|---|
+| Brand + keyword | 2 | ? | |
+| Keyword-led | 3 | ? | |
+| Benefit / udbytte | 3 | ? | |
+| Feature / spec | 2 | ? | |
+| Social proof / trust | 1 | ? | |
+| Urgency | 0-1 | ? | |
+| CTA (specifik) | 1 | ? | |
+| Garanti / risiko | 1 | ? | |
+| Location / segment | 1 | ? | |
+
+Målene er en **consumer-default** (alarm-eksemplet). De bøjer sig efter branchen — se "Vinkel-mix pr. branche" i reference-filen. Eksempel på en legitim afvigelse: et B2B-compliance/certificerings-produkt (testinstitut, akkreditering) må gerne være trust-tungt (3 i stedet for 1) og udelade urgency/garanti — skriv da grunden, fx "trust-tungt: compliance-vertikal, akkreditering ER købsargumentet". En afvigelse uden grund er en fejl, ikke en stil.
 
 Gennemgå kvalitets-check-listen fra reference-filen før du skriver `ads.json`.
 
@@ -254,7 +337,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/annoncetekster-v2/fill-sheet.py \
   --out "RSA - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Hvis scriptet afviser pga. for lange felter: ret teksten og kør igen. Output er en `.xlsx` med teksterne i række 2, live LEN-formler, røde farveregler og auto-tilpassede kolonne-bredder — klar til kunde-review.
+Scriptet afviser arket i to tilfælde:
+- **Exit 1 — for lange felter** (over Googles hårde grænse). Ikke til forhandling: ret teksten og kør igen.
+- **Exit 2 — kvalitets-gate fejlet** (færre end 4 korte headlines, eller næsten-ens headlines). Det er normalt en reel fejl — ret teksten og kør igen. Kun hvis det er en bevidst, begrundet undtagelse: kør igen med `--allow-quality-warnings` og forklar brugeren hvorfor i dit svar. Override aldrig stiltiende.
+
+Output er en `.xlsx` med teksterne i række 2, live LEN-formler, røde farveregler og auto-tilpassede kolonne-bredder — klar til kunde-review.
 
 ## Trin 6 — Gem (write — gated)
 
@@ -277,6 +364,7 @@ Lever:
 2. **Drive-link** til samme fil uploadet via connector.
 3. **En tabel** med alle 19 strenge + tegnantal, så brugeren ser alt er sikkert.
 4. **Næste skridt (manuelt, human-in-the-loop):** del filen med kunden til review (skillen deler IKKE selv), og efter kundens rettelser: importer arket i Google Ads Editor.
+5. **Datakilder** (kort linje): landingsside (Firecrawl) + om Trin 2.5 kørte (Google Ads MCP `run_custom_gaql`, antal top-annoncer lært fra) eller blev sprunget over (ny kunde / ingen MCP).
 
 Del aldrig filen med kunden automatisk. Send aldrig nogen mail. Præsenter linket — Carl/brugeren videresender.
 
