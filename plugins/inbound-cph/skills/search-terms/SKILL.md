@@ -1,6 +1,6 @@
 ---
 name: search-terms
-description: Run a focused Google Ads search terms analysis for one client and deliver a colour-coded spreadsheet (eight tabs) that classifies every term as relevant, winner-to-promote, mis-placed, irrelevant, or borderline, grounds the calls in the client's scraped offering, and hands back an import-ready negative-keyword list. Read-only against Google Ads; builds a fresh .xlsx and saves to Drive or locally (runs in Cowork). Use when the user says "search term analyse", "soegetermer for [klient]", "find spild i [klient]", "negative keyword kandidater", "hvilke soegetermer konverterer", or "analyser search terms".
+description: Run a focused Google Ads search terms analysis for one client and deliver a colour-coded spreadsheet (eight tabs) that classifies every term as relevant (well placed), winner-to-promote, placement-problem (structural or intent mismatch with ad/LP), irrelevant, or borderline, grounds the calls in the client's scraped offering, pulls each ad group's ads + landing-page URL for intent-check, and hands back an import-ready negative-keyword list. The exact analysis window is computed and shown everywhere (Oversigt + filename). Read-only against Google Ads; builds a fresh .xlsx and saves to Drive or locally (runs in Cowork). Use when the user says "search term analyse", "soegetermer for [klient]", "find spild i [klient]", "negative keyword kandidater", "hvilke soegetermer konverterer", or "analyser search terms".
 ---
 
 # search-terms
@@ -21,7 +21,7 @@ A **keyword** is what you bid on. A **search term** is what the user actually ty
 
 1. **RELEVANT (godt placeret)** - matches the client's offering and is already correctly served, typically because it is already its own exact keyword -> **no action**, this is a health signal. Do NOT tell the user to "add as keyword" here: if the triggering keyword equals the term at EXACT match, it already is a keyword. The "add as keyword" action belongs in VINDER, not here.
 2. **VINDER** - converts well and is not yet its own exact keyword -> promote to an exact keyword so we control bid and quality. (The one action the user's original template did not separate out.)
-3. **FORKERT_PLACERET** - the term already exists as a keyword in a *different* ad group, so it is stealing traffic from where it should land -> add as a negative in the current ad group and let the right keyword serve it.
+3. **PLACEMENT_PROBLEM** - the term is relevant for the client, but it lands in the wrong place. Two sub-types (recorded in the `placement_reason` field): **struktur** (the term exists as an ENABLED keyword in another production ad group that is the canonical home) or **intent** (the ad-group the term landed in has ads/LP that do not address the search intent - even though the ad-group name might look right). Handling: negative in the wrong ad group + let the right keyword serve, or update ad/LP if the location is the canonical home but the creative is off.
 4. **IRRELEVANT** - wrong intent for this client (a service/word the client does not offer, competitor, off-category) -> add as a negative keyword.
 5. **GRAENSE** - generic or ambiguous -> flag for manual review rather than force a bucket.
 
@@ -43,7 +43,15 @@ Ask each, wait for the answer before the next.
 
 **1a. Klientnavn.** Match against `list_accessible_accounts` by account name. Present the match for confirmation: "Fandt [Kontonavn] (ID: XXXXXXXXXX) - er det den rigtige konto?" If no match, ask for the ID manually.
 
-**1b. Datointerval.** Offer "Sidste 3 maaneder (standard)", "Sidste 30 dage", or custom. **Default = last 90 days.** Search-term patterns need volume; the user's template used a 3-month window for good reason. Note: GAQL has no `LAST_90_DAYS` literal (only 7/14/30), so for the 90-day window use an explicit `segments.date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` computed as today minus 90 days. The 30-day option can use `DURING LAST_30_DAYS`.
+**1b. Datointerval.** Offer "Sidste 3 maaneder (standard)", "Sidste 30 dage", "Sidste 6 maaneder", or custom. **Default = last 90 days.** Search-term patterns need volume; the user's template used a 3-month window for good reason.
+
+Always convert the user's answer into a **concrete `BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` range** computed from today. GAQL has no `LAST_90_DAYS` literal (only 7/14/30), so we go through BETWEEN for everything except the 30-day option (where `DURING LAST_30_DAYS` is fine). The concrete start + end dates flow into:
+- All three GAQL queries in Trin 2 (same window everywhere)
+- The Oversigt block ("Periode: 13. feb 2026 - 12. maj 2026 (3 maaneder)")
+- The output filename (`Search Terms - <klient> - YYYY-MM-DD til YYYY-MM-DD.xlsx`)
+- The `--period` arg passed to `build-sheet.py`
+
+This is non-negotiable: every deliverable must show the exact window it covers. The user's template did this and it is what makes the analysis auditable.
 
 **1c. Landingsside / website.** Ask for the client's main URL. Used to ground classification in what the client actually offers (Trin 2c). If the user does not have it, fall back to asking them to describe the offering.
 
@@ -91,11 +99,24 @@ FROM keyword_view
 WHERE campaign.status = 'ENABLED' AND ad_group_criterion.status = 'ENABLED'
 ```
 
-Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`, **excluding test/duplicate campaigns** (names matching `/w2m|test|vol 2/i` - confirm against the actual campaign list). This is what makes FORKERT_PLACERET detectable without false-positiving on parallel test campaigns.
+Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`, **excluding test/duplicate campaigns** (names matching `/w2m|test|vol 2/i` - confirm against the actual campaign list). This is what makes PLACEMENT_PROBLEM detectable without false-positiving on parallel test campaigns.
 
 **2c. Client offering via Firecrawl.** Scrape the landing page / website from intake (same pattern as `ads-audit`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
 
-**2d. Account total search cost** for coverage reporting:
+**2d. Ad-group ads + landing pages** for the intent-mismatch half of PLACEMENT_PROBLEM. Without this we can only see *structural* placement issues (keyword exists in two ad groups), never *intent* issues (term is relevant and ad-group name fits, but the actual ad and LP do not address the search intent). DSC's `Grupperejser` ad group in campaign 2 has `final_urls: ["https://danskstudiecenter.dk/"]` (the front page, not a grupperejse-LP) - that is exactly the kind of thing this pull catches.
+
+```sql
+SELECT campaign.name, ad_group.name,
+       ad_group_ad.ad.final_urls,
+       ad_group_ad.ad.responsive_search_ad.headlines
+FROM ad_group_ad
+WHERE campaign.status = 'ENABLED'
+  AND ad_group_ad.status = 'ENABLED'
+```
+
+Build a map `(campaign, ad_group) -> {final_urls: [...], headlines: [top 6 unpinned headline texts]}`. Cap headlines at 6 to keep the LLM context tight. If an ad group has no ENABLED ad (rare), record `null` and skip the intent check for terms in that group.
+
+**2e. Account total search cost** for coverage reporting:
 
 ```sql
 SELECT metrics.cost_micros FROM campaign
@@ -123,10 +144,16 @@ Account references (compute once):
 
 Classify each term into exactly one bucket, in this priority order:
 
-1. **FORKERT_PLACERET** - the term (normalised) exists as an ENABLED keyword in **2+ ad groups**, or in a **different** ad group than the one it served here (from the 2b map). It is pulling traffic away from its canonical home. **Two rules learned from the live DSC test:**
+1. **PLACEMENT_PROBLEM** - the term is relevant for the client but lands in the wrong place. Set `placement_reason` to either `struktur` or `intent`.
+
+   **a. struktur** - the term (normalised) exists as an ENABLED keyword in **2+ ad groups**, or in a **different** ad group than the one it served here (from the 2b map). It is pulling traffic away from its canonical home. **Two rules learned from the live DSC test:**
    - **Filter test/duplicate campaigns out of the keyword map first.** DSC had parallel `W2M ...`, `... TEST`, `Own Brand ... vol 2` campaigns. A keyword's presence in a *test* campaign is not a legitimate "correct home" - only count production campaigns (heuristic: exclude names matching `/w2m|test|vol 2/i`; confirm the prod set by listing campaign names once at the start). Without this filter you false-positive on correctly-placed terms.
    - **The biggest cases have the keyword in BOTH the served ad group and another one** (e.g. "grupperejser" is an EXACT keyword in both `2 > Grupperejser` and `3 > Grupperejser`). The structural check only *nominates* these; the LLM picks the canonical home (the conventional call: Destination over Generisk, Brand over non-Brand, exact-intent ad group over catch-all) and recommends a negative in the others. Do not auto-pick.
-   Begrundelse names the other ad group(s) + match type, e.g. "Eksisterer ogsaa som keyword i [Kampagne > Ad group] (EXACT); kanonisk hjem er X. Tilfoej negativ i [den forkerte gruppe]." Suggested negative level = ad group.
+   Begrundelse names the other ad group(s) + match type, e.g. "Struktur: eksisterer ogsaa som keyword i [Kampagne > Ad group] (EXACT); kanonisk hjem er X. Tilfoej negativ i [den forkerte gruppe]."
+
+   **b. intent** - the term is relevant, lives in only one ad group (no struktur problem), but the ad group's ad and LP do not address the search intent. The LLM compares the term against the ad group's top headlines + final URL (from 2d): does a user searching this term actually get a relevant ad and land on a page that answers their query? Begrundelse names the mismatch concretely, e.g. "Intent: term 'grupperejse til bali' lander i ad group X, men LP peger paa forsiden (/) og annoncen taler om generelle grupperejser, ikke Bali. Anbefal at flytte termen til Bali-gruppen eller opdater LP."
+
+   Suggested negative level for struktur = ad group. For intent: either negative-in-current + adjust the right home, OR update the ad/LP if this *is* the canonical home (the LLM flags which).
 
 2. **IRRELEVANT** - the term does not fit the client's offering (from 2c) or is clear off-intent (gratis, selv/DIY, jobs/stilling, brugt, wikipedia/forum, competitor). This is the LLM judgement, grounded in the scraped offering. Begrundelse names the offending token, e.g. "Indeholder 'studierejse' som DSC ikke tilbyder." Suggested level = account-shared list if generic, else campaign.
 
@@ -136,15 +163,15 @@ Classify each term into exactly one bucket, in this priority order:
 
 5. **GRAENSE** - generic/ambiguous, cannot be confidently assigned (e.g. a broad head term that could be relevant or not). Begrundelse: "Generisk soegning - vurder manuelt." Honest bucket; do not force these.
 
-A term that is both convertible and mis-placed is FORKERT_PLACERET (priority 1) - placement is the more actionable fix.
+A term that is both convertible and mis-placed is PLACEMENT_PROBLEM (priority 1) - placement is the more actionable fix.
 
 ## Trin 4 - Anbefalede negatives (synthese)
 
-Build the import-ready list from FORKERT_PLACERET + IRRELEVANT (and any GRAENSE the analysis confirms as waste). One row per recommended negative:
+Build the import-ready list from PLACEMENT_PROBLEM + IRRELEVANT (and any GRAENSE the analysis confirms as waste). One row per recommended negative:
 `Negative keyword | Anbefalet match type | Hvor (niveau) | Spildt budget (DKK) | Begrundelse`
 
 - **Match type:** EXACT for placement fixes (block the precise term), PHRASE for generic-irrelevant tokens that should catch variants.
-- **Hvor:** ad group for FORKERT_PLACERET; account/shared list for generic IRRELEVANT; campaign for client-specific irrelevant.
+- **Hvor:** ad group for PLACEMENT_PROBLEM; account/shared list for generic IRRELEVANT; campaign for client-specific irrelevant.
 - **Spildt budget:** the term's spend over the window.
 - Deduplicate by (negative, level). This tab is what the ads team imports into Editor.
 
@@ -161,14 +188,15 @@ A fresh `.xlsx` is built each run by `build-sheet.py` (openpyxl) and saved to Dr
 Steps:
 
 1. Write the analysis to a JSON file matching the schema in the header of `build-sheet.py`: client + account_id + period + scope + filter, `offering` (scraped), `method_notes`, `distribution` (count + spend per bucket), `rows` (every term once, each tagged with its `klassificering`), and `negatives` (the synthesised import list). The script routes rows into per-tab views by `klassificering` itself.
-2. Build the workbook:
+2. Build the workbook (filename carries the analysed window, not the build date):
    ```bash
    python3 ${CLAUDE_PLUGIN_ROOT}/skills/search-terms/build-sheet.py \
      --in <analysis.json> \
-     --out "Search Terms - <klient> - <YYYY-MM-DD>.xlsx"
+     --out "Search Terms - <klient> - <start> til <end>.xlsx"
    ```
+   The `period` field in the JSON is what shows in Oversigt; the dates in the filename should match the same window.
 3. **Drive (gated):** show destination folder + filename, confirm, then upload the `.xlsx` via the Drive connector `create_file` (same params as rsa-copy):
-   - `title`: `Search Terms - <klient> - <YYYY-MM-DD>`
+   - `title`: `Search Terms - <klient> - <start> til <end>`
    - `parentId`: the folder from intake (or omit for root)
    - `contentMimeType`: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
    - `base64Content`: base64 of the `.xlsx`
@@ -185,7 +213,7 @@ Note column widths, header style, and classification fills come from `build-shee
 | Alle search terms | hver term een gang, klassificerings-kolonne farvet pr. bucket |
 | Godt placeret (ingen handling) | RELEVANT-termer (allerede korrekt placeret, intet at goere) |
 | Vindere (promover til exact) | VINDER-termer |
-| Forkert placeret | FORKERT_PLACERET-termer |
+| Placement-problem | PLACEMENT_PROBLEM-termer (struktur eller intent), incl. Ad-group LP + Top annonce-tema kolonner |
 | Irrelevante (tilfoej negativ) | IRRELEVANT-termer |
 | Graensetilfaelde | GRAENSE-termer |
 | Anbefalede negatives | importklar negativ-liste |
@@ -195,10 +223,13 @@ Note column widths, header style, and classification fills come from `build-shee
 Term-faner (Alle + de fem klassificerings-faner) deler samme 13 kolonner:
 `Search term | Match type | Kampagne | Ad group | Triggerende keyword | Keyword match type | Budget brugt (DKK) | Impressions | Klik | CTR (%) | Konverteringer | Klassificering | Begrundelse / Anbefaling`
 
+Placement-problem-fanen har **tre ekstra kolonner** (kun her, fordi det er der intent-konteksten er relevant):
+`... | Placement-aarsag (struktur/intent) | Ad-group LP | Top annonce-tema`
+
 Anbefalede negatives:
 `Negative keyword | Anbefalet match type | Hvor (kampagne/konto-niveau) | Spildt budget (DKK) | Begrundelse`
 
-Colour palette (baked into `build-sheet.py`, matches the user's template + VINDER): header #1F4E78 white bold; classification fills RELEVANT #C6EFCE, VINDER #A9D08E, FORKERT_PLACERET #FFEB9C, IRRELEVANT #FFC7CE, GRAENSE #D9E1F2.
+Colour palette (baked into `build-sheet.py`, matches the user's template + VINDER): header #1F4E78 white bold; classification fills RELEVANT #C6EFCE, VINDER #A9D08E, PLACEMENT_PROBLEM #FFEB9C, IRRELEVANT #FFC7CE, GRAENSE #D9E1F2.
 
 ## Trin 7 - Output
 

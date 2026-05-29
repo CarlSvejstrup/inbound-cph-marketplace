@@ -8,7 +8,7 @@ The original taxonomy below (Spild / Vinder / Irrelevant / Nyt emne) was superse
 
 - **RELEVANT** - matches offering, correctly placed.
 - **VINDER** - converts well, not yet an exact keyword -> promote (our addition to the user's template).
-- **FORKERT_PLACERET** - already a keyword in a *different* ad group, stealing traffic -> negative in current ad group (the user's insight; we had missed it).
+- **PLACEMENT_PROBLEM** (was FORKERT_PLACERET in v0.7) - the term is relevant but lands in the wrong place. Two sub-types: **struktur** (already a keyword in another production ad group, stealing traffic) and **intent** (ad-group's ads/LP do not address the search intent even though the term is on-category). The intent half was added in v0.8 after the user pointed out that DSC's "Grupperejser" ad group in campaign 2 pointed to the front page, not a grupperejse-LP - exactly the kind of mismatch struktur alone misses.
 - **IRRELEVANT** - not part of the client's offering / off-intent -> negative.
 - **GRAENSE** - generic/ambiguous -> manual review.
 

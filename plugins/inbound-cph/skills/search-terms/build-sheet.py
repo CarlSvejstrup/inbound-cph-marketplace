@@ -5,7 +5,10 @@ Layout follows the field-tested template a user produced for Dansk Studie Center
 with one addition: a dedicated Vindere tab (converting terms not yet exact keywords).
 Eight sheets:
   Oversigt | Alle search terms | Godt placeret (ingen handling) | Vindere (promover til exact)
-  | Forkert placeret | Irrelevante (tilfoej negativ) | Graensetilfaelde | Anbefalede negatives
+  | Placement-problem | Irrelevante (tilfoej negativ) | Graensetilfaelde | Anbefalede negatives
+
+The Placement-problem tab has three extra columns (Placement-aarsag, Ad-group LP,
+Top annonce-tema) that the other term tabs do not - intent context lives there.
 
 Colours, header style, classification row-fills, and freeze panes are baked into the
 .xlsx layer, so they survive upload to Drive and render when opened in Google Sheets.
@@ -14,7 +17,7 @@ No gws / Sheets API. Runs in Cowork and locally.
 Classification values (used to colour the Klassificering column):
   RELEVANT          -> green  C6EFCE
   VINDER            -> teal   A9D08E (distinct from RELEVANT)
-  FORKERT_PLACERET  -> yellow FFEB9C
+  PLACEMENT_PROBLEM -> yellow FFEB9C  (sub-typed via row's placement_reason: struktur | intent)
   IRRELEVANT        -> red    FFC7CE
   GRAENSE           -> blue   D9E1F2
 
@@ -35,7 +38,12 @@ Input JSON schema (lists may be empty; missing keys render blank):
   // One list per classification tab. Each row is a full term record:
   "rows": [
     {"term","match_type","kampagne","ad_group","keyword","keyword_match_type",
-     "spend","impr","clicks","ctr","conv","klassificering","begrundelse"}
+     "spend","impr","clicks","ctr","conv","klassificering","begrundelse",
+     // PLACEMENT_PROBLEM rows only (ignored on other buckets):
+     "placement_reason",  // "struktur" | "intent"
+     "ad_group_lp",       // the served ad group's final URL (from ad_group_ad pull)
+     "ad_group_top_theme" // 1-line synthesis of the served ad group's top headlines
+    }
   ],
   // Anbefalede negatives: synthesised import-ready list.
   "negatives": [
@@ -63,7 +71,7 @@ HEADER_FG = "FFFFFF"
 FILL = {
     "RELEVANT": "C6EFCE",
     "VINDER": "A9D08E",
-    "FORKERT_PLACERET": "FFEB9C",
+    "PLACEMENT_PROBLEM": "FFEB9C",
     "IRRELEVANT": "FFC7CE",
     "GRAENSE": "D9E1F2",
 }
@@ -92,6 +100,11 @@ NEG_KEYS = ["negative", "match_type", "hvor", "spildt_budget", "begrundelse"]
 TERM_WIDTHS = [32, 12, 26, 22, 24, 16, 16, 12, 8, 9, 13, 18, 60]
 NEG_WIDTHS = [28, 18, 36, 22, 60]
 
+# Extra columns appended on the Placement-problem tab only (intent context).
+PLACEMENT_EXTRA_HEADERS = ["Placement-aarsag", "Ad-group LP", "Top annonce-tema"]
+PLACEMENT_EXTRA_KEYS = ["placement_reason", "ad_group_lp", "ad_group_top_theme"]
+PLACEMENT_EXTRA_WIDTHS = [16, 44, 40]
+
 
 def _fill(hex_color):
     return PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
@@ -113,11 +126,16 @@ def _header_row(ws, headers, widths):
     ws.freeze_panes = "A2"
 
 
-def _write_term_tab(wb, title, rows):
+def _write_term_tab(wb, title, rows, extra=False):
+    """Write a term tab. If extra=True (only for the placement tab), append the
+    three intent-context columns: Placement-aarsag, Ad-group LP, Top annonce-tema."""
     ws = wb.create_sheet(title)
-    _header_row(ws, TERM_HEADERS, TERM_WIDTHS)
+    headers = TERM_HEADERS + (PLACEMENT_EXTRA_HEADERS if extra else [])
+    keys = TERM_KEYS + (PLACEMENT_EXTRA_KEYS if extra else [])
+    widths = TERM_WIDTHS + (PLACEMENT_EXTRA_WIDTHS if extra else [])
+    _header_row(ws, headers, widths)
     for r, row in enumerate(rows, start=2):
-        for c, key in enumerate(TERM_KEYS, start=1):
+        for c, key in enumerate(keys, start=1):
             val = row.get(key)
             if key in ("spend", "ctr"):
                 val = _round(val)
@@ -208,7 +226,7 @@ def build(data, out_path):
     # --- Per-class tabs ---
     _write_term_tab(wb, "Godt placeret (ingen handling)", by_class("RELEVANT"))
     _write_term_tab(wb, "Vindere (promover til exact)", by_class("VINDER"))
-    _write_term_tab(wb, "Forkert placeret", by_class("FORKERT_PLACERET"))
+    _write_term_tab(wb, "Placement-problem", by_class("PLACEMENT_PROBLEM"), extra=True)
     _write_term_tab(wb, "Irrelevante (tilfoej negativ)", by_class("IRRELEVANT"))
     _write_term_tab(wb, "Graensetilfaelde", by_class("GRAENSE"))
 
