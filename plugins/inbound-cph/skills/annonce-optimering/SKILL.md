@@ -22,10 +22,10 @@ Derfor: skillet dømmer **aldrig** en asset på dens konverteringsrate. Det rapp
 - Tæller aktive RSA per ad group → flag ad groups med <2 (byg en challenger).
 - Finder dødvægt-assets (aldrig serveret / næsten-nul impressions) → kandidater til at skære.
 - Klassificerer serverede assets på vinkel-type og finder vinkler uden serveret asset → **gap-brief** til `annoncetekster-v2`.
-- Viser Googles `performance_label` KUN når den er BEST/GOOD/LOW; ellers "Google har ikke nok data endnu".
+- Klassificerer hver asset som DØDVÆGT / FOR NY / AKTIV ud fra `MIN_IMPRESSIONS`.
 
 **Det gør IKKE:**
-- Dømmer ikke assets på CVR (konfunderet + under signifikans). En valgfri CVR-indikation vises kun bag en hård signifikans-tærskel; ellers "utilstrækkelig data".
+- Dømmer ikke assets på CVR (konfunderet + under signifikans). Google-label og CVR-indikation vises slet ikke i arket — på Inbounds konti er de altid identiske ("ikke nok data" / "utilstrækkelig data"), så de er fjernet som støj. Skillet kan stadig bruge dem internt til status-logikken, men de er ikke en kolonne.
 - Skriver/redigerer/pauser aldrig på kontoen. Alt er anbefalinger (human-in-the-loop hard rule).
 - Vurderer aldrig pausede kampagner/annoncer (bevidste — ekskluderes, flages aldrig som negativt fund).
 
@@ -92,18 +92,18 @@ Tæl distinkte ad-id'er per (kampagne, ad group).
 
 ## Trin 3 — Klassificér (struktur, ikke profit)
 
-For hver asset, beregn `status`:
-- **DOEDVAEGT** — impressions under `MIN_IMPRESSIONS` (eller 0). Et dæknings-faktum, ikke en CVR-dom.
-- **FOR_NY** — `performance_label` er `LEARNING` eller `PENDING` OG impressions er lave. "Google lærer stadig — rør ikke endnu."
-- **AKTIV** — serveres med rimeligt volumen.
+For hver asset, beregn `status` (skriv ASCII-enummet i JSON; arket viser den danske form):
+- **DOEDVAEGT** (vises som **DØDVÆGT**) — impressions under `MIN_IMPRESSIONS` (eller 0). Et dæknings-faktum, ikke en CVR-dom. Dvs. Google serverer den næsten aldrig.
+- **FOR_NY** (vises som **FOR NY**) — `performance_label` er `LEARNING`/`PENDING` OG impressions er lave. "Google lærer stadig — rør ikke endnu."
+- **AKTIV** — impressions på eller over `MIN_IMPRESSIONS`. Serveres med rimeligt volumen.
+
+Tærsklen er bevidst en ren impression-grænse (ikke konvertering), fordi CVR-data er upålidelig på disse konti.
 
 For hver asset, udled `vinkel` (benefit / trust / urgency / CTA / feature / keyword-led / brand / location / garanti — samme taksonomi som `annoncetekster-v2/references/headline-craft.md`). Brug asset-teksten.
 
 Per ad group: hvilke vinkler har INGEN serveret asset? Det er `manglende_vinkler` → fødes til gap-brief.
 
-`google_label`: behold rå-værdien; `build-sheet.py` viser den kun hvis den er BEST/GOOD/LOW, ellers "Google har ikke nok data endnu".
-
-`cvr_hint`: lad den være tom MEDMINDRE en asset overstiger en hård signifikans-tærskel (fx ≥100 impressions OG ≥10 konverteringer — på næsten alle Inbound-konti vil ingen asset nå det, og det er ærligt). Når tom → scriptet skriver "utilstrækkelig data".
+`google_label` og `cvr_hint`: behøves IKKE i `analysis.json` — de vises ikke længere som kolonner (altid identiske på Inbounds konti, fjernet som støj). Hvis du vil bruge en signifikans-gate til status-logikken internt, så gør det i din egen klassificering; arket viser kun `status`.
 
 **Anbefalinger er recommend-only.** Eksempler: "Aldrig serveret — kandidat til at skære." / "Kun 1 RSA i denne ad group — byg en challenger." / "Mangler en CTA-vinkel — tilføj i næste runde." Aldrig "fjern denne" som en kommando; altid som forslag til mennesket.
 
@@ -121,7 +121,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/annonce-optimering/build-sheet.py \
   --out "Annonce-optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Output: en `.xlsx` med fire faner — **Oversigt** (med en ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler), **Assets** (status-farvet, label-maskeret), **Gap-brief** (til annoncetekster-v2).
+Output: en `.xlsx` med fanerne — **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler), **én fane pr. ad group** (assets for den gruppe, status-farvet; fuldt kampagne- + ad group-navn står i toppen af fanen, da fanenavnet kan være afkortet til Excels 31-tegns-grænse), og **Gap-brief** (til annoncetekster-v2). Asset-fanerne har kolonnerne `Felt | Tekst | Vinkel | Impressions | Klik | Spend (DKK) | Status | Anbefaling` — Google-label og CVR-indikation er fjernet.
 
 ## Trin 6 — Gem (write — gated)
 

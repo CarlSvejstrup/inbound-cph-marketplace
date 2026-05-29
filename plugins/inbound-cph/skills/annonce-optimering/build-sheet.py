@@ -46,13 +46,16 @@ Input JSON schema (lists may be empty; missing keys render blank):
      "manglende_vinkler": ["urgency", "CTA"]}   // angles with no served asset -> gap-brief
   ],
 
-  // Per asset row (headline/description).
+  // Per asset row (headline/description). Grouped into ONE TAB PER AD GROUP by
+  // (kampagne, ad_group). The Google-label and CVR columns were intentionally
+  // dropped from the sheet: on Inbound's accounts every row is identical
+  // ("ikke nok data endnu" / "utilstraekkelig data"), so they were noise. The
+  // skill may still compute cvr_hint internally for the significance gate, but
+  // it is not rendered.
   "assets": [
     {"kampagne","ad_group","felt_type","tekst","vinkel",
      "impressions","clicks","cost",
-     "google_label",          // shown only if BEST/GOOD/LOW; else rendered as the "ikke nok data" note
-     "status",                // "DOEDVAEGT" | "AKTIV" | "FOR_NY"
-     "cvr_hint",              // "" or a value only when significance floor passed; else "utilstraekkelig data"
+     "status",                // "DOEDVAEGT" | "AKTIV" | "FOR_NY" (shown as DØDVÆGT / AKTIV / FOR NY)
      "anbefaling"}            // recommend-only text
   ],
 
@@ -96,16 +99,17 @@ from openpyxl.utils import get_column_letter  # noqa: E402
 HEADER_BG = "1F4E78"
 HEADER_FG = "FFFFFF"
 # Status colours: dead weight = red, active = green, too-new = blue.
+# Keys are the ASCII enums the skill writes into status; STATUS_DISPLAY maps
+# them to the real Danish shown in the sheet.
 STATUS_FILL = {
     "DOEDVAEGT": "FFC7CE",
     "AKTIV": "C6EFCE",
     "FOR_NY": "D9E1F2",
 }
-# Google label colours, only used when a real BEST/GOOD/LOW is present.
-LABEL_FILL = {
-    "BEST": "C6EFCE",
-    "GOOD": "A9D08E",
-    "LOW": "FFC7CE",
+STATUS_DISPLAY = {
+    "DOEDVAEGT": "DØDVÆGT",
+    "AKTIV": "AKTIV",
+    "FOR_NY": "FOR NY",
 }
 FLAG_FILL = "FFEB9C"  # yellow for challenger flags / missing angles
 
@@ -118,27 +122,26 @@ AG_HEADERS = [
     "Kampagne", "Ad group", "Antal aktive RSA", "Byg challenger?",
     "Manglende vinkler (gap-brief)",
 ]
-AG_KEYS = ["kampagne", "ad_group", "rsa_count", "challenger_flag", "manglende_vinkler"]
 AG_WIDTHS = [26, 24, 16, 16, 40]
 
+# Per-ad-group asset tab. Google-label and CVR-indikation columns were removed:
+# on Inbound's accounts they are always identical ("ikke nok data endnu" /
+# "utilstrækkelig data"), so they carried no information.
 ASSET_HEADERS = [
-    "Kampagne", "Ad group", "Felt", "Tekst", "Vinkel",
-    "Impressions", "Klik", "Spend (DKK)", "Google-label", "Status",
-    "CVR-indikation", "Anbefaling",
+    "Felt", "Tekst", "Vinkel", "Impressions", "Klik", "Spend (DKK)",
+    "Status", "Anbefaling",
 ]
 ASSET_KEYS = [
-    "kampagne", "ad_group", "felt_type", "tekst", "vinkel",
-    "impressions", "clicks", "cost", "google_label", "status",
-    "cvr_hint", "anbefaling",
+    "felt_type", "tekst", "vinkel", "impressions", "clicks", "cost",
+    "status", "anbefaling",
 ]
-ASSET_WIDTHS = [22, 22, 12, 40, 14, 12, 8, 12, 14, 12, 18, 50]
+ASSET_WIDTHS = [12, 42, 16, 12, 8, 12, 12, 52]
+# 0-based index of the Status column within ASSET_KEYS (for colouring).
+STATUS_COL = ASSET_KEYS.index("status") + 1
 
 GAP_HEADERS = ["Kampagne", "Ad group", "Manglende vinkler", "Forslag til challenger"]
 GAP_KEYS = ["kampagne", "ad_group", "manglende_vinkler", "forslag"]
 GAP_WIDTHS = [24, 24, 30, 56]
-
-LABEL_NOTE = "Google har ikke nok data endnu"
-CVR_NOTE = "utilstraekkelig data"
 
 
 def _fill(hex_color):
@@ -188,10 +191,9 @@ def _oversigt(wb, data):
     ws.cell(row=r, column=1, value="Hvad rapporten er").font = SECTION_FONT
     r += 1
     for line in [
-        "Strukturel asset-hygiejne: RSA-daekning, doedvaegt-assets, vinkel-huller.",
-        "Den doemmer IKKE assets paa konverteringsrate - per-asset CVR i Google er",
+        "Strukturel asset-hygiejne: RSA-dækning, dødvægt-assets, vinkel-huller.",
+        "Den dømmer IKKE assets på konverteringsrate - per-asset CVR i Google er",
         "konfunderet (samme klik tilskrives alle serverede assets) og under signifikans.",
-        "Google-label vises kun naar den er BEST/GOOD/LOW; ellers 'ikke nok data endnu'.",
         "Alt er anbefalinger - intet redigeres, pauses eller skrives til kontoen.",
     ]:
         ws.cell(row=r, column=1, value=line).alignment = WRAP
@@ -207,14 +209,14 @@ def _oversigt(wb, data):
 
 
 def _ad_group_tab(wb, data):
-    ws = wb.create_sheet("Ad group-daekning")
+    ws = wb.create_sheet("Ad group-dækning")
     _header_row(ws, AG_HEADERS, AG_WIDTHS)
     for r, row in enumerate(data.get("ad_groups", []), start=2):
         ws.cell(row=r, column=1, value=row.get("kampagne")).alignment = WRAP
         ws.cell(row=r, column=2, value=row.get("ad_group")).alignment = WRAP
         ws.cell(row=r, column=3, value=row.get("rsa_count"))
         flag = bool(row.get("challenger_flag"))
-        fc = ws.cell(row=r, column=4, value="JA - byg challenger" if flag else "OK")
+        fc = ws.cell(row=r, column=4, value="JA - byg challenger" if flag else "OK")  # noqa
         if flag:
             fc.fill = _fill(FLAG_FILL)
         mc = ws.cell(row=r, column=5, value=_join(row.get("manglende_vinkler")))
@@ -223,28 +225,75 @@ def _ad_group_tab(wb, data):
             mc.fill = _fill(FLAG_FILL)
 
 
-def _assets_tab(wb, data):
-    ws = wb.create_sheet("Assets")
-    _header_row(ws, ASSET_HEADERS, ASSET_WIDTHS)
-    for r, row in enumerate(data.get("assets", []), start=2):
-        for c, key in enumerate(ASSET_KEYS, start=1):
-            val = row.get(key)
-            if key == "cost":
-                val = _round(val)
-            if key == "google_label":
-                # Only surface a real label; otherwise the honest note.
-                val = val if val in LABEL_FILL else LABEL_NOTE
-            if key == "cvr_hint" and not val:
-                val = CVR_NOTE
-            ws.cell(row=r, column=c, value=val).alignment = WRAP
-        # Colour the Status cell (col 10).
-        status = row.get("status")
-        if status in STATUS_FILL:
-            ws.cell(row=r, column=10).fill = _fill(STATUS_FILL[status])
-        # Colour the Google-label cell (col 9) only when it is a real label.
-        label = row.get("google_label")
-        if label in LABEL_FILL:
-            ws.cell(row=r, column=9).fill = _fill(LABEL_FILL[label])
+_TAB_FORBIDDEN = ':\\/?*[]'
+
+
+def _safe_tab_name(base, used):
+    """Excel tab names: max 31 chars, none of : \\ / ? * [ ], and unique.
+    Sanitise, truncate, and de-dupe with a numeric suffix."""
+    name = "".join("-" if ch in _TAB_FORBIDDEN else ch for ch in (base or "")).strip()
+    name = name or "Ad group"
+    name = name[:31]
+    if name not in used:
+        used.add(name)
+        return name
+    # De-dupe: append " (n)" while staying within 31 chars.
+    i = 2
+    while True:
+        suffix = f" ({i})"
+        candidate = name[:31 - len(suffix)] + suffix
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+        i += 1
+
+
+def _asset_tabs(wb, data):
+    """One tab per ad group. Each tab holds that ad group's assets, with the
+    campaign + ad group named in a header row above the table."""
+    assets = data.get("assets", [])
+    # Group assets by (kampagne, ad_group), preserving first-seen order.
+    groups = {}
+    order = []
+    for row in assets:
+        key = (row.get("kampagne", ""), row.get("ad_group", ""))
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+
+    used_names = set()
+    for kampagne, ad_group in order:
+        ws = wb.create_sheet(_safe_tab_name(ad_group, used_names))
+        # Context header (full names live here; the tab label may be truncated).
+        ws["A1"] = "Ad group:"
+        ws["A1"].font = SECTION_FONT
+        ws["B1"] = ad_group
+        ws["A2"] = "Kampagne:"
+        ws["A2"].font = SECTION_FONT
+        ws["B2"] = kampagne
+        # Table starts at row 4.
+        head_row = 4
+        fill = _fill(HEADER_BG)
+        for c, head in enumerate(ASSET_HEADERS, start=1):
+            cell = ws.cell(row=head_row, column=c, value=head)
+            cell.fill = fill
+            cell.font = HEADER_FONT
+            cell.alignment = WRAP
+        for i, w in enumerate(ASSET_WIDTHS, start=1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+        ws.freeze_panes = f"A{head_row + 1}"
+        for r, row in enumerate(groups[(kampagne, ad_group)], start=head_row + 1):
+            for c, key in enumerate(ASSET_KEYS, start=1):
+                val = row.get(key)
+                if key == "cost":
+                    val = _round(val)
+                if key == "status":
+                    val = STATUS_DISPLAY.get(val, val)
+                ws.cell(row=r, column=c, value=val).alignment = WRAP
+            status = row.get("status")
+            if status in STATUS_FILL:
+                ws.cell(row=r, column=STATUS_COL).fill = _fill(STATUS_FILL[status])
 
 
 def _gap_tab(wb, data):
@@ -261,7 +310,7 @@ def build(data, out_path):
     wb = openpyxl.Workbook()
     _oversigt(wb, data)
     _ad_group_tab(wb, data)
-    _assets_tab(wb, data)
+    _asset_tabs(wb, data)
     _gap_tab(wb, data)
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)
