@@ -95,7 +95,7 @@ Grunden: vi vil bygge muskelhukommelse om Inbounds navngivningskonvention og fan
 
 Udled så meget som muligt fra samtalen og landingssiden FØR du spørger. Hvis Carl allerede har sagt klientnavn og URL i samme besked, behøver du ikke spørge om dem — bekræft dem som første option `(Anbefalet)` i det første kald, eller spring dem helt over og gå direkte til kampagnetype.
 
-### Kald 1 — Identitet, kampagnetype og sprog (1 AskUserQuestion, 2-4 spørgsmål)
+### Kald 1 — Identitet, kampagnetype, sprog og antal RSA'er (1 AskUserQuestion, op til 4 spørgsmål)
 
 Saml i samme kald:
 1. **Klient + URL** — kun hvis ikke allerede klart fra samtalen. Ellers spring over.
@@ -104,6 +104,15 @@ Saml i samme kald:
    - Display / YouTube / Demand Gen — `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
    - Audience — `YYYY-MD - IC - Audience type - Audience navn`
 3. **Annoncetekst-sprog** (altid spørg): hvilket sprog skal selve annonceteksterne skrives på? Vis som options med `Dansk (Anbefalet)` som første, derefter `Engelsk`, `Svensk`, `Norsk` — og "Other" til alt andet. Default er **dansk**. Dette styrer KUN annonceteksterne; samtalen/intaken kører fortsat på dansk medmindre brugeren skriver på engelsk (se Trin 0). Hvis landingssiden senere viser sig at være på et andet sprog end det valgte, så nævn uoverensstemmelsen for brugeren før du skriver teksterne — gæt ikke.
+
+4. **Antal RSA'er + vinkler** (altid spørg): hvor mange RSA'er til dette ad group, og hvilke led-vinkler? `AskUserQuestion` med `multiSelect: true`. Vis disse options i denne rækkefølge:
+   - `1 RSA (Anbefalet)` — én stærk annonce, hele 9-vinkel-mixet. Default. Vælges denne, ignorér resten.
+   - `Features` — leder med produkt-/ydelse-spec.
+   - `Benefits` — leder med udbytte/resultat.
+   - `Trust signals` — leder med social proof / trust-tal.
+   - `Clear call-to-action` — leder med tilbud / urgency / handling.
+   
+   Brugeren vælger enten `1 RSA` ELLER 2-4 af vinkel-options'ene (én RSA per valgt vinkel). Forklar i spørgsmålsteksten at hver valgt vinkel bliver til én komplet RSA der *leder* med den vinkel men stadig bærer hele mixet (ikke en mono-tematisk annonce — se Trin 4). Default-vinkel-sættet hvis brugeren vil have flere men ikke specificerer hvilke: **Features, Benefits, Trust signals, Clear CTA** (vælg de første N af den rækkefølge). Begrund kort: best practice er 2-3 distinkte RSA'er per ad group, men Google er drevet mod 1-2 høj-Ad-Strength annoncer frem for 3 tynde — derfor er 1 default, og 2-3 kun når brugeren beder om det.
 
 ### Kald 2 — Navngivnings-felter komprimeret (1 AskUserQuestion, 2-4 spørgsmål)
 
@@ -156,6 +165,7 @@ Begrund overordnet: top-keyword skal stå i mindst 3 headlines for Google's rele
 
 Saml svarene og vis dem som en kort liste til brugeren før du går til Trin 2:
 - Klient, URL, kampagnenavn
+- Antal RSA'er + valgte led-vinkler (fx "3 RSA'er: Features, Benefits, Trust signals")
 - Top-USP, tilbud, trust-tal, voice, banned words, top-keywords
 
 Vent på "OK" / "go" / lignende kort bekræftelse. Hvis brugeren retter noget: opdater og bekræft igen.
@@ -342,25 +352,26 @@ Målene er en **consumer-default** (alarm-eksemplet). De bøjer sig efter branch
 
 Gennemgå kvalitets-check-listen fra reference-filen før du skriver `ads.json`.
 
-### Flere RSA'er i samme ad group (kun når brugeren beder om det)
+### Flere RSA'er i samme ad group (styret af Kald 1, spørgsmål 4)
 
-Best practice anbefaler **2-3 RSA'er per ad group** med distinkte vinkler. Hvis brugeren vil have flere RSA'er, skal du forstå hvad "distinkt vinkel" faktisk betyder her — det er den nemmeste regel at læse forkert:
+**Antallet og vinklerne er allerede valgt af brugeren** i intake (Kald 1, spørgsmål 4 — "Antal RSA'er + vinkler"). Du beslutter det IKKE selv her. Hver led-vinkel brugeren valgte (Features / Benefits / Trust signals / Clear CTA) bliver til én komplet RSA der leder med den vinkel. Valgte brugeren `1 RSA`, så laver du kun én — spring resten af denne sektion over.
+
+Hvis brugeren bad om flere RSA'er, skal du forstå hvad "distinkt vinkel" faktisk betyder her — det er den nemmeste regel at læse forkert:
 
 > **Distinkt vinkel = distinkt LED/vægtning og formulering, IKKE en mono-tematisk annonce.**
 
-Hver RSA er stadig et **komplet 15-headline-sæt med hele 9-vinkel-mixet ovenfor**. Forskellen mellem RSA 1, 2 og 3 er hvilken vinkel der *leder* og hvilke ord der bruges — ikke at den ene kun har features og den anden kun trust.
+Hver RSA er stadig et **komplet 15-headline-sæt med hele 9-vinkel-mixet ovenfor**. Forskellen mellem RSA'erne er hvilken vinkel der *leder* og hvilke ord der bruges — ikke at den ene kun har features og den anden kun trust. Mapping fra brugerens valg i Kald 1 til led-vinkel:
 
-| | Leder med | Stadig med (hele mixet) |
+| Bruger valgte | RSA leder med | Stadig med (hele mixet) |
 |---|---|---|
-| **RSA 1** | Features / produkt-spec | + benefit, trust, CTA, keyword-led, … |
-| **RSA 2** | Trust / social proof (omformuleret) | + benefit, feature, CTA, keyword-led, … |
-| **RSA 3** | Tilbud / urgency / CTA | + benefit, feature, trust, keyword-led, … |
+| **Features** | Produkt-/ydelse-spec | + benefit, trust, CTA, keyword-led, … |
+| **Benefits** | Udbytte / resultat | + feature, trust, CTA, keyword-led, … |
+| **Trust signals** | Social proof / trust-tal (omformuleret) | + benefit, feature, CTA, keyword-led, … |
+| **Clear CTA** | Tilbud / urgency / handling | + benefit, feature, trust, keyword-led, … |
 
-**Hvorfor ikke mono-tematiske RSA'er:** en RSA der KUN er trust-headlines ville (a) dumpe vinkel-auditen ovenfor, og (b) trippe `fill-sheet.py`'s næsten-ens-gate (3+ headlines der deler de første 12 tegn afvises). Reference-filen og scriptets gates vinder hver konflikt — også her. Du laver tre *fuldt udfyldte* RSA'er der hver især består auditen, ikke tre tynde tema-annoncer.
+**Hvorfor ikke mono-tematiske RSA'er:** en RSA der KUN er trust-headlines ville (a) dumpe vinkel-auditen ovenfor, og (b) trippe `fill-sheet.py`'s næsten-ens-gate (3+ headlines der deler de første 12 tegn afvises). Reference-filen og scriptets gates vinder hver konflikt — også her. Du laver *fuldt udfyldte* RSA'er der hver især består auditen, ikke tynde tema-annoncer.
 
 **Vinkel-auditen køres PER RSA.** Med N RSA'er skriver du N audit-tabeller (én per annonce) i dit svar. Hver enkelt RSA skal selvstændigt opfylde mixet og længde-variationen — gatene tjekker hver række for sig.
-
-**Antal:** default er 1. Google er drevet mod 1-2 RSA'er med høj Ad Strength frem for 3 tynde. Lav 2-3 kun når brugeren beder om det, og kun hvis du kan give hver sin reelle led-vinkel. To stærke slår tre svage.
 
 Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i intake (Trin 1, punkt 8).
 
