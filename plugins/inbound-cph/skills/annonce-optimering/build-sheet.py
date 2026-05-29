@@ -248,9 +248,65 @@ def _safe_tab_name(base, used):
         i += 1
 
 
+def _ad_group_overview(ws, start_row, kampagne, ad_group, group_assets, ag_meta):
+    """Write a compact per-ad-group overview block. Returns the row after it.
+
+    Shows the facts that hold without significance: campaign + ad group, RSA
+    count + challenger flag, asset counts split by status and by field type, and
+    the missing angles (gap-brief). All derived from data we already have."""
+    r = start_row
+    ws.cell(row=r, column=1, value="Ad group:").font = SECTION_FONT
+    ws.cell(row=r, column=2, value=ad_group)
+    r += 1
+    ws.cell(row=r, column=1, value="Kampagne:").font = SECTION_FONT
+    ws.cell(row=r, column=2, value=kampagne)
+    r += 1
+
+    ws.cell(row=r, column=1, value="Overblik").font = SECTION_FONT
+    r += 1
+
+    # Counts derived from this group's assets.
+    n_assets = len(group_assets)
+    by_status = {"AKTIV": 0, "DOEDVAEGT": 0, "FOR_NY": 0}
+    n_head = n_desc = 0
+    for a in group_assets:
+        st = a.get("status")
+        if st in by_status:
+            by_status[st] += 1
+        ft = (a.get("felt_type") or "").upper()
+        if ft == "HEADLINE":
+            n_head += 1
+        elif ft == "DESCRIPTION":
+            n_desc += 1
+
+    rsa_count = ag_meta.get("rsa_count")
+    challenger = bool(ag_meta.get("challenger_flag"))
+    mangler = ag_meta.get("manglende_vinkler") or []
+
+    rows = [
+        ("Aktive RSA i gruppen:", rsa_count if rsa_count is not None else "?"),
+        ("Byg challenger?", "JA - kun under 2 RSA" if challenger else "OK - mindst 2 RSA"),
+        ("Assets i alt:", f"{n_assets} ({n_head} headlines, {n_desc} descriptions)"),
+        ("Status-fordeling:",
+         f"{by_status['AKTIV']} aktive / {by_status['DOEDVAEGT']} dødvægt / {by_status['FOR_NY']} for ny"),
+        ("Manglende vinkler:", ", ".join(mangler) if mangler else "ingen - fuldt dækket"),
+    ]
+    for label, val in rows:
+        ws.cell(row=r, column=1, value=label).font = SECTION_FONT
+        c = ws.cell(row=r, column=2, value=val)
+        c.alignment = WRAP
+        # Highlight the two action-bearing lines.
+        if label == "Byg challenger?" and challenger:
+            c.fill = _fill(FLAG_FILL)
+        if label == "Manglende vinkler:" and mangler:
+            c.fill = _fill(FLAG_FILL)
+        r += 1
+    return r + 1  # blank spacer row after the block
+
+
 def _asset_tabs(wb, data):
-    """One tab per ad group. Each tab holds that ad group's assets, with the
-    campaign + ad group named in a header row above the table."""
+    """One tab per ad group. Each tab opens with a per-ad-group overview block,
+    then the asset table for that group."""
     assets = data.get("assets", [])
     # Group assets by (kampagne, ad_group), preserving first-seen order.
     groups = {}
@@ -262,18 +318,18 @@ def _asset_tabs(wb, data):
             order.append(key)
         groups[key].append(row)
 
+    # Lookup of ad-group metadata (rsa_count, challenger_flag, manglende_vinkler).
+    ag_lookup = {
+        (g.get("kampagne", ""), g.get("ad_group", "")): g
+        for g in data.get("ad_groups", [])
+    }
+
     used_names = set()
     for kampagne, ad_group in order:
         ws = wb.create_sheet(_safe_tab_name(ad_group, used_names))
-        # Context header (full names live here; the tab label may be truncated).
-        ws["A1"] = "Ad group:"
-        ws["A1"].font = SECTION_FONT
-        ws["B1"] = ad_group
-        ws["A2"] = "Kampagne:"
-        ws["A2"].font = SECTION_FONT
-        ws["B2"] = kampagne
-        # Table starts at row 4.
-        head_row = 4
+        ag_meta = ag_lookup.get((kampagne, ad_group), {})
+        # Overview block (full names live here; the tab label may be truncated).
+        head_row = _ad_group_overview(ws, 1, kampagne, ad_group, groups[(kampagne, ad_group)], ag_meta)
         fill = _fill(HEADER_BG)
         for c, head in enumerate(ASSET_HEADERS, start=1):
             cell = ws.cell(row=head_row, column=c, value=head)

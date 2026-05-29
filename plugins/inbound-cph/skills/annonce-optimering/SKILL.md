@@ -121,7 +121,16 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/annonce-optimering/build-sheet.py \
   --out "Annonce-optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Output: en `.xlsx` med fanerne — **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler), **én fane pr. ad group** (assets for den gruppe, status-farvet; fuldt kampagne- + ad group-navn står i toppen af fanen, da fanenavnet kan være afkortet til Excels 31-tegns-grænse), og **Gap-brief** (til annoncetekster-v2). Asset-fanerne har kolonnerne `Felt | Tekst | Vinkel | Impressions | Klik | Spend (DKK) | Status | Anbefaling` — Google-label og CVR-indikation er fjernet.
+Output: en `.xlsx` med fanerne — **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler på tværs af alle grupper), **én fane pr. ad group**, og **Gap-brief** (til annoncetekster-v2).
+
+Hver ad group-fane åbner med et **overblik** øverst, så man ser gruppens tilstand på et øjeblik før selve tabellen:
+- Ad group + Kampagne (fulde navne — fanenavnet kan være afkortet til Excels 31-tegns-grænse)
+- Aktive RSA i gruppen + "Byg challenger?" (gul hvis under 2)
+- Assets i alt (split i headlines/descriptions)
+- Status-fordeling (antal aktive / dødvægt / for ny)
+- Manglende vinkler (gul hvis der er huller)
+
+Derunder asset-tabellen med kolonnerne `Felt | Tekst | Vinkel | Impressions | Klik | Spend (DKK) | Status | Anbefaling` — Google-label og CVR-indikation er fjernet.
 
 ## Trin 6 — Gem (write — gated)
 
