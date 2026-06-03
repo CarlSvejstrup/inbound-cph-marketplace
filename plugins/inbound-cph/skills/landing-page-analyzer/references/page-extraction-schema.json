@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "properties": {
+    "product_service": {
+      "type": "string",
+      "description": "One line: what this page sells."
+    },
+    "brand": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo_text": { "type": ["string", "null"] }
+      },
+      "required": ["name"]
+    },
+    "usp_candidates": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Differentiators the page leads with. Only what is stated on the page."
+    },
+    "tone": {
+      "type": "string",
+      "enum": ["formel", "venlig-direkte", "teknisk-praecis", "energisk-inspirerende"],
+      "description": "Overall tone of voice of the page copy."
+    },
+    "on_page_ctas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Call-to-action phrases present on the page, verbatim."
+    },
+    "trust_signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": { "type": "string", "description": "Verbatim on-page trust string. Never invented." },
+          "has_numbers": { "type": "boolean", "description": "True only if the claim contains a usable number." }
+        },
+        "required": ["claim", "has_numbers"]
+      }
+    },
+    "active_offer": {
+      "type": "object",
+      "properties": {
+        "present": { "type": "boolean" },
+        "text": { "type": ["string", "null"] },
+        "expiry": { "type": ["string", "null"], "description": "Date YYYY-MM-DD, or 'unknown' if an offer is present but no date is stated, else null." }
+      },
+      "required": ["present"]
+    },
+    "page_language": {
+      "type": "string",
+      "description": "Detected language code, e.g. da, en, sv, no."
+    }
+  },
+  "required": ["product_service", "brand", "usp_candidates", "tone", "on_page_ctas", "trust_signals", "active_offer", "page_language"]
+}
