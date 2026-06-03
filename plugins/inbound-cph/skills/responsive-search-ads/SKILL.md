@@ -46,8 +46,10 @@ Campaign | Ad Group | Ad type | Labels |
 Headline 1 | LEN | ... | Headline 15 | LEN |
 Description 1 | LEN | ... | Description 4 | LEN |
 Path 1 | LEN | Path 2 | LEN |
-Final URL | Final mobile URL
+Final URL | Final mobile URL | Vinkel | Hypotese
 ```
+
+`LEN`, `Vinkel` og `Hypotese` er IKKE Editor-felter. Editor matcher import-kolonner på navn og ignorerer ukendte overskrifter, så de tre forsvinder rent ved import og rører aldrig kontoen. `LEN` giver live tegntælling + rød farve til mennesket; `Vinkel`/`Hypotese` (de to sidste kolonner) dokumenterer annoncens led-vinkel + hypotese per RSA. De er bevidst navngivet så de ikke kolliderer med rigtige Editor-felter (undgå generiske navne som `Label`/`Comment`/`Status`).
 
 ### Flere RSA'er i samme ad group (multi-row)
 
@@ -364,22 +366,26 @@ Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i in
   "descriptions": ["...", "... (op til 4)"],
   "paths": ["...", "..."],
   "final_url": "https://...",
-  "final_mobile_url": ""
+  "final_mobile_url": "",
+  "vinkel": "Trust + tryghed",
+  "hypotese": "Akkreditering er købsargumentet i compliance-segmentet"
 }
 ```
 
-**Flere RSA'er (samme ad group, én række per annonce):** `campaign`/`ad_group`/`final_url` på top-niveau arves af hver annonce.
+**Flere RSA'er (samme ad group, én række per annonce):** `campaign`/`ad_group`/`final_url` på top-niveau arves af hver annonce. Hver RSA bør have sin egen `vinkel` + `hypotese` (det er præcis den led-vinkel den blev bygget på i vinkel-auditen).
 ```json
 {
   "campaign": "IC | GSN | Generic | Alarmsystemer",
   "ad_group": "Alarmsystemer",
   "final_url": "https://...",
   "ads": [
-    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...", "..."] },
-    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...", "..."] }
+    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...", "..."], "vinkel": "Trust", "hypotese": "..." },
+    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...", "..."], "vinkel": "Tilbud + CTA", "hypotese": "..." }
   ]
 }
 ```
+
+**`vinkel` + `hypotese` (valgfri, men anbefalet):** den overordnede led-vinkel og hypotesen bag annoncen. De lander i de to sidste kolonner i arket (`Vinkel`, `Hypotese`), EFTER `Final mobile URL`. Google Ads Editor matcher import-kolonner på navn og ignorerer ukendte overskrifter, så disse to felter forsvinder rent ved import og rører aldrig kontoen — de er kun til menneskets dokumentation og kobler til `annonce-optimering`s vinkel-gap-brief. Skriv dem fra vinkel-auditen (Trin 4), så rationalet følger med arket.
 
 ## Trin 5 — Byg arket
 

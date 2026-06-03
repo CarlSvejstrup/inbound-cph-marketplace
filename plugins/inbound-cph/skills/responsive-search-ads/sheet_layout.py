@@ -48,12 +48,22 @@ HEADER_FONT = Font(bold=True)
 # Field spec: (header, limit-or-None). None = no LEN column (Campaign, Ad Group,
 # Ad type, Labels, Final URL, Final mobile URL). A limit means a LEN column with
 # a conditional-format rule follows.
+#
+# "Vinkel" and "Hypotese" are Inbound-internal documentation columns, NOT Google
+# Ads Editor fields. They sit LAST, after Final mobile URL. Editor matches import
+# columns by name and silently ignores any header it does not recognise, so these
+# two are dropped on import and never touch the account. They are deliberately
+# named so they cannot collide with a real Editor field (avoid generic names like
+# Label / Comment / Status). They document, per RSA row, the overall creative
+# angle and the hypothesis behind that ad - and feed annonce-optimering's
+# angle/gap-brief loop later.
 FIELDS = (
     [("Campaign", None), ("Ad Group", None), ("Ad type", None), ("Labels", None)]
     + [(f"Headline {i}", 30) for i in range(1, 16)]
     + [(f"Description {i}", 90) for i in range(1, 5)]
     + [("Path 1", 15), ("Path 2", 15)]
     + [("Final URL", None), ("Final mobile URL", None)]
+    + [("Vinkel", None), ("Hypotese", None)]
 )
 
 # Field -> 1-based text-column index, derived once from FIELDS. LEN columns are

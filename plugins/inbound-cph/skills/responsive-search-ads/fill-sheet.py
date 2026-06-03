@@ -18,8 +18,14 @@ Two ads.json shapes are accepted:
       "descriptions": ["...", ...],            # up to 4, each <= 90 chars
       "paths": ["...", "..."],                 # up to 2, each <= 15 chars
       "final_url": "https://...",
-      "final_mobile_url": ""                   # optional
+      "final_mobile_url": "",                  # optional
+      "vinkel": "",                            # optional, Inbound-internal (ignored by Editor)
+      "hypotese": ""                           # optional, Inbound-internal (ignored by Editor)
     }
+
+  "vinkel" / "hypotese" are documentation only: the overall creative angle and
+  the hypothesis behind this RSA. They land in the last two sheet columns, which
+  Google Ads Editor ignores on import. Per RSA row.
 
   Multiple RSAs in one ad group (one Editor row per ad):
     {
@@ -144,6 +150,11 @@ def _write_ad(ws, ad: dict, row: int) -> None:
         ws[text_cell("Final URL", row)] = ad["final_url"]
     if ad.get("final_mobile_url"):
         ws[text_cell("Final mobile URL", row)] = ad["final_mobile_url"]
+    # Inbound-internal documentation columns (ignored by Editor on import).
+    if ad.get("vinkel"):
+        ws[text_cell("Vinkel", row)] = ad["vinkel"]
+    if ad.get("hypotese"):
+        ws[text_cell("Hypotese", row)] = ad["hypotese"]
 
 
 def fill(ads: list, out: Path) -> None:
