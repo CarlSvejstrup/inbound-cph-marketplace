@@ -5,11 +5,13 @@ description: Lav Google Ads Responsive Search Ad-tekster i høj kvalitet fra en 
 
 # responsive-search-ads
 
-Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake og keyword-data fra Google Ads MCP, og aflever dem i et regneark der kan importeres direkte i Google Ads Editor. Hele forløbet og alt output er på dansk.
+Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake og keyword-data fra Google Ads MCP, og aflever dem i et regneark som kunden kan gennemse og rette med live tegntælling + rød farvekode. Hele forløbet og alt output er på dansk.
+
+**Vigtigt om Editor-import (rettet 2026-06-03):** Google Ads Editor importerer IKKE .xlsx-filer — Googles officielle Editor-hjælp siger direkte "Google Ads Editor doesn't import XLS files" (`support.google.com/google-ads/editor/answer/56368`). Arket her er **menneske-review/redigerings-laget** (live `=LEN()` + rød farve så kundens for lange rettelser fanges), IKKE selve import-filen. Det er stadig præcis det det altid har været god til. Editors rigtige import-stier er: (1) **File import** af en CSV (eller Unicode-tekst `.txt`) i Editors kolonne-skema, eller (2) **"Make multiple changes" → paste** af tab-separerede rækker. Hvilken sti ads-teamet bruger er en workflow-fakta vi endnu ikke har afklaret — antag ikke. Se "Editor-import" nedenfor.
 
 ## Why this skill exists
 
-The ads team turns a client's landing page into RSA ad copy, fills a sheet, sends it to the client for review, then imports the corrected sheet into Google Ads Editor. The slow, skilled part is the landing-page analysis + copywriting under hard character limits. The risky part is the client editing a headline too long and it sneaking back over-length. This skill automates the copywriting and ships a sheet with live char-count + red color-code so over-length text is caught the moment the client types it.
+The ads team turns a client's landing page into RSA ad copy, fills a sheet, sends it to the client for review, then gets the corrected copy into Google Ads Editor (via a CSV export or a paste — Editor does not import the .xlsx itself; see the note at the top). The slow, skilled part is the landing-page analysis + copywriting under hard character limits. The risky part is the client editing a headline too long and it sneaking back over-length. This skill automates the copywriting and ships a sheet with live char-count + red color-code so over-length text is caught the moment the client types it.
 
 Det er bygget op om en udvidet intake (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP), et valgfrit trin der **lærer budskab af kundens egne top-performende annoncer** (Trin 2.5 — kun aktive annoncer), og de testede skrive-regler i `references/headline-craft.md` (angle-taxonomi, Sentence case, længde-variation, 2026 disapproval-policy).
 
@@ -39,7 +41,7 @@ This runs in **Cowork** (Drive connector) and **locally** (write file to disk) �
 
 ## Column contract (defined in sheet_layout.py)
 
-This IS the Google Ads Editor import schema. Header row 1, then **one data row per RSA** (row 2 for a single ad; rows 2..N+1 for N ads). Every text column is followed by a `LEN` column. Pre-seeded on every data row: `Ad type = "Responsive search ad"`. `Campaign`-cellen overskrives ved hver kørsel med det navn brugeren bekræfter i Trin 1.
+Kolonnenavnene følger Editors felt-navne (`Campaign`, `Ad Group`, `Headline 1`, …), så arket er en tro 1:1-spejling af Editor-skemaet og let at konvertere til en import-CSV. Men arket selv (.xlsx) importeres ikke direkte — se "Editor-import" og rettelsen i toppen. Header row 1, then **one data row per RSA** (row 2 for a single ad; rows 2..N+1 for N ads). Every text column is followed by a `LEN` column. Pre-seeded on every data row: `Ad type = "Responsive search ad"`. `Campaign`-cellen overskrives ved hver kørsel med det navn brugeren bekræfter i Trin 1.
 
 ```
 Campaign | Ad Group | Ad type | Labels |
@@ -49,11 +51,20 @@ Path 1 | LEN | Path 2 | LEN |
 Final URL | Final mobile URL | Vinkel | Hypotese
 ```
 
-`LEN`, `Vinkel` og `Hypotese` er IKKE Editor-felter. Editor matcher import-kolonner på navn og ignorerer ukendte overskrifter, så de tre forsvinder rent ved import og rører aldrig kontoen. `LEN` giver live tegntælling + rød farve til mennesket; `Vinkel`/`Hypotese` (de to sidste kolonner) dokumenterer annoncens led-vinkel + hypotese per RSA. De er bevidst navngivet så de ikke kolliderer med rigtige Editor-felter (undgå generiske navne som `Label`/`Comment`/`Status`).
+`LEN`, `Vinkel` og `Hypotese` er IKKE Editor-felter — de hører kun til menneske-review-laget. `LEN` giver live tegntælling + rød farve til kunden; `Vinkel`/`Hypotese` (de to sidste kolonner) dokumenterer annoncens led-vinkel + hypotese per RSA. **Når data konverteres til en import-CSV (se "Editor-import"), tager CSV'en KUN Editor-skema-kolonnerne med — LEN/Vinkel/Hypotese bliver i .xlsx'en.** Det er den rene grænse: review-laget bærer ekstra-kolonnerne, import-laget bærer kun Editor-felterne. (Bruger ads-teamet i stedet paste-stien, skal mennesket markere kun Editor-kolonnerne — antag ikke at Editor selv filtrerer dem fra.)
+
+### Editor-import (det .xlsx'en IKKE gør)
+
+Google Ads Editor importerer **ikke** .xlsx (Googles Editor-hjælp, answer 56368: "Google Ads Editor doesn't import XLS files"). Arket her er review/redigerings-laget. Editors to rigtige import-stier:
+
+1. **File import:** en **CSV** (eller Unicode-tekst `.txt`) i Editors kolonne-skema → Account → Import → From file.
+2. **Paste:** "Make multiple changes" → indsæt tab-separerede rækker (kolonne-auto-mapping).
+
+**Uafklaret (workflow-fakta, ikke en API-fakta):** hvilken sti ads-teamet faktisk bruger. Rikkes oprindelige beskrivelse ("importer arket … bulk-upload") er tvetydig. Spørg/afklar med Rikke før der bygges en CSV-eksportør — og bemærk at `campaign-build`-spec'en (§4) allerede planlægger at emittere Editor-skema RSA-CSV'er, så en CSV-eksportør hører sandsynligvis hjemme dér, ikke som en parallel sti her.
 
 ### Flere RSA'er i samme ad group (multi-row)
 
-Google Ads Editor importerer **én række per annonce**. Gentager man `Campaign` + `Ad Group` på flere rækker, lander de som flere RSA'er i samme ad group. Det er præcis sådan du leverer de 2-3 RSA'er per ad group som best practice anbefaler — ÉT ark, flere rækker, ikke flere filer.
+Editor opretter **én RSA per række** i import-skemaet. Gentager man `Campaign` + `Ad Group` på flere rækker, lander de som flere RSA'er i samme ad group. Det er præcis sådan du leverer de 2-3 RSA'er per ad group som best practice anbefaler — ÉT ark (review) → ÉN CSV med flere rækker (import), ikke flere filer.
 
 `fill-sheet.py` accepterer derfor to `ads.json`-former:
 
@@ -400,7 +411,7 @@ Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i in
 }
 ```
 
-**`vinkel` + `hypotese` (valgfri, men anbefalet):** den overordnede led-vinkel og hypotesen bag annoncen. De lander i de to sidste kolonner i arket (`Vinkel`, `Hypotese`), EFTER `Final mobile URL`. Google Ads Editor matcher import-kolonner på navn og ignorerer ukendte overskrifter, så disse to felter forsvinder rent ved import og rører aldrig kontoen — de er kun til menneskets dokumentation og kobler til `annonce-optimering`s vinkel-gap-brief. Skriv dem fra vinkel-auditen (Trin 4), så rationalet følger med arket.
+**`vinkel` + `hypotese` (valgfri, men anbefalet):** den overordnede led-vinkel og hypotesen bag annoncen. De lander i de to sidste kolonner i arket (`Vinkel`, `Hypotese`), EFTER `Final mobile URL`. De hører til menneske-review-laget — de tages IKKE med når data konverteres til en import-CSV (kun Editor-skema-kolonner kommer med). De er til dokumentation og kobler til `annonce-optimering`s vinkel-gap-brief. Skriv dem fra vinkel-auditen (Trin 4), så rationalet følger med arket.
 
 ## Trin 5 — Byg arket
 
@@ -436,7 +447,7 @@ Lever:
 1. **Lokal sti** til `.xlsx`-filen på disken.
 2. **Drive-link** til samme fil uploadet via connector.
 3. **En tabel** med alle 19 strenge + tegnantal, så brugeren ser alt er sikkert.
-4. **Næste skridt (manuelt, human-in-the-loop):** del filen med kunden til review (skillen deler IKKE selv), og efter kundens rettelser: importer arket i Google Ads Editor.
+4. **Næste skridt (manuelt, human-in-the-loop):** del .xlsx'en med kunden til review (skillen deler IKKE selv). Efter kundens rettelser går teksten ind i Google Ads Editor — men IKKE som .xlsx (det kan Editor ikke importere). Enten (a) eksportér de godkendte rækker til en CSV i Editors kolonne-skema og brug File-import, eller (b) kopiér rækkerne (kun Editor-kolonnerne) ind via "Make multiple changes" → paste. Nævn at .xlsx'en er review-laget, ikke import-filen.
 5. **Datakilder** (kort linje): landingsside (Firecrawl) + om Trin 2.5 kørte (Google Ads MCP `run_custom_gaql`, antal top-annoncer lært fra) eller blev sprunget over (ny kunde / ingen MCP).
 
 Del aldrig filen med kunden automatisk. Send aldrig nogen mail. Præsenter linket — Carl/brugeren videresender.
@@ -462,7 +473,7 @@ Drive: https://docs.google.com/.../<file id>
 Paths: friluft (7) udstyr (6) | Final URL: https://nordkapfriluft.dk/outdoor
 
 Alle felter inden for grænsen. LEN-formler + conditional formatting aktiv — kundens for lange rettelser bliver røde live.
-Næste: del med kunden til review, importer derefter i Google Ads Editor.
+Næste: del .xlsx'en med kunden til review. Til Editor: eksportér godkendte rækker til CSV (Editor-skema) og File-import, ELLER paste rækkerne via "Make multiple changes". Editor importerer ikke .xlsx direkte.
 ```
 
 ## Maintenance
