@@ -114,6 +114,21 @@ Saml i samme kald:
    
    Brugeren vælger enten `1 RSA` ELLER 2-4 af vinkel-options'ene (én RSA per valgt vinkel). Forklar i spørgsmålsteksten at hver valgt vinkel bliver til én komplet RSA der *leder* med den vinkel men stadig bærer hele mixet (ikke en mono-tematisk annonce — se Trin 4). Default-vinkel-sættet hvis brugeren vil have flere men ikke specificerer hvilke: **Features, Benefits, Trust signals, Clear CTA** (vælg de første N af den rækkefølge). Begrund kort: best practice er 2-3 distinkte RSA'er per ad group, men Google er drevet mod 1-2 høj-Ad-Strength annoncer frem for 3 tynde — derfor er 1 default, og 2-3 kun når brugeren beder om det.
 
+   **Gap-brief-tilstand (lukker loopet fra `annonce-optimering`):** hvis brugeren starter kørslen med et gap-brief — typisk indsat manuelt fra en tidligere `annonce-optimering`-kørsel — så skal det *forvælge* dette spørgsmål i stedet for at spørge fra bunden. Gap-brief'et er en liste af manglende vinkler per ad group (se "Gap-brief-kontrakt" nedenfor). Behandling:
+   - Lav én challenger-RSA per manglende vinkel, ledet af den vinkel. Vis det forvalgte sæt som options med `(Anbefalet — fra gap-brief)` så brugeren kan bekræfte eller justere.
+   - Sæt hver challengers `vinkel`-felt (Trin 4 / ark-kolonnen) til den manglende vinkel den fylder, og skriv i `hypotese` at den lukker et gap fundet i optimerings-kørslen (fx "Challenger: fylder manglende urgency-vinkel fra annonce-optimering").
+   - **Gap-brief'et forvælger KUN dette vinkel-spørgsmål.** Resten af intaken kører som normalt: landingssiden scrapes stadig (Trin 2), USP/trust/tilbud spørges stadig (Kald 4), og `headline-craft.md`-reglerne gælder stadig. En challenger har lige så meget brug for fuldt copy-kontekst som en frisk annonce — spring ikke intake over.
+
+### Gap-brief-kontrakt (delt med `annonce-optimering`)
+
+`annonce-optimering` *producerer* dette; `responsive-search-ads` *forbruger* det. Samme form i begge skills, så loopet er dokumenteret ens i begge ender. **Medium: brugeren indsætter det manuelt** i chatten når kørslen starter — vi parser hverken xlsx-fanen eller `analysis.json`. Det holder de to Cowork-kørsler løst koblet.
+
+Formen er en liste per ad group:
+```
+- Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>
+```
+Vinkel-navnene er fra vinkel-taksonomien i `references/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti). Hvis brugeren indsætter noget der ligner men ikke matcher, så map til den nærmeste taksonomi-vinkel og nævn det.
+
 ### Kald 2 — Navngivnings-felter komprimeret (1 AskUserQuestion, 2-4 spørgsmål)
 
 Spørg i ét kald om de specifikke felter der hører til den valgte kampagnetype. Brug det kortest mulige feltsæt:

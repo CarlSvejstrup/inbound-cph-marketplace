@@ -111,6 +111,16 @@ Per ad group: hvilke vinkler har INGEN serveret asset? Det er `manglende_vinkler
 
 Saml `manglende_vinkler` per ad group til en `gap_brief`-liste. For hver: et konkret `forslag` til hvilke challenger-headlines `responsive-search-ads` skal skrive. Det er her build→operate→iterate-loopet lukkes: outputtet fra dette skill er inputtet til næste `responsive-search-ads`-kørsel.
 
+### Gap-brief-kontrakt (delt med `responsive-search-ads`)
+
+Dette skill *producerer* gap-brief'et; `responsive-search-ads` *forbruger* det. Samme form i begge skills. **Medium: brugeren kopierer det ind manuelt** i den næste kørsel — vi skriver det IKKE til en fil de to skills deler, og forbrugeren parser hverken xlsx-fanen eller `analysis.json`. Det holder de to Cowork-kørsler løst koblet.
+
+Ud over `gap_brief`-feltet i `analysis.json` (til arkets Gap-brief-fane), så **udskriv gap-brief'et i dit svar** i denne kopiér-klare form, én linje per ad group:
+```
+- Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>
+```
+Vinkel-navnene SKAL være fra vinkel-taksonomien i `responsive-search-ads/references/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti), så forbrugeren kan forvælge dem direkte. Nævn i outputtet at brugeren kan indsætte blokken i en `responsive-search-ads`-kørsel for at få challenger-annoncer der fylder hullerne.
+
 ## Trin 5 — Skriv analysis.json og byg arket
 
 Skriv en `analysis.json` efter skemaet i toppen af `build-sheet.py` (felter: `client`, `account_id`, `period`, `scope`, `min_impressions`, `method_notes`, `ad_groups`, `assets`, `gap_brief`).
@@ -149,7 +159,7 @@ Lever:
 1. **Lokal sti** + **Drive-link** (hvis uploadet).
 2. **Kort opsummering:** antal ad groups uden challenger, antal dødvægt-assets, og de vigtigste vinkel-huller.
 3. **Det ærlige forbehold:** "Rapporten er strukturel hygiejne — den dømmer ikke assets på konverteringsrate, fordi Google-data på disse konti er for tyndt og per-asset-metrics er konfunderede."
-4. **Loop-tilbagekobling:** "Gap-brief'et kan fødes direkte ind i `responsive-search-ads` til at skrive challenger-headlines."
+4. **Loop-tilbagekobling:** udskriv den kopiér-klare gap-brief-blok (formen fra Trin 4), og sig: "Indsæt denne blok i en `responsive-search-ads`-kørsel, så forvælger den vinklerne og skriver challenger-annoncer der fylder hullerne."
 5. **Næste skridt (manuelt, human-in-the-loop):** brugeren beslutter hvilke assets der skæres/bygges; skillet rører aldrig kontoen.
 6. **Datakilder:** Google Ads MCP (`run_custom_gaql`, `ad_group_ad_asset_view` + `ad_group_ad`), vindue brugt.
 
