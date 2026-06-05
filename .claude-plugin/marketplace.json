@@ -1,5 +1,5 @@
 {
-  "name": "inbound-cph-demo",
+  "name": "inbound-cph",
   "owner": { "name": "Carl Svejstrup" },
   "plugins": [
     {
