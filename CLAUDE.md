@@ -1,8 +1,12 @@
 # CLAUDE.md — inbound-cph-marketplace
 
-Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against an Inbound CPH client workspace.
+Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against Inbound CPH's Google Ads work.
 
-These rules apply globally. Skill-level `SKILL.md` files refine, never override.
+This repo is a **marketplace with two plugins**:
+- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → assembled review workbook + Editor CSVs).
+- **`google-ads-optimization`** — optimize a LIVE Google Ads account (audit, RSA asset-hygiene, search-terms, change-log).
+
+Each plugin also carries its own `CLAUDE.md` (a copy of the same operating contract) loaded via `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` when a skill runs. This repo-root file is the canonical version; the plugin copies refine, never override. Skill-level `SKILL.md` files refine further, never override.
 
 ---
 
@@ -10,82 +14,86 @@ These rules apply globally. Skill-level `SKILL.md` files refine, never override.
 
 **No external write happens without explicit user approval. No exceptions. This rule overrides skill convenience, demo polish, and "obvious next step" reasoning.**
 
-External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, calls a third-party API with side effects (Semrush enrichment, Ads API, etc.), or updates an internal Inbound system through the gateway.
+External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Google Ads is never written to — every skill is read-only / recommend-only against the account.** The campaign-build output is a workbook + Editor CSVs that a human imports into Google Ads Editor after approval; the optimization skills only diagnose and recommend.
 
-Read operations are not writes. Drafting in chat is not a write. Producing a proposed change is not a write. The boundary is the moment bytes leave Cowork and land somewhere persistent or visible to anyone other than the operator.
+Read operations are not writes. Drafting in chat is not a write. Producing a proposed change is not a write. The boundary is the moment bytes leave the agent and land somewhere persistent or visible to anyone other than the operator.
 
 ### The approval pattern (use this exactly)
 
 For every write, follow this four-step pattern:
 
 1. **Draft.** Produce the full content of the change in chat.
-2. **Render the proposal.** Show the exact change in a fenced code block (or a clear diff for edits to existing files), prefixed with one of:
+2. **Render the proposal.** Show the exact change in a fenced code block (or a clear diff for edits), prefixed with one of:
    - *"Proposed write to `<path>` — confirm to write, edit to revise, or say skip."*
+   - *"Proposed upload to Drive `<folder>` — confirm to upload, edit to revise, or say skip."*
    - *"Proposed email to `<recipient>` — confirm to send, edit to revise, or say skip."*
-   - *"Proposed update to `<system>` — confirm to apply, edit to revise, or say skip."*
 3. **Wait for explicit approval.** Approval is `yes` / `approve` / `confirm` / `send it` / `write it` / `apply` — or an edit (which counts as approval of the edited version). Silence is NOT approval. A thumbs-up emoji is NOT approval. A continuation prompt ("ok now do X") is NOT approval of the prior write. Re-prompt if ambiguous.
 4. **Execute and confirm back.** Only after explicit approval, perform the write. Then confirm with the path/recipient and what was written, so the user can verify.
 
 ### Things that look like edge cases but aren't
 
-- **"Just append a line to memory"** — still a write. Still needs approval. The whole point of `client-memory.md` being the moat is that nothing lands there without judgement.
+- **"Just save the sheet to Drive"** — still a write. Still needs approval (covers both the local file and the Drive upload).
 - **"The user just said do it"** — if "it" wasn't the specific write you're about to perform, re-confirm. Approval is scoped to the exact change shown, not to the session.
-- **"It's a re-run of a write the user approved earlier"** — re-confirm. State has changed; the new draft may differ from the old.
+- **"It's a re-run of a write the user approved earlier"** — re-confirm. State has changed; the new draft may differ.
 - **"It's idempotent / can be undone"** — irrelevant. Approval is required regardless of reversibility.
-- **Scheduled tasks (Cowork `/proactivity-scan` running Monday morning, etc.)** — the scheduled run produces a draft and *notifies* the user; the write itself only happens after the user approves on review. A scheduled task is not standing approval to write.
-- **Demo / live walkthrough** — same rule. Demonstrating the human-in-the-loop pattern *is* a feature of the demo, not friction to skip past.
+- **"Push the campaign to the Ads account"** — never. There is no API-push path in this suite by design; the human imports the CSVs into Editor. (Verified constraint: Google Ads Editor imports CSV, not .xlsx; the workbook is the review layer, the CSVs are the import layer.)
+- **Scheduled tasks** — a scheduled run produces a draft and *notifies*; the write only happens after the user approves on review. Not standing approval.
+- **Demo / live walkthrough** — same rule. Demonstrating the human-in-the-loop pattern *is* a feature, not friction.
 
 ### Why this matters (do not lose this)
 
-The Kunde Specialist agent operates against the client's institutional memory and external systems. An unapproved write that turns out to be wrong corrupts the context bank, embarrasses the agency, or worse — touches a client surface (email, Drive shared with the client, an Ads campaign) without authorisation. The cost of pausing for one confirmation is seconds. The cost of a wrong autonomous write is trust.
-
-This is also why Inbound's setup is differentiated. Most agency AI deployments either run too autonomously (and break trust) or run too read-only (and never compound). The human-in-the-loop write pattern is what lets the system get smarter every week *and* stay safe. Bake it in from skill #1 — retrofitting safety later is harder than building it now.
+These skills operate against the client's institutional memory (Drive) and live Google Ads accounts. An unapproved write that turns out wrong corrupts a client's Drive, embarrasses the agency, or touches a client surface without authorisation. The cost of pausing for one confirmation is seconds; the cost of a wrong autonomous write is trust. This human-in-the-loop pattern is what lets the system stay safe while compounding. Bake it in from skill #1.
 
 ---
 
 ## Reading is free, writing is gated
 
-The corollary to the rule above: **read aggressively, write conservatively.**
+The corollary: **read aggressively, write conservatively.**
 
-When the user asks for a brief, a scan, a pulse, a recommendation — read everything relevant in the client workspace without asking. The agent's value is synthesis across context the user can't hold in their head. Reads don't need approval; volume of context is the point.
+When the user asks for research, an audit, a structure, or a draft — read everything relevant (Drive, Google Ads MCP, the web via Firecrawl, Semrush when available) without asking. The agent's value is synthesis across context the user can't hold in their head. Reads don't need approval; volume of context is the point.
 
-But every skill that produces a recommendation or a draft stops at "here's the draft, confirm to apply." Even if the skill description says "appends to memory" or "sends the email." The skill describes the *intent*; the agent enforces the *gate*.
-
----
-
-## Client workspace shape (read paths)
-
-Every client workspace follows this structure on Drive:
-
-```
-<client>/
-  01-brand/        brand.md, voice.md, kpis.md
-  02-past-reports/ historical deliverables
-  03-meetings/     YYYY-MM-DD-<topic>.md
-  04-memory/       client-memory.md  ← the moat artefact, write-gated
-  05-data/         CSVs, Semrush pulls, snapshots
-  06-decisions/    YYYY-MM-DD-<topic>.md
-```
-
-Demo client for evaluation: **Nordkap Friluft**, in the Drive folder `nordkap-friluft/` (root ID `1Ca6_V4v57h7NDVQS0NRI-yP47gh_QTa9`). Skills assume this shape; if a client folder is missing one of these, surface it rather than silently improvising.
+But every skill that produces an artifact or recommendation stops at "here's the draft/workbook/CSV, confirm to save." The skill describes the *intent*; the agent enforces the *gate*.
 
 ---
 
 ## Skills in this repo
 
+### google-ads-setup — build a new campaign
+
 | Skill | Purpose | Writes? |
 |---|---|---|
-| `client-brief` | One-page synthesis: brand + memory + last 3 meetings + open decisions | No — read-only |
-| `proactivity-scan` | 3 ranked proactive recommendations from data + memory | Yes — proposes one-line memory append, **gated** |
-| `weekly-pulse` | 2-minute weekly status delta | Yes — proposes structured memory append, **gated** |
+| `landing-page-analyzer` | Scrape a landing page → structured positioning JSON | No — read-only |
+| `competitor-research` | Competitor positioning from their own pages → differentiator map | No — read-only |
+| `campaign-strategy` | Campaign settings as a decision object (tab 01) | No — emits an object |
+| `semrush-research` | **Gated** keyword volume/difficulty/CPC + organic + trends; degrades to theme-derived | No — read-only |
+| `structuring` | Phase-2 gate: ad groups + keywords (Exact/Phrase) + client-specific negatives | No — emits an object |
+| `rsa-copywriter` | RSAs for every ad group, reusing `responsive-search-ads` per group | Gated — sheet save |
+| `assets` | Sitelinks, callouts, structured snippets (lead forms = manual UI) | No — emits an object |
+| `assembler` | Merges all four shapes → 10-tab workbook + Editor CSVs (NO API push) | Gated — file/Drive save |
+| `responsive-search-ads` | RSA copy engine: one ad group → Editor-ready sheet with live `=LEN()` | Gated — sheet save |
 
-Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. The two are reinforcing, not redundant.
+### google-ads-optimization — optimize a live account
+
+| Skill | Purpose | Writes? |
+|---|---|---|
+| `ads-audit` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
+| `annonce-optimering` | Post-launch RSA asset-hygiene → gap-brief | Gated — sheet save |
+| `search-terms` | Search-terms analysis → sheet + negative-keyword list | Gated — sheet save |
+| `ads-aendringslog` | Change-history → format-matched changelog draft | Gated — Drive paste |
+
+Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. The two are reinforcing, not redundant. All Google Ads MCP use is read-only.
+
+---
+
+## Cross-plugin note
+
+`${CLAUDE_PLUGIN_ROOT}` resolves to a single plugin's directory, so a skill cannot reference files in a sibling plugin. `responsive-search-ads` lives in `google-ads-setup` because `rsa-copywriter` + `assembler` depend on it in code. The `annonce-optimering` ↔ `responsive-search-ads` gap-brief loop crosses the plugin boundary, but it's manual paste (no code coupling) — both plugins must be installed to close the build→operate→iterate loop.
 
 ---
 
 ## Voice and tone
 
-When drafting any client-facing content (email, brief, recommendation copy, report section), read `01-brand/voice.md` first. For Nordkap, the voice is Nordic-restraint — understated, evidence-led, no hype. Sara hates hype. This shows up in `04-memory/client-memory.md` permanent notes and is non-negotiable for any draft worth confirming.
+Defaults to **Danish** for user interaction. English preserved for marketing/tool vocabulary (SEO, ROAS, GA4, RSA, etc.). Avoid AI/ML jargon when explaining the system — users are marketers, not engineers. Per-plugin `context/voice-house-style.md` carries Inbound's house voice; client-facing ad copy follows the client's own voice, never invented.
 
 ---
 
@@ -93,3 +101,4 @@ When drafting any client-facing content (email, brief, recommendation copy, repo
 
 - A read you weren't sure was needed → do it.
 - A write you weren't sure was approved → don't do it. Ask.
+- A push to a Google Ads account → never. Emit artifacts; the human imports.
