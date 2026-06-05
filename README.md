@@ -35,13 +35,14 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 | `assembler` | Merges all the above into Ian's 10-tab review workbook + per-entity Editor CSVs (no API push) |
 | `responsive-search-ads` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards |
 
-### google-ads-optimization (3 skills) — optimize a live account
+### google-ads-optimization (4 skills) — optimize a live account
 
 | Skill | Purpose |
 |---|---|
 | `ads-audit` | Full paid-search audit → polished HTML slide deck + PDF |
 | `annonce-optimering` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief |
 | `search-terms` | Search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list |
+| `ads-aendringslog` | Auto-build a changelog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
 
 ## Data integration
 
@@ -73,7 +74,7 @@ plugins/
     .claude-plugin/plugin.json
     CLAUDE.md                     # same contract (copy)
     context/
-    skills/                       # ads-audit, annonce-optimering, search-terms
+    skills/                       # ads-audit, annonce-optimering, search-terms, ads-aendringslog
 docs/
   project-status.md, session-handoff.md, ...
 ```
