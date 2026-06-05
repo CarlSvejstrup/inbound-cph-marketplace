@@ -1,43 +1,74 @@
 # Session handoff — 2026-06-05 (optimization-loop build)
 
-## Current state (2026-06-05)
+## Current state (2026-06-05, end of session)
 
-- **Branch:** `feat/optimization-loop` (NOT merged to main yet). Commits `76eb7e3`, `e5236c3`
-  + a pending docs/README commit. Not pushed.
+- **Branch:** `feat/optimization-loop` (NOT merged to main, NOT pushed). Commits `76eb7e3`,
+  `e5236c3`, `39b9aed`, `fe514cd`.
 - **Marketplace:** 3 plugins — `google-ads-setup` (9 skills), `google-ads-optimization`
   (2 skills), `google-ads-general` (2 skills). Repo
   https://github.com/CarlSvejstrup/inbound-cph-marketplace.
-- **New this session — the optimization loop** (`workflows/optimization-loop/`): a *local*
+- **Built this session — the optimization loop** (`workflows/optimization-loop/`): a *local*
   Claude Code Workflow (NOT a Cowork plugin) that diagnoses a live account in parallel and
-  chains findings into Editor CSVs. Recommend-only.
+  produces ONE editable Excel workbook. Recommend-only.
 
 ### Optimization-loop build status
 
-- **DONE + verified:** the shared lib (`lib/builders/load.py` by-path loader = cell-identical
-  to the skills' own output; `lib/gaql/*` live-verified queries + the LAST_90_DAYS guard;
-  `quality_score.py` + `change_events.py` verified against live DSC 2026-06-05;
-  `editor_csv.py` asserted). The skills are NOT modified (by-path reuse). `SPEC.md` is the
-  design contract.
-- **DONE + PASSED:** `smoke.workflow.js` proved the agent→Bash/MCP→schema-JSON pattern against
-  live DSC (3069826320) — real analysis: 8 negatives (incl. a struktur self-competition
-  finding), 6 winners, significance gate fired (601 conv → low_confidence=false). Saved as
-  `fixtures/dsc-smoke-search-terms.json`.
-- **IN FLIGHT at handoff:** the FULL `loop.workflow.js` end-to-end run on DSC (Workflow task
-  `w5j3aj0ln`, run `wf_b215523d-8ef`). 4 parallel agents launched cleanly. This is the parked
-  unknown — the measure/asset-hygiene/QS/execute stages are not yet verified end-to-end until
-  this run lands. Check its result; inspect the CSV bundle in
-  `workflows/optimization-loop/runs/2026-06-05-3069826320/`.
-- **Resume:** `Workflow({scriptPath: ".../loop.workflow.js", resumeFromRunId: "wf_b215523d-8ef"})`
-  returns cached agents. To re-run fresh, see `README.md`.
+- **DONE + verified (unit):** the shared lib —
+  - `lib/builders/load.py`: by-path loader of the skills' own `build()`, output cell-identical
+    to their CLIs; RSA length/quality gates fire through it. **Skills NOT modified.**
+  - `lib/gaql/*`: live-verified queries + the `LAST_90_DAYS`-isn't-a-literal guard.
+  - `lib/gaql/quality_score.py` + `change_events.py`: verified against live DSC. QS is
+    keyword-grain; change-history bulk-collapse + ≤29-day clamp verified.
+  - `lib/builders/review_workbook.py`: the ONE editable `.xlsx` (Editor-header columns +
+    metadata band + `#Original` for edit rows). Verified: account-level negative → blank
+    Campaign; winners → Exact/Paused; `#Original` only on edit rows.
+  - `SPEC.md` is the design contract; §3.5b is the column contract the converter is built on.
+- **DONE + PASSED (workflow):** `smoke.workflow.js` proved the agent→Bash/MCP→schema-JSON
+  pattern against live DSC (3069826320) — real analysis: 8 negatives (incl. a struktur
+  self-competition finding on `grupperejser`), 6 winners, significance gate fired (601 conv →
+  low_confidence=false). Saved as `fixtures/dsc-smoke-search-terms.json`.
+- **PARTIAL (full run `wf_b215523d-8ef`):** launched 4 parallel diagnostics; **2 of 4 journaled
+  a result before the session moved on** — QS (avg 6.4, 20 flagged keywords, matches the live
+  probe) and measure (correct `is_baseline_run: true`). search-terms + asset-hygiene + the
+  execute stage did NOT finish. **And that run used the OLD CSV execute stage** (pre-refactor),
+  so its execute output is superseded regardless. The QS + measure stages are now validated
+  through the real workflow, not just unit tests.
+- **ARCHITECTURE CHANGE late in session (commit `fe514cd`):** the loop returns ONE editable
+  Excel workbook, NOT CSVs (Carl's call: experts must edit + send to client before import). A
+  separate converter skill (to be built in `google-ads-general`) does workbook → Editor CSV.
+  The assembler was already Excel-only (`eb4ebd9`) and was NOT touched.
 
-### Suggested next tasks
+### The parked unknown
 
-1. Inspect the full-run CSV bundle + Danish exec summary; fix any stage that drifted.
-2. If clean: a second run with `prior_run_dir` pointed at the first run's dir, to exercise the
-   measure stage's "what we proposed / what was applied / did it move" comparison (not just
-   baseline).
-3. Decide merge: `feat/optimization-loop` → main once the full run is verified.
-4. Refresh the stale M-series sections below + `docs/project-status.md` for the 3-plugin reality.
+A full `loop.workflow.js` run that reaches the **execute stage and writes the workbook** has not
+happened yet (the one full run predates the Excel refactor and didn't finish execute). That
+end-to-end run — diagnostics → workbook with the right tabs/columns/`#Original` — is THE thing to
+verify next. Re-run fresh (see `README.md`); the diagnostics are cheap to re-run.
+
+### Next session — TWO tracks (Carl, 2026-06-05)
+
+**Track 1 — SETUP (the one Carl most wants to nail).** The `google-ads-setup` campaign-build
+suite. Goals:
+- **Make it actually work end-to-end** — the live Cowork run is still the parked unknown for the
+  build suite too.
+- **Compare against what Ian built.** Ian sent a skill / something he created. Pull it, read it,
+  and benchmark our setup flow against his — what does he do better, what do we, what to merge.
+- **User-friendliness + UI.** Think about a UI layer (Ian made something here). Make the
+  build flow less raw-skill, more guided.
+- **The customer part.** Ian's thing includes a customer-facing piece. Figure out what the
+  customer side of setup looks like for us.
+
+**Track 2 — OPTIMIZATION (dial in + test).** The loop built this session. Goals:
+- **Run it end-to-end** and see the workbook output (the parked unknown above).
+- **Find what works / what doesn't** on a real account, and **where to optimize** the loop
+  itself.
+- Build the **workbook → Editor CSV converter skill** in `google-ads-general` (SPEC §3.5b is its
+  interface; preserve `*#Original` columns, drop the metadata band).
+- Then a **second run with `prior_run_dir`** set, to exercise the measure stage's
+  proposed/applied/did-it-move comparison (not just baseline).
+
+**Plumbing:** decide merge of `feat/optimization-loop` → main once the workbook run is verified;
+refresh the stale M-series sections below + `docs/project-status.md` for the 3-plugin reality.
 
 ---
 
