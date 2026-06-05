@@ -180,6 +180,8 @@ structuring must tag each row with the fields the assembler needs, so the rules 
       "temperature": "Generic",
       "landing_page_url": "https://...",
       "theme": "one-line intent of this group",
+      "paths": ["ai-seo", "bureau"],
+      "max_cpc": "",
       "keywords": [
         { "text": "ai seo bureau", "match_type": "Exact" },
         { "text": "ai seo konsulent", "match_type": "Phrase" }
@@ -210,3 +212,8 @@ structuring must tag each row with the fields the assembler needs, so the rules 
 
 `angles` + `keyword_seeds_for_rsa` are the semantic content Phase-3 rsa-copywriter
 consumes — this is why creative is downstream of the gate, not a peer.
+
+`paths` (the two Editor display-path segments, ≤15 chars each, derived from the ad-group
+theme — mirrors Ian's tab 02 Path 1/Path 2) and `max_cpc` (optional default bid; blank =
+let the bid strategy decide) are consumed by the Phase-4 assembler for tab 02 + adgroups.csv.
+Emit `paths` per ad group; `max_cpc` may be left empty.
