@@ -1,13 +1,20 @@
 # Assembler contract (Phase-4 barrier)
 
 Single source of truth for how the `assembler` skill merges the four upstream output shapes
-into Ian's 10-tab review workbook + per-entity Editor CSVs, runs QA/validation, and stops at
-import artifacts (NO API push). All tab/CSV column shapes verified against Ian's skeleton
-(`InboundCPH_AI-SEO_Google-Ads-kampagneskelet.xlsx`) and the Editor CSV research (2026-06-03).
-If SKILL.md and this file disagree, this file wins.
+into Ian's 10-tab review workbook, runs QA/validation, and stops at the review artifact (NO API
+push, NO CSV). All tab column shapes verified against Ian's skeleton
+(`InboundCPH_AI-SEO_Google-Ads-kampagneskelet.xlsx`). If SKILL.md and this file disagree, this
+file wins.
 
-The assembler is a **pure transform**: 4 JSON shapes → workbook + CSVs. No external reads, no
-writes to any account.
+The assembler is a **pure transform**: 4 JSON shapes → ONE workbook. No external reads, no CSV,
+no writes to any account.
+
+**Excel-only (decision 2026-06-05).** The workbook is the client-confirmation artifact — often
+the Excel sent to the client for sign-off. Editor CSVs are generated LATER, from the confirmed
+Excel, by the separate `google-ads-general` converter skill. The assembler's job is therefore to
+make the workbook a **lossless superset**: every field a CSV will need has a dedicated workbook
+cell. §5 below is no longer something the assembler emits — it is the converter's target schema,
+kept here so the workbook columns and the CSV columns stay traceable to each other.
 
 ---
 
@@ -33,31 +40,37 @@ three negative tiers map to THREE DIFFERENT places — never collapse them:
 
 | Tier | Goes to | NEVER goes to |
 |---|---|---|
-| `inherited_shared_list` (the 277) | tab 08 launch-gate line ("attach shared list 'Generelle negative søgeord' id 6688642473") + a reference line in tab 04 | ANY CSV row. If the 277 appear in a CSV, Phase 2 has regressed. |
-| `client_specific_additions` | tab 04 rows + the committed-negatives CSV (Type=Campaign negative / Negative per level) | — |
-| `monitor_first_candidates` | tab 05 only | the committed-negatives CSV (committing them is the over-blocking harm) |
+| `inherited_shared_list` (the 277) | tab 08 launch-gate line ("attach shared list 'Generelle negative søgeord' id 6688642473") + a reference line in tab 04 | enumerated anywhere. If the 277 appear as term rows, Phase 2 has regressed. The converter must also drop the tab-04 reference line (it is not an Editor row). |
+| `client_specific_additions` | tab 04 rows (with `Level` + `Ad group` columns so the converter can derive Editor's Type) | — |
+| `monitor_first_candidates` | tab 05 only | tab 04 (committing them is the over-blocking harm) — the converter reads tab 04 only, so tab 05 never reaches a CSV |
 
 **Negative match types stay as-is** — broad is correct for negatives. Do NOT apply the
 positive no-Broad lock to negatives. (Ian's own tab 04 happens to use Phrase per term; carry
-whatever match_type the structuring object set.)
+whatever match_type the structuring object set.) The `Level` column (`campaign`/`ad_group`) +
+`Ad group` column are what let the converter set Editor's `Type` (Campaign negative vs the
+ad-group `Negative`) — they are load-bearing, not cosmetic.
 
 ---
 
-## 3. CSV = Editor-schema columns ONLY; metadata stays in the workbook
+## 3. Workbook is a lossless superset; the CSV boundary lives in the converter
 
-Same clean boundary as the RSA sheet (LEN/Vinkel/Hypotese stay in .xlsx). Every input object
-carries non-Editor metadata the CSV MUST DROP, kept in the workbook as documentation:
+The workbook intentionally carries EVERYTHING — both the Editor-schema fields and the
+review-only metadata. It is the rich superset. The `google-ads-general` converter is where the
+boundary is drawn: it reads the confirmed Excel and drops the workbook-only columns below,
+keeping only verified Editor headers (§5).
 
-| Object | Workbook-only metadata (NOT in CSV) |
+| Object | Workbook-only metadata (converter DROPS) |
 |---|---|
 | assets | `grounded_in`, `url_source`, `header_column_unverified` |
-| negatives | `why` / `Reason`, `Category` |
+| negatives | `why` / `Reason`, `Category` (but `Level` + `Ad group` are KEPT — they map to Editor's Type) |
 | RSA | `vinkel`, `hypotese` (`Test hypothesis`), LEN columns |
 | keywords | `Notes`, `Keyword display` |
-| tab 09 | `Pass`, `Length` (validation is review-only) |
+| tab 09 | the whole tab (validation is review-only) |
 
-The assembler is the ONE place this boundary is enforced. CSVs carry only verified Editor
-headers (see §5).
+The superset cells added so the converter is lossless (none of these existed before 2026-06-05):
+**tab 02 `Max CPC`**, **tab 01 `Daily budget (DKK)`** (separate from the prose `Budget
+rationale`), **tab 04 `Level` + `Ad group`**, **tab 07 `Level` + per-type columns**
+(`Sitelink text` / `Callout text` / `Snippet header` / `Snippet values` no longer overloaded).
 
 ---
 
@@ -65,14 +78,14 @@ headers (see §5).
 
 | Tab | Content | Source |
 |---|---|---|
-| 00 README | Deliverable, Date, Account, Campaign, launch gate, import note | campaign-strategy + run meta |
-| 01 Campaign settings | the 19 tab-01 columns | campaign-strategy.json |
-| 02 Ad groups | Campaign, Ad group, Intent, Main kw, Supporting queries, Final URL, Path 1, Path 2, Primary angles | structuring ad_groups[] |
+| 00 README | Deliverable, Date, Account, Campaign, launch gate, workflow note | campaign-strategy + run meta |
+| 01 Campaign settings | the tab-01 columns; budget is split into `Daily budget (DKK)` (numeric, for the converter) + `Budget rationale` (prose) | campaign-strategy.json |
+| 02 Ad groups | Campaign, Ad group, Intent, Main kw, Supporting queries, Final URL, Path 1, Path 2, **Max CPC**, Primary angles | structuring ad_groups[] |
 | 03 Keywords | Campaign, Ad group, Keyword, Match type, Keyword display, Final URL, Status, Notes | structuring keywords[] |
-| 04 Negative keywords | Campaign, Negative keyword, Match type, Category, Reason | client_specific_additions + a shared-list reference line |
+| 04 Negative keywords | Campaign, **Level**, **Ad group**, Negative keyword, Match type, Category, Reason | client_specific_additions + a shared-list reference line |
 | 05 Monitor negatives | Candidate negative, Default action, Reason | monitor_first_candidates |
 | 06 RSAs | Campaign, Ad group, Ad label, Ad type, Final URL, Path 1, Path 2, Test hypothesis, Headline 1-15, Description 1-4 | rsa manifest |
-| 07 Assets | Campaign, Asset type, Asset text, Final URL, Description line 1, Description line 2 | assets.json |
+| 07 Assets | Campaign, **Level**, Asset type, Sitelink text, Final URL, Description line 1, Description line 2, Callout text, Snippet header, Snippet values | assets.json |
 | 08 Launch QA | Priority, Check, Owner, Launch gate | campaign-strategy networks/tracking + the shared-list attach line |
 | 09 Validation | Area, Ad group, Ad label, Field, Text, Length, Limit, Pass | recomputed from tab 06 |
 
@@ -83,35 +96,44 @@ the CSV uses the explicit Match type column instead.
 
 ---
 
-## 5. Per-entity Editor CSVs (verified schema, English headers)
+## 5. Per-entity Editor CSVs — the CONVERTER's target schema (not emitted here)
 
-One CSV per entity type in v1 (Editor's flat namespace; entity = which cells populated). English
-headers auto-map on any install (verified answer 57747). UTF-8 (Danish æ/ø/å load-bearing).
+This is what the `google-ads-general` converter produces from the confirmed Excel. Kept here so
+the workbook columns above stay traceable to the CSV columns. One CSV per entity type in v1
+(Editor's flat namespace; entity = which cells populated). English headers auto-map on any
+install (verified answer 57747). UTF-8 (Danish æ/ø/å load-bearing). Editor imports CSV only, not
+.xlsx (answer 30564) — which is exactly why the converter exists.
 
-- **campaigns.csv:** `Campaign`, `Campaign type`, `Budget`, `Bid strategy type`, `Networks`,
-  `Language targeting`, `Campaign status`. (Budget > 0 is the only hard-required field.)
-- **adgroups.csv:** `Campaign`, `Ad group`, `Max CPC`, `Ad group status`.
-- **keywords.csv:** `Campaign`, `Ad group`, `Keyword`, `Match type` (`Exact`/`Phrase` —
-  NEVER blank, NEVER bare), `Status`.
-- **negatives.csv:** client-specific additions ONLY. `Campaign`, `Ad group` (blank for
-  campaign-level), `Keyword`, `Type` (`Campaign negative` for campaign-level / `Negative` for
-  ad-group-level). Match type via the keyword text syntax or the Type column — pick ONE.
-- **ads.csv (RSA):** the Editor RSA columns (Campaign, Ad group, Ad type, Headline 1-15,
-  Description 1-4, Path 1-2, Final URL). Reuse the RSA column set from `sheet_layout.py` FIELDS
-  (drop LEN/Vinkel/Hypotese).
-- **assets.csv:** `Campaign`, `Ad group` (blank=campaign-level; `<Account-level>` literal for
-  account-level), `Sitelink text`, `Final URL`, `Description line 1`, `Description line 2`,
-  `Callout text`, `Snippet Values` + the snippet header column (UNVERIFIED name — see §7).
-  Lead forms emit NO row.
+Each bullet lists the CSV column → the workbook cell it reads. **Bold** = a value transform, not
+a straight copy.
+
+- **campaigns.csv** (from tab 01): `Campaign`←Campaign, `Campaign type`←Campaign type,
+  `Budget`←**Daily budget (DKK)** (numeric cell, NOT the rationale), `Bid strategy type`←Bidding
+  strategy, `Networks`←**Networks** (remap `Search; Search Partners; Display` → Editor's
+  `Google Search;Display`), `Language targeting`←Languages, `Campaign status`←**`Paused`**
+  (paused-until-QA). Budget > 0 is the only hard-required field.
+- **adgroups.csv** (from tab 02): `Campaign`, `Ad group`, `Max CPC`←Max CPC (blank = let the
+  strategy decide), `Ad group status`←`Enabled`.
+- **keywords.csv** (from tab 03): `Campaign`, `Ad group`, `Keyword`, `Match type` (`Exact`/
+  `Phrase` — NEVER blank, NEVER Broad; re-run guard §6.1), `Status`←**`Paused`**.
+- **negatives.csv** (from tab 04, client-specific rows ONLY — skip the shared-list reference
+  line): `Campaign`, `Ad group`←Ad group (blank when Level=campaign), `Keyword`←**bracket/quote
+  form built from Negative keyword + Match type**, `Type`←**`Campaign negative` when
+  Level=campaign / `Negative` when Level=ad_group**.
+- **ads.csv (RSA)** (from tab 06): `Campaign`, `Ad group`, `Ad type`, `Headline 1-15`,
+  `Description 1-4`, `Path 1-2`, `Final URL`. Drop Ad label / Test hypothesis.
+- **assets.csv** (from tab 07): `Campaign`←**`<Account-level>` literal when Level=account, else
+  the campaign name** (answer 56368), `Ad group` (blank=campaign-level), `Sitelink text`,
+  `Final URL`, `Description line 1`, `Description line 2`, `Callout text`, `Snippet Values` +
+  the snippet header column (UNVERIFIED name — see §7). Lead forms emit NO row.
 
 ---
 
 ## 6. Two hard emit-time guards (defense-in-depth)
 
-1. **No blank/Broad positive keyword.** Every keywords.csv row MUST have an explicit `Exact`
-   or `Phrase`. If any row's match type is blank/missing/Broad, the assembler REFUSES to emit
-   the keyword CSV and reports which rows. This is the last gate before a human import — the
-   silent-Broad trap caught at the boundary.
+1. **No blank/Broad positive keyword.** Every positive keyword row MUST have an explicit `Exact`
+   or `Phrase`. If any row's match type is blank/missing/Broad, the assembler REFUSES to build
+   and reports which rows. The silent-Broad trap caught at the boundary.
 2. **Recompute tab 09 independently.** Do NOT trust fill-sheet's earlier gate. Recompute
    LEN + Pass for every headline (30) / description (90) / path (15) against the limits
    imported from `sheet_layout.py`. Catches any human edit between Phase 3 and assembly. Any
@@ -121,13 +143,19 @@ Limits (30/90/15) and the LEN+red-CF technique are IMPORTED from
 `responsive-search-ads/sheet_layout.py` (FIELDS owns them) — never retype them here. Reuse the
 limits + CF pattern, not `build_sheet` itself (it's RSA-specific).
 
+**Both guards MUST re-run in the converter.** A human can edit the confirmed Excel between
+assembly and conversion — a Broad keyword or over-length headline introduced there would
+otherwise sail straight into a CSV. The assembler guarding its inputs does not protect the
+converter's inputs; the converter re-checks at its own boundary.
+
 ---
 
 ## 7. UNVERIFIED / carried-forward (flagged, not resolved here)
 
-- **Structured-snippet header column name** (assets) — likely `Subject`/`Header`, UNVERIFIED.
-  Emit it in a clearly-labeled column + carry the `header_column_unverified` flag into a
-  build-time Editor round-trip note in the output. Do not hardcode it as certain.
+- **Structured-snippet header column name** (the CSV column, assets) — likely `Subject`/
+  `Header`, UNVERIFIED. The workbook stores the snippet header value plainly in `Snippet header`;
+  the UNVERIFIED part is what Editor's CSV header for it should be. The CONVERTER resolves this
+  via an Editor round-trip before relying on it — do not hardcode it as certain there.
 - **UTM tagging** — NOT written by the assembler yet (carried-forward gap, Peter's task
   breakdown). Tab 08 already carries Ian's "Final URLs and UTM convention approved" Should-pass
   gate, so the gap is covered AS A GATE even though the assembler doesn't emit UTMs. Source the
@@ -143,9 +171,12 @@ limits + CF pattern, not `build_sheet` itself (it's RSA-specific).
 Golden reference = Ian's filled skeleton. Build a minimal set of the four input objects (or
 derive from Ian's file), run the assembler, verify:
 1. 10 tabs present with the correct headers (match Ian's tab names/columns).
-2. CSV columns match the verified Editor schema (§5).
-3. The 277 shared-list terms appear in NO CSV (grep the negatives.csv).
-4. monitor_first_candidates appear in NO committed-negatives CSV (tab 05 only).
+2. The superset cells are present and populated: tab 02 `Max CPC`, tab 01 numeric
+   `Daily budget (DKK)` (the number survives, not just the rationale), tab 04 `Level` +
+   `Ad group`, tab 07 `Level` + per-type columns (snippet values NOT in the Final URL cell).
+3. The 277 shared-list terms are NOT enumerated (only the single reference line in tab 04).
+4. monitor_first_candidates appear in tab 05 only (the converter reads tab 04, so they can't
+   leak to a CSV).
 5. No blank/Broad positive keyword row (guard §6.1 fires if present).
-6. Danish æ/ø/å survive in workbook + CSV (UTF-8).
+6. Danish æ/ø/å survive in the workbook (UTF-8); account-level assets carry `Level=account`.
 7. tab 09 Pass computes correctly against 30/90/15 (feed an over-length string → Pass=False).

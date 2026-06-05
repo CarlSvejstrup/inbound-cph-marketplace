@@ -2,9 +2,15 @@
 """Phase-4 assembler for campaign-build.
 
 Pure transform: merges the four upstream JSON shapes (campaign-strategy, structuring,
-rsa manifest, assets) into Ian's 10-tab review workbook + per-entity Google Ads Editor
-CSVs, then runs validation. NO Google Ads API push, no external reads/writes — it only
-reads local JSON and writes local files.
+rsa manifest, assets) into Ian's 10-tab review workbook, then runs validation. NO Google
+Ads API push, no external reads/writes — it only reads local JSON and writes one .xlsx.
+
+The assembler is Excel-ONLY (decision 2026-06-05). The workbook is the client-confirmation
+artifact; Editor CSVs are generated LATER, from the confirmed Excel, by the separate
+`google-ads-general` converter skill. The workbook is therefore a lossless superset — every
+field a CSV needs has a dedicated workbook cell (Max CPC, numeric daily budget, negative
+level/ad-group, per-type asset columns). The CSV = Editor-schema-only boundary now lives in
+the converter, not here.
 
 Reuses the hard field limits (headline 30 / description 90 / path 15) and the LEN+red
 conditional-formatting technique from responsive-search-ads/sheet_layout.py — there is one
@@ -18,12 +24,11 @@ Two hard emit-time guards (defense-in-depth, see references/assembler-contract.m
   2. Tab 09 validation recomputes LEN + Pass independently against the imported limits, so a
      human edit between Phase 3 and assembly that pushes a field over-length is still caught.
 
-The inherited 277-term MCC shared negative list is NEVER emitted as CSV rows — it is applied
-by reference (a tab-08 launch-gate line). Only client-specific additions become negative rows.
-Monitor-first candidates go to tab 05 only, never the committed negatives CSV.
+The inherited 277-term MCC shared negative list is NEVER enumerated — it is applied by
+reference (a tab-08 launch-gate line + a single reference line in tab 04). Only client-specific
+additions become negative rows. Monitor-first candidates go to tab 05 only.
 """
 import argparse
-import csv
 import importlib.util
 import json
 import os
@@ -176,8 +181,9 @@ def tab_readme(wb, strategy, meta):
         ("Account", strategy.get("account_id", "")),
         ("Campaign", strategy.get("campaign", "")),
         ("Important launch gate", strategy.get("tracking_prerequisite", "")),
-        ("Import note", "CSV files use English Editor headers (auto-map any install). "
-                        "Editor imports CSV only, not .xlsx. No API push."),
+        ("Workflow note", "This workbook is for review and client confirmation. After it is "
+                          "approved, it is converted to Google Ads Editor CSVs (separate step) "
+                          "and imported manually. Nothing is pushed to the account automatically."),
     ]
     for r in rows:
         ws.append(list(r))
@@ -185,7 +191,9 @@ def tab_readme(wb, strategy, meta):
 
 
 def tab_campaign_settings(wb, strategy):
-    """Mirror Ian's tab 01 exactly: 19 horizontal columns, header row + one data row."""
+    """Mirror Ian's tab 01: horizontal columns, header row + one data row. Budget is split
+    into a numeric 'Daily budget (DKK)' cell + a 'Budget rationale' cell so the number the
+    CSV converter needs is never lost behind the prose rationale."""
     ws = wb.create_sheet("01 Campaign settings")
     nets = strategy.get("networks", {})
     budget = strategy.get("budget_recommendation") or {}
@@ -201,7 +209,10 @@ def tab_campaign_settings(wb, strategy):
         ("Campaign type", strategy.get("campaign_type", "Search")),
         ("Campaign state", strategy.get("campaign_state", "Paused until launch QA is complete")),
         ("Goal", strategy.get("goal", "Leads")),
-        ("Budget recommendation", budget.get("rationale") or str(budget.get("daily_dkk", ""))),
+        # Two cells, not one: the numeric daily budget is what campaigns.csv needs, so it must
+        # survive on its own and never be overwritten by the prose rationale (gap fix).
+        ("Daily budget (DKK)", budget.get("daily_dkk", "")),
+        ("Budget rationale", budget.get("rationale", "")),
         ("Bidding strategy", strategy.get("bidding_strategy", "")),
         ("Primary conversion action", strategy.get("primary_conversion_action", "")),
         ("Do not optimize toward", strategy.get("do_not_optimize_toward", "")),
@@ -223,8 +234,10 @@ def tab_campaign_settings(wb, strategy):
 
 def tab_ad_groups(wb, structuring):
     ws = wb.create_sheet("02 Ad groups")
+    # Max CPC is a load-bearing Editor field (adgroups.csv needs it) — it MUST live in the
+    # workbook so the Excel→CSV converter is lossless. Blank = let the bid strategy decide.
     cols = ["Campaign", "Ad group", "Intent", "Main kw", "Supporting queries",
-            "Final URL", "Path 1", "Path 2", "Primary angles"]
+            "Final URL", "Path 1", "Path 2", "Max CPC", "Primary angles"]
     _write_header(ws, cols)
     campaign = structuring.get("campaign", "")
     for ag in structuring.get("ad_groups", []):
@@ -237,6 +250,7 @@ def tab_ad_groups(wb, structuring):
             ag.get("landing_page_url", ""),
             paths[0] if len(paths) > 0 else "",
             paths[1] if len(paths) > 1 else "",
+            ag.get("max_cpc", ""),
             "; ".join(ag.get("angles", [])),
         ])
     _autosize(ws)
@@ -263,7 +277,11 @@ def tab_keywords(wb, structuring):
 
 def tab_negatives(wb, structuring):
     ws = wb.create_sheet("04 Negative keywords")
-    cols = ["Campaign", "Negative keyword", "Match type", "Category", "Reason"]
+    # Level + Ad group must be in the workbook: the CSV converter derives Editor's Type
+    # (Campaign negative vs ad-group Negative) and the Ad group cell from them. Without these
+    # columns a campaign- vs ad-group-level negative is indistinguishable in the Excel.
+    cols = ["Campaign", "Level", "Ad group", "Negative keyword", "Match type",
+            "Category", "Reason"]
     _write_header(ws, cols)
     campaign = structuring.get("campaign", "")
     negs = structuring.get("negatives", {})
@@ -271,7 +289,7 @@ def tab_negatives(wb, structuring):
     # Reference line ONLY — the 277 terms are applied by reference, never enumerated here.
     if shared.get("apply_by_reference"):
         ws.append([
-            campaign,
+            campaign, "(shared list)", "",
             f"[SHARED LIST APPLIED BY REFERENCE: '{shared.get('name', SHARED_NEG_NAME)}' "
             f"id {shared.get('shared_set_id', SHARED_NEG_ID)}]",
             "(shared list)", "Inherited MCC list",
@@ -279,8 +297,10 @@ def tab_negatives(wb, structuring):
             f"{shared.get('mcc_customer_id', SHARED_NEG_MCC)}.",
         ])
     for n in negs.get("client_specific_additions", []):
+        level = n.get("level", "campaign")
         ws.append([
-            campaign, n.get("text", ""), n.get("match_type", "broad"),
+            campaign, level, "" if level == "campaign" else n.get("ad_group", ""),
+            n.get("text", ""), n.get("match_type", "broad"),
             n.get("category", ""), n.get("why", ""),
         ])
     _autosize(ws)
@@ -350,20 +370,29 @@ def tab_rsas(wb, structuring, rsa_manifest):
 
 def tab_assets(wb, assets):
     ws = wb.create_sheet("07 Assets")
-    cols = ["Campaign", "Asset type", "Asset text", "Final URL",
-            "Description line 1", "Description line 2"]
+    # One dedicated column per asset field instead of overloading "Asset text"/"Final URL".
+    # The old layout stuffed snippet values into the Final URL cell — fragile for the CSV
+    # converter and looks broken on a client-facing sheet. Each row fills only its type's cols;
+    # the converter keys off "Asset type". Snippet header + values get their own columns.
+    # Level (campaign vs account) must be in the workbook: the converter emits the literal
+    # "<Account-level>" in Editor's Campaign column for account-level asset sets (answer 56368).
+    # Without this column, account- vs campaign-level attachment is unrecoverable from the Excel.
+    cols = ["Campaign", "Level", "Asset type", "Sitelink text", "Final URL",
+            "Description line 1", "Description line 2", "Callout text",
+            "Snippet header", "Snippet values"]
     _write_header(ws, cols)
     campaign = assets.get("campaign", "")
+    level = assets.get("attachment_level", "campaign")
     for s in assets.get("sitelinks", []):
         if s.get("url_source") == "omitted-unconfirmed" or not s.get("final_url"):
             continue  # Firewall B: never ship a guessed/unconfirmed sitelink URL
-        ws.append([campaign, "Sitelink", s.get("text", ""), s.get("final_url", ""),
-                   s.get("desc_line_1", ""), s.get("desc_line_2", "")])
+        ws.append([campaign, level, "Sitelink", s.get("text", ""), s.get("final_url", ""),
+                   s.get("desc_line_1", ""), s.get("desc_line_2", ""), "", "", ""])
     for c in assets.get("callouts", []):
-        ws.append([campaign, "Callout", c.get("text", ""), "", "", ""])
+        ws.append([campaign, level, "Callout", "", "", "", "", c.get("text", ""), "", ""])
     for sn in assets.get("structured_snippets", []):
-        ws.append([campaign, "Structured snippet", sn.get("header", ""),
-                   "; ".join(sn.get("values", [])), "", ""])
+        ws.append([campaign, level, "Structured snippet", "", "", "", "", "",
+                   sn.get("header", ""), "; ".join(sn.get("values", []))])
     _autosize(ws)
 
 
@@ -438,108 +467,6 @@ def tab_validation(wb, rsa_manifest):
     return failures
 
 
-# --------------------------------------------------------------------------- CSVs
-def _write_csv(path, headers, rows):
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(headers)
-        for r in rows:
-            w.writerow(r)
-
-
-def emit_csvs(outdir, strategy, structuring, rsa_manifest, assets):
-    os.makedirs(outdir, exist_ok=True)
-    campaign = strategy.get("campaign", "") or structuring.get("campaign", "")
-    written = []
-
-    # campaigns.csv
-    nets = strategy.get("networks", {})
-    net_str = ";".join([n for n, on in
-                        [("Google Search", nets.get("search")), ("Display", nets.get("display"))]
-                        if on])
-    budget = (strategy.get("budget_recommendation") or {}).get("daily_dkk", "")
-    p = os.path.join(outdir, "campaigns.csv")
-    _write_csv(p, ["Campaign", "Campaign type", "Budget", "Bid strategy type", "Networks",
-                   "Language targeting", "Campaign status"],
-               [[campaign, strategy.get("campaign_type", "Search"), budget,
-                 strategy.get("bidding_strategy", ""), net_str or "Google Search",
-                 ";".join(strategy.get("languages", [])), "Paused"]])
-    written.append(p)
-
-    # adgroups.csv
-    rows = [[campaign, _ag_name(ag), ag.get("max_cpc", ""), "Enabled"]
-            for ag in structuring.get("ad_groups", [])]
-    p = os.path.join(outdir, "adgroups.csv")
-    _write_csv(p, ["Campaign", "Ad group", "Max CPC", "Ad group status"], rows)
-    written.append(p)
-
-    # keywords.csv — guard already passed (explicit Exact/Phrase on every row)
-    rows = []
-    for ag in structuring.get("ad_groups", []):
-        for kw in ag.get("keywords", []):
-            rows.append([campaign, _ag_name(ag), kw.get("text", ""),
-                         kw.get("match_type", ""), "Paused"])
-    p = os.path.join(outdir, "keywords.csv")
-    _write_csv(p, ["Campaign", "Ad group", "Keyword", "Match type", "Status"], rows)
-    written.append(p)
-
-    # negatives.csv — client-specific additions ONLY. NEVER the 277, NEVER monitor candidates.
-    rows = []
-    for n in structuring.get("negatives", {}).get("client_specific_additions", []):
-        level = n.get("level", "campaign")
-        ag = "" if level == "campaign" else n.get("ad_group", "")
-        type_val = "Campaign negative" if level == "campaign" else "Negative"
-        # Carry match type via the keyword-text bracket/quote syntax so Editor does not
-        # default the negative to Broad. Broad negatives stay bare (correct default).
-        kw_text = _display_form(n.get("text", ""), n.get("match_type", "broad"))
-        rows.append([campaign, ag, kw_text, type_val])
-    p = os.path.join(outdir, "negatives.csv")
-    _write_csv(p, ["Campaign", "Ad group", "Keyword", "Type"], rows)
-    written.append(p)
-
-    # ads.csv (RSA) — Editor RSA columns, drop LEN/Vinkel/Hypotese.
-    # "Ad group" (lowercase g) to match Ian's skeleton + the other 5 CSVs. Editor
-    # auto-map is case-insensitive (answer 57747), but stay internally consistent.
-    cols = (["Campaign", "Ad group", "Ad type", "Final URL", "Path 1", "Path 2"]
-            + [f"Headline {i}" for i in range(1, 16)]
-            + [f"Description {i}" for i in range(1, 5)])
-    rows = []
-    for ag, _label, url, paths, _hyp, hls, descs in _rsa_rows(rsa_manifest):
-        row = [campaign, ag, "Responsive search ad", url,
-               paths[0] if len(paths) > 0 else "", paths[1] if len(paths) > 1 else ""]
-        row += [(hls[i] if i < len(hls) else "") for i in range(15)]
-        row += [(descs[i] if i < len(descs) else "") for i in range(4)]
-        rows.append(row)
-    p = os.path.join(outdir, "ads.csv")
-    _write_csv(p, cols, rows)
-    written.append(p)
-
-    # assets.csv — sitelinks/callouts/snippets. Lead forms emit NO row. Snippet header col UNVERIFIED.
-    cols = ["Campaign", "Ad group", "Sitelink text", "Final URL", "Description line 1",
-            "Description line 2", "Callout text", "Snippet header (UNVERIFIED col)", "Snippet Values"]
-    rows = []
-    acamp = assets.get("campaign", "") or campaign
-    # Attachment level: campaign -> Campaign filled, Ad group blank; account -> the literal
-    # "<Account-level>" string in the Campaign column (verified, Editor answer 56368).
-    level = assets.get("attachment_level", "campaign")
-    camp_cell = "<Account-level>" if level == "account" else acamp
-    for s in assets.get("sitelinks", []):
-        if s.get("url_source") == "omitted-unconfirmed" or not s.get("final_url"):
-            continue
-        rows.append([camp_cell, "", s.get("text", ""), s.get("final_url", ""),
-                     s.get("desc_line_1", ""), s.get("desc_line_2", ""), "", "", ""])
-    for c in assets.get("callouts", []):
-        rows.append([camp_cell, "", "", "", "", "", c.get("text", ""), "", ""])
-    for sn in assets.get("structured_snippets", []):
-        rows.append([camp_cell, "", "", "", "", "", "", sn.get("header", ""),
-                     ";".join(sn.get("values", []))])
-    p = os.path.join(outdir, "assets.csv")
-    _write_csv(p, cols, rows)
-    written.append(p)
-
-    return written
-
-
 # --------------------------------------------------------------------------- main
 def load_json(path):
     with open(path, encoding="utf-8") as f:
@@ -547,13 +474,12 @@ def load_json(path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Phase-4 campaign-build assembler (pure transform, no API push).")
+    ap = argparse.ArgumentParser(description="Phase-4 campaign-build assembler (Excel-only, no API push).")
     ap.add_argument("--strategy", required=True, help="campaign-strategy.json")
     ap.add_argument("--structuring", required=True, help="structuring.json")
     ap.add_argument("--rsa", required=True, help="rsa manifest json")
     ap.add_argument("--assets", required=True, help="assets.json")
     ap.add_argument("--workbook", required=True, help="output .xlsx path")
-    ap.add_argument("--csvdir", required=True, help="output dir for per-entity CSVs")
     ap.add_argument("--date", default="", help="deliverable date (passed in; script can't call now)")
     args = ap.parse_args()
 
@@ -581,15 +507,14 @@ def main():
     failures = tab_validation(wb, rsa_manifest)
     wb.save(args.workbook)
 
-    written = emit_csvs(args.csvdir, strategy, structuring, rsa_manifest, assets)
-
     print(json.dumps({
         "workbook": args.workbook,
-        "csvs": written,
         "validation_failures": failures,
         "adless_ad_groups": adless_ad_groups,
-        "note": "No API push. Human imports the CSVs into Editor after approval. "
-                "Shared negative list 6688642473 applied by reference (tab 08), not in any CSV.",
+        "note": "Excel-only. The workbook is the client-confirmation artifact; Editor CSVs are "
+                "generated later from the confirmed Excel by the google-ads-general converter "
+                "skill. No API push. Shared negative list 6688642473 applied by reference "
+                "(tab 08 + tab 04 reference line), never enumerated.",
     }, ensure_ascii=False, indent=2))
 
     if failures:
