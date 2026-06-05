@@ -1,0 +1,178 @@
+{
+  "summary": "De-risk probe: one agent runs the search-terms GAQL against a live account via the Google Ads MCP and returns schema-validated SearchTermFindings. Proves the agent->Bash/MCP->schema-JSON pattern before building the full loop.",
+  "agentCount": 1,
+  "logs": [
+    "Smoke probe returned: 8 negatives, 6 winners, 6 placement problems, low_confidence=false"
+  ],
+  "result": {
+    "account_id": "3069826320",
+    "window": {
+      "start": "2026-03-07",
+      "end": "2026-06-05"
+    },
+    "low_confidence": false,
+    "account_conversions": 601.26,
+    "negatives": [
+      {
+        "keyword": "grupperejser",
+        "match_type": "EXACT",
+        "level": "ad_group",
+        "campaign": "2 - Search - Rejser - Destination",
+        "ad_group": "Grupperejser",
+        "wasted_spend_dkk": 1995.92,
+        "reason": "Struktur: 'grupperejser' findes som EXACT keyword i baade '2 - Search - Rejser - Destination > Grupperejser' (forsiden som LP, generiske brand-headlines, 7,17 konv) og '3 - Search - Rejser - Generisk > Grupperejser' (/rejser-LP, grupperejse-specifikke headlines, 13,55 konv). Normalt vaelger vi Destination > Generisk, men her peger Destination-gruppen paa forsiden med generiske headlines, mens Generisk har den dedikerede /rejser-LP og konverterer ca. 2x. Kanonisk hjem = Generisk-gruppen. Tilfoej negativ paa 'grupperejser' i Destination-gruppen. Bemaerk: leg'en konverterer (selvkonkurrence/konsolidering, ikke rent spild). EXACT-negativen stopper kun selve exact-forespoergslen 'grupperejser'; close-variant/phrase-halen i Destination-gruppen (grupperejse, gruppe rejse, grupperejse sydamerika, brasilien grupperejse osv.) kraever enten en bredere negativ eller at duplikat-keywordet saettes paa pause."
+      },
+      {
+        "keyword": "grupperejser for unge",
+        "match_type": "EXACT",
+        "level": "ad_group",
+        "campaign": "2 - Search - Rejser - Destination",
+        "ad_group": "Grupperejser for unge_Category",
+        "wasted_spend_dkk": 1286.82,
+        "reason": "Struktur: 'grupperejser for unge' findes som EXACT i baade '2 ... > Grupperejser for unge_Category' (forsiden som LP, 1,58 konv) og '3 - Search - Rejser - Generisk > Grupperejser' (/rejser-LP, 3,23 konv). _Category-gruppen peger paa forsiden og konverterer daarligst; Generisk har relevant LP og konverterer 2x. Kanonisk hjem = '3 > Grupperejser'. Tilfoej negativ i _Category-gruppen."
+      },
+      {
+        "keyword": "højskole udlandet",
+        "match_type": "EXACT",
+        "level": "ad_group",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole i Udlandet_Category",
+        "wasted_spend_dkk": 241.64,
+        "reason": "Struktur: 'højskole udlandet' findes som EXACT i baade '3 > Højskole i Udlandet_Category' (forsiden som LP, 0 konv) og '3 > Højskole rejser' (/rejser-LP med højskole-specifikke headlines, 1 konv). Kanonisk hjem = 'Højskole rejser' (relevant LP, eneste konv). Tilfoej negativ i _Category-gruppen."
+      },
+      {
+        "keyword": "højskoler i udlandet",
+        "match_type": "EXACT",
+        "level": "ad_group",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole i Udlandet_Category",
+        "wasted_spend_dkk": 36.64,
+        "reason": "Struktur (lav-volumen): EXACT i baade '_Category' og 'Højskole rejser'. Kanonisk hjem = 'Højskole rejser'. Tilfoej negativ i _Category-gruppen."
+      },
+      {
+        "keyword": "højskoleophold udlandet",
+        "match_type": "EXACT",
+        "level": "ad_group",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole i Udlandet_Category",
+        "wasted_spend_dkk": 9.28,
+        "reason": "Struktur (meget lav-volumen, 0 konv): EXACT i baade '_Category' (9,28 kr) og 'Højskole rejser' (21,07 kr). Kanonisk hjem = 'Højskole rejser'. Tilfoej negativ i _Category-gruppen. Marginalt."
+      },
+      {
+        "keyword": "stjernegård rejser",
+        "match_type": "PHRASE",
+        "level": "account",
+        "campaign": null,
+        "ad_group": null,
+        "wasted_spend_dkk": 42.43,
+        "reason": "Irrelevant: konkurrent-brand (Stjernegaard Rejser, dansk rejsebureau). Termen 'stjernegård rejser new zealand' fangede via broad i New Zealand-gruppen, 0 konv. Tilfoej PHRASE-negativ paa konto/delt liste."
+      },
+      {
+        "keyword": "viktors farmor",
+        "match_type": "PHRASE",
+        "level": "account",
+        "campaign": null,
+        "ad_group": null,
+        "wasted_spend_dkk": 14.13,
+        "reason": "Irrelevant: konkurrent-brand (Viktors Farmor, dansk rejsebureau). Termen 'viktors farmor sri lanka' fangede via broad i Sri Lanka-gruppen, 0 konv. Tilfoej PHRASE-negativ paa konto/delt liste."
+      },
+      {
+        "keyword": "arbejde",
+        "match_type": "PHRASE",
+        "level": "campaign",
+        "campaign": "2 - Search - Rejser - Destination",
+        "ad_group": null,
+        "wasted_spend_dkk": 57.3,
+        "reason": "Irrelevant intent: DSC saelger rejser/højskole/sabbataar, ikke jobformidling. Termerne 'arbejde i australien sabbataar', 'arbejde i new york sabbataar', 'arbejde australien sabbataar' fangede via 'sabbataar [destination]' PHRASE i destinationsgrupper, 0 konv samlet. Tilfoej PHRASE-negativ 'arbejde' paa kampagne 2."
+      }
+    ],
+    "winners": [
+      {
+        "term": "dansk studiecenter",
+        "campaign": "1 - Search - Brand",
+        "ad_group": "Dansk Studie Center_Brand",
+        "already_exact": false,
+        "conversions": 54.93,
+        "cpa_dkk": 13.67,
+        "reason": "Brand-variant (med mellemrum) der serveres via BROAD 'dansk studiecenter' + EXACT 'danskstudiecenter' (uden mellemrum). Selve den mellemrumsskilte form er IKKE eget exact keyword. 54,93 konv, CPA 13,67 kr (langt under konto-CPA 61,74). Promover til EXACT i Brand-gruppen for at styre bud + kvalitet."
+      },
+      {
+        "term": "dansk studie center anmeldelser",
+        "campaign": "1 - Search - Brand",
+        "ad_group": "Dansk Studie Center_Brand",
+        "already_exact": false,
+        "conversions": 4,
+        "cpa_dkk": 3.52,
+        "reason": "Brand + 'anmeldelser' (reviews), serveres via PHRASE 'studiecenter'. Ikke eget exact. 4 konv, CPA 3,52 kr. Promover til EXACT i Brand-gruppen."
+      },
+      {
+        "term": "danske studie center",
+        "campaign": "1 - Search - Brand",
+        "ad_group": "Dansk Studie Center_Brand",
+        "already_exact": false,
+        "conversions": 6,
+        "cpa_dkk": 47.93,
+        "reason": "Brand-stavefejl (danske vs dansk), serveres via PHRASE 'danske studie center'. Ikke eget exact. 6 konv, CPA 47,93 kr (under konto-CPA). Promover til EXACT i Brand-gruppen; vil ogsaa stoppe at den laekker til non-brand broad-grupper."
+      },
+      {
+        "term": "zanzibar højskole",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole rejser",
+        "already_exact": false,
+        "conversions": 3,
+        "cpa_dkk": 55.94,
+        "reason": "AEgte non-brand vinder: højskole + destination (Zanzibar) som DSC ikke har dedikeret ad group til. Serveres via 'rejse højskole'/'højskole udlandet' broad/phrase highways, 3 konv, CPA 55,94 kr (under konto-CPA). Promover til EXACT i 'Højskole rejser' (eller overvej dedikeret Zanzibar-gruppe)."
+      },
+      {
+        "term": "rejsende højskole",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole rejser",
+        "already_exact": false,
+        "conversions": 4,
+        "cpa_dkk": 20.55,
+        "reason": "Generisk rejsehøjskole-term, serveres via PHRASE 'rejse højskole'. Ikke eget exact. 4 konv, CPA 20,55 kr. Promover til EXACT i 'Højskole rejser'."
+      },
+      {
+        "term": "højskoleophold i udlandet",
+        "campaign": "3 - Search - Rejser - Generisk",
+        "ad_group": "Højskole rejser",
+        "already_exact": false,
+        "conversions": 3,
+        "cpa_dkk": 18.48,
+        "reason": "Kerne-udbudsterm (højskoleophold i udlandet), serveres via PHRASE 'rejse højskole'. Ikke eget exact. 3 konv, CPA 18,48 kr. Promover til EXACT i 'Højskole rejser'."
+      }
+    ],
+    "placement_problems": [
+      {
+        "term": "grupperejser",
+        "reason": "struktur",
+        "detail": "EXACT 'grupperejser' i 2 ad groups: '2 - Search - Rejser - Destination > Grupperejser' (1.995,92 kr, 7,17 konv, forside-LP) og '3 - Search - Rejser - Generisk > Grupperejser' (1.607,51 kr, 13,55 konv, /rejser-LP). Konto konkurrerer mod sig selv. Kanonisk hjem = Generisk-gruppen (bedre LP + ca. 2x konv). Negativ i Destination-gruppen."
+      },
+      {
+        "term": "grupperejser for unge",
+        "reason": "struktur",
+        "detail": "EXACT 'grupperejser for unge' i '2 > Grupperejser for unge_Category' (1.286,82 kr, 1,58 konv, forside-LP) og '3 > Grupperejser' (977,24 kr, 3,23 konv, /rejser-LP). Kanonisk hjem = '3 > Grupperejser'. Negativ i _Category-gruppen."
+      },
+      {
+        "term": "højskole udlandet",
+        "reason": "struktur",
+        "detail": "EXACT 'højskole udlandet' i '3 > Højskole i Udlandet_Category' (241,64 kr, 0 konv, forside-LP) og '3 > Højskole rejser' (120,87 kr, 1 konv, /rejser-LP). Kanonisk hjem = 'Højskole rejser'. Negativ i _Category-gruppen."
+      },
+      {
+        "term": "højskoler i udlandet",
+        "reason": "struktur",
+        "detail": "EXACT i '3 > Højskole i Udlandet_Category' (36,64 kr) og '3 > Højskole rejser' (8,86 kr), 0 konv. Kanonisk hjem = 'Højskole rejser'. Lav-volumen."
+      },
+      {
+        "term": "højskoleophold udlandet",
+        "reason": "struktur",
+        "detail": "EXACT i '3 > Højskole i Udlandet_Category' (9,28 kr) og '3 > Højskole rejser' (21,07 kr), 0 konv. Kanonisk hjem = 'Højskole rejser'. Marginal."
+      },
+      {
+        "term": "Grupperejser / _Category ad groups (forside-LP)",
+        "reason": "intent",
+        "detail": "Flere kategori-ad-groups i kampagne 2 (Grupperejser, Grupperejser for unge_Category, Grupperejser i udlandet_Category, Højskole grupperejser_Category) OG '3 > Højskole i Udlandet_Category' peger paa forsiden 'https://danskstudiecenter.dk/' med generiske brand-headlines ('Fokus paa sikkerhed og tryghed | Frihed i trygge rammer | ...'), ikke en relevant grupperejse-/højskole-LP. Til sammenligning bruger '3 > Grupperejser' og '3 > Højskole rejser' /rejser med emne-specifikke headlines. Anbefaling: peg disse ad groups paa relevant under-LP (/rejser) + emne-specifikke headlines, ELLER konsolider til Generisk-grupperne (sammenfalder med struktur-fixet)."
+      }
+    ]
+  }
+}
