@@ -177,34 +177,40 @@ def tab_readme(wb, strategy, meta):
 
 
 def tab_campaign_settings(wb, strategy):
+    """Mirror Ian's tab 01 exactly: 19 horizontal columns, header row + one data row."""
     ws = wb.create_sheet("01 Campaign settings")
-    cols = ["Setting", "Value"]
-    _write_header(ws, cols)
     nets = strategy.get("networks", {})
-    rows = [
+    budget = strategy.get("budget_recommendation") or {}
+    net_str = "; ".join(
+        n for n, on in [("Search", nets.get("search")),
+                        ("Search Partners", nets.get("search_partners")),
+                        ("Display", nets.get("display"))] if on
+    )
+    # (header, value) in Ian's exact column order.
+    pairs = [
+        ("Account ID", strategy.get("account_id", "")),
         ("Campaign", strategy.get("campaign", "")),
         ("Campaign type", strategy.get("campaign_type", "Search")),
         ("Campaign state", strategy.get("campaign_state", "Paused until launch QA is complete")),
         ("Goal", strategy.get("goal", "Leads")),
+        ("Budget recommendation", budget.get("rationale") or str(budget.get("daily_dkk", ""))),
         ("Bidding strategy", strategy.get("bidding_strategy", "")),
-        ("Daily budget (DKK)", (strategy.get("budget_recommendation") or {}).get("daily_dkk", "")),
-        ("Budget rationale", (strategy.get("budget_recommendation") or {}).get("rationale", "")),
         ("Primary conversion action", strategy.get("primary_conversion_action", "")),
         ("Do not optimize toward", strategy.get("do_not_optimize_toward", "")),
         ("Location", strategy.get("location", "")),
         ("Location option", strategy.get("location_option", "")),
         ("Languages", "; ".join(strategy.get("languages", []))),
-        ("Search network", nets.get("search", "")),
-        ("Search partners", nets.get("search_partners", "")),
-        ("Display expansion", nets.get("display", "")),
+        ("Networks", net_str),
         ("Ad rotation", strategy.get("ad_rotation", "")),
         ("Start match types", strategy.get("start_match_types", "")),
+        ("AI Max for Search", strategy.get("ai_max_for_search", "")),
+        ("Target CPA switch rule", strategy.get("target_cpa_switch_rule", "")),
         ("Ad schedule", strategy.get("ad_schedule", "")),
         ("Tracking prerequisite", strategy.get("tracking_prerequisite", "")),
     ]
-    for r in rows:
-        ws.append([r[0], str(r[1])])
-    _autosize(ws)
+    _write_header(ws, [h for h, _ in pairs])
+    ws.append([str(v) for _, v in pairs])
+    _autosize(ws, max_width=45)
 
 
 def tab_ad_groups(wb, structuring):
@@ -303,15 +309,17 @@ def _rsa_rows(rsa_manifest):
         final_url = data.get("final_url") or art.get("final_url", "")
         ads = data.get("ads") or [data]  # single-RSA form is the object itself
         for i, ad in enumerate(ads, start=1):
-            paths = ad.get("paths", ["", ""])
+            # `or default` (not get(k, default)): a JSON null must also fall back, else
+            # len(None) crashes the build after the guards have already passed.
+            paths = ad.get("paths") or ["", ""]
             yield (
                 ad_group,
                 f"RSA {i}" + (f" - {ad.get('vinkel')}" if ad.get("vinkel") else ""),
-                ad.get("final_url", final_url),
+                ad.get("final_url") or final_url,
                 paths,
-                ad.get("hypotese", ""),
-                ad.get("headlines", []),
-                ad.get("descriptions", []),
+                ad.get("hypotese") or "",
+                ad.get("headlines") or [],
+                ad.get("descriptions") or [],
             )
 
 
@@ -472,8 +480,10 @@ def emit_csvs(outdir, strategy, structuring, rsa_manifest, assets):
     _write_csv(p, ["Campaign", "Ad group", "Keyword", "Type"], rows)
     written.append(p)
 
-    # ads.csv (RSA) — Editor RSA columns, drop LEN/Vinkel/Hypotese
-    cols = (["Campaign", "Ad Group", "Ad type", "Final URL", "Path 1", "Path 2"]
+    # ads.csv (RSA) — Editor RSA columns, drop LEN/Vinkel/Hypotese.
+    # "Ad group" (lowercase g) to match Ian's skeleton + the other 5 CSVs. Editor
+    # auto-map is case-insensitive (answer 57747), but stay internally consistent.
+    cols = (["Campaign", "Ad group", "Ad type", "Final URL", "Path 1", "Path 2"]
             + [f"Headline {i}" for i in range(1, 16)]
             + [f"Description {i}" for i in range(1, 5)])
     rows = []
