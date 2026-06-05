@@ -21,12 +21,16 @@ agent → returns a CSV bundle + a Danish executive summary.
 - **Asset hygiene**: champion-challenger coverage, dead-weight assets, angle-gap brief.
   Structural only, never a per-asset CVR judgement.
 - **Quality score**: keyword-grain (no fabricated ad-group QS); LP is a flag, not a score.
-- **Execute**: builds `negatives.csv`, `keyword_expansion.csv`, and (if needed)
-  `rsa_challengers.csv` via the loop's builder lib + the RSA skill's own gates. Writes
-  `recommendations.json` for the next run's measure stage.
+- **Execute**: builds **ONE editable Excel workbook** (`Optimering - <client> - <date>.xlsx`)
+  with tabs for negatives, winner-keywords, and RSA challengers. Each tab has Editor-header
+  columns (the converter keeps) + review-metadata columns (the converter drops); edit rows carry
+  `#Original` so Editor edits in place. Writes `recommendations.json` for the next run's measure.
 
-**Recommend-only.** No Google Ads API writes, no Drive writes. The human imports each CSV in
-Editor, reviews the green/yellow diff, and hits Post. That is the only HITL gate.
+**Recommend-only, Excel-first.** No Google Ads API writes, no Drive writes. The expert **edits
+the workbook** (and can send it to the client), then runs a separate converter skill (in
+`google-ads-general`) that turns the confirmed workbook into Editor CSVs, then imports those in
+Editor, reviews the green/yellow diff, and hits Post. Editor imports CSV not `.xlsx` (answer
+30564) — which is why the converter exists. The workbook-edit + the Post are the human gates.
 
 ## Run it
 

@@ -194,13 +194,23 @@ const CHANGE_DELTAS = {
   },
 }
 
-const CSV_BUNDLE = {
+// The loop returns ONE editable Excel workbook (experts edit + send to client; a separate
+// converter skill does workbook -> Editor CSV). NOT CSVs. See SPEC section 3.5.
+const WORKBOOK_BUNDLE = {
   type: 'object',
-  required: ['negatives_csv_path', 'keyword_expansion_csv_path', 'rsa_csv_path', 'executive_summary_md', 'wrote_run_recommendations'],
+  required: ['workbook_path', 'tabs', 'executive_summary_md', 'wrote_run_recommendations'],
   properties: {
-    negatives_csv_path: { type: ['string', 'null'] },
-    keyword_expansion_csv_path: { type: ['string', 'null'] },
-    rsa_csv_path: { type: ['string', 'null'] },
+    workbook_path: { type: 'string' },                 // the one .xlsx deliverable
+    tabs: { type: 'array', items: { type: 'string' } }, // which entity tabs got rows
+    counts: {
+      type: 'object',
+      properties: {
+        negatives: { type: 'number' },
+        winners: { type: 'number' },
+        rsa_new: { type: 'number' },
+        rsa_edits: { type: 'number' },
+      },
+    },
     executive_summary_md: { type: 'string' },
     wrote_run_recommendations: { type: 'boolean' },
   },
@@ -310,7 +320,7 @@ log(`Diagnose done. baseline=${measure?.is_baseline_run} | ` +
     `${(assetHygiene?.ad_groups || []).filter(g => g.challenger_flag).length} ad groups need a challenger | ` +
     `${(qs?.flagged_keywords || []).length} low-QS keywords`)
 
-// --- Barrier -> Stage B: one execute agent builds CSVs + summary -----------
+// --- Barrier -> Stage B: one execute agent builds the review workbook + summary ---
 phase('Execute')
 
 const execPayload = JSON.stringify({ measure, searchTerms, assetHygiene, qs })
@@ -321,47 +331,63 @@ ${RULES}
 You are the EXECUTE stage of the Inbound CPH optimization loop for ${clientName}
 (customer_id ${customerId}), window ${start}..${end}, today ${today}.
 
-You receive all diagnostic findings as JSON below. Build the Editor-import CSVs by running the
-loop's builder library (single source of truth - do not hand-write CSVs or RSA columns):
+ARCHITECTURE: the loop returns ONE editable Excel WORKBOOK (the expert edits it, can send it
+to the client, then runs a separate converter skill that produces the Editor CSVs). You do NOT
+write CSVs. You assemble a findings object and build the workbook via the loop's builder.
 
 RUN DIR (create it): ${runDir}
+WORKBOOK -> ${runDir}/Optimering - ${clientName} - ${today}.xlsx
 
-1) NEGATIVES CSV -> ${runDir}/negatives.csv
-   python3 importing ${libDir}/builders/editor_csv.py, call build_negatives_csv(negatives, out).
-   Use searchTerms.negatives (+ any SEMrush competitor-waste if present, else none).
+STEP 1 - assemble the findings object for review_workbook.build():
+{
+  "client": "${clientName}", "account_id": "${customerId}",
+  "period": "${start} til ${end}", "today": "${today}",
+  "negatives": searchTerms.negatives (+ any SEMrush competitor-waste if present),
+  "winners": searchTerms.winners with already_exact=false (the builder promotes them to Exact,
+             Paused; skip already_exact),
+  "rsa_rows": for each ad group with challenger_flag or missing_angles, ONE rsa_row:
+     - headlines[] (<=15) + descriptions[] (<=4) + paths[2] + final_url, grounded in
+       assetHygiene.gap_brief + ${repoRoot}/plugins/google-ads-setup/skills/responsive-search-ads/references/headline-craft.md.
+       Apply headline-craft as VARIATION + tiebreakers (NOT hard <20-char ceilings); keep the
+       validated "ignore Ad Strength" stance. RESPECT the hard Editor limits: headline <=30,
+       description <=90, path <=15 chars. Drop/triM any over-length line before writing.
+     - status: "Paused" for a brand-new challenger.
+     - is_edit: false for a NEW challenger (ad group had <2 RSAs). If you are REWRITING an
+       existing RSA (e.g. a QS/intent fix on an ad group that already has 2+ RSAs), set
+       is_edit:true and original:{"Headline 1": "<current live H1>", "Final URL": "<current>"}
+       carrying the live values you saw in the diagnostics, so Editor edits in place via
+       #Original instead of creating a duplicate. Default to NEW challengers unless you have the
+       live current value to anchor an edit.
+     - reason: one Danish line (why this challenger / edit).
 
-2) KEYWORD-EXPANSION CSV -> ${runDir}/keyword_expansion.csv
-   build_keyword_expansion_csv(winners, out) with searchTerms.winners. It skips already_exact and
-   sets new keywords to Paused. Conservative - promote proven winners, never aggressively scale.
+STEP 2 - build the workbook:
+  python3 ${libDir}/builders/review_workbook.py --in <findings.json> --out "${runDir}/Optimering - ${clientName} - ${today}.xlsx"
+  (or import review_workbook and call build(findings, out)). It writes tabs: Laes mig,
+  Negative keywords, Nye keywords (vindere), RSA challengers. Dark headers = Editor columns the
+  converter keeps; light headers = metadata the converter drops. #Original columns appear only
+  for edit rows.
 
-3) RSA CSV -> ${runDir}/rsa_challengers.csv (only if any ad group has challenger_flag or
-   missing_angles). For each such ad group, write challenger RSA text grounded in
-   assetHygiene.gap_brief + ${repoRoot}/plugins/google-ads-setup/skills/responsive-search-ads/references/headline-craft.md
-   (apply its rules as VARIATION + tiebreakers, NOT as hard <20-char ceilings; keep the validated
-   "ignore Ad Strength" stance). Build the sheet by importing ${libDir}/builders/load.py and
-   calling build_rsa(ads, out) - it enforces the skill's own length + quality gates. New ads are
-   Paused; NEVER emit a Removed row for an old ad. If no ad group needs one, set rsa_csv_path=null.
+STEP 3 - PERSIST THIS RUN -> ${runDir}/recommendations.json: a compact JSON of what you
+  recommended (negatives, winners, rsa ad groups + is_edit, qs flags) so the NEXT run's measure
+  stage can read it as "what we proposed last run". Set wrote_run_recommendations=true.
 
-4) PERSIST THIS RUN -> ${runDir}/recommendations.json
-   Write a compact JSON of what you recommended this run (negatives, winners, rsa ad groups, qs
-   flags) so the NEXT run's measure stage can read it as "what we proposed last run". Set
-   wrote_run_recommendations=true.
+STEP 4 - EXECUTIVE SUMMARY (Danish, markdown) - executive_summary_md:
+  - "Siden sidst" (from measure): ${measure?.is_baseline_run ? 'this is a BASELINE run - say so, no prior to compare.' : 'what was applied + what moved, each with an honest significance flag.'}
+  - "Denne kørsel fandt": N negatives (X DKK spild), M vindere, K ad groups uden challenger, QS-flag.
+  - "Sådan bruger du filen": the expert edits the workbook, runs the converter skill (workbook ->
+    Editor CSV), then imports the CSVs in Editor (Konto > Importer > Fra fil > gennemgå grøn/gul
+    > Send). Nothing is written to the account by the loop.
+  - Honest caveats: low_confidence if set; SEMrush absent (gated); QS LP = flag not score.
+  - A "## Kilder" block listing the MCP tools + any Firecrawl URLs used.
 
-5) EXECUTIVE SUMMARY (Danish, markdown) - executive_summary_md. Structure:
-   - "Siden sidst" (from measure): ${measure?.is_baseline_run ? 'this is a BASELINE run - say so, no prior to compare.' : 'what was applied + what moved, each with an honest significance flag.'}
-   - "Denne kørsel fandt": N negatives (X DKK spild), M vindere, K ad groups uden challenger, QS-flag.
-   - "I hver CSV" + the exact Editor steps (Konto > Importer > Fra fil > gennemgå grøn/gul > Send).
-   - Honest caveats: low_confidence if set; SEMrush absent (gated); QS LP = flag not score.
-   - A "## Kilder" block listing the MCP tools + any Firecrawl URLs used.
-
-Return CsvBundle (the three paths or null, executive_summary_md, wrote_run_recommendations).
+Return WorkbookBundle: workbook_path, tabs (which tabs got rows), counts
+{negatives, winners, rsa_new, rsa_edits}, executive_summary_md, wrote_run_recommendations.
 DIAGNOSTIC FINDINGS JSON:
 ${execPayload}
-`, { label: 'execute', phase: 'Execute', schema: CSV_BUNDLE, agentType: 'general-purpose' })
+`, { label: 'execute', phase: 'Execute', schema: WORKBOOK_BUNDLE, agentType: 'general-purpose' })
 
-log(`Execute done. negatives=${bundle?.negatives_csv_path ? 'yes' : 'no'} | ` +
-    `expansion=${bundle?.keyword_expansion_csv_path ? 'yes' : 'no'} | ` +
-    `rsa=${bundle?.rsa_csv_path ? 'yes' : 'no'} | recs persisted=${bundle?.wrote_run_recommendations}`)
+log(`Execute done. workbook=${bundle?.workbook_path ? 'yes' : 'no'} | ` +
+    `tabs=${(bundle?.tabs || []).join(', ')} | recs persisted=${bundle?.wrote_run_recommendations}`)
 
 return {
   account_id: customerId,

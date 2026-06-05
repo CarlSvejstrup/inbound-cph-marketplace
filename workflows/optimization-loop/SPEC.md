@@ -2,7 +2,8 @@
 
 Single source of truth for the Google Ads optimization loop: a **local Claude Code
 Workflow** that diagnoses a live account across several dimensions in parallel, then
-chains the findings into a single bundle of Google Ads Editor CSVs for human review.
+chains the findings into a single editable Excel workbook for the expert to review, edit, and
+(via a separate converter skill) turn into Google Ads Editor CSVs.
 
 Status: **spec / build-in-progress.** This document is the design contract; the runnable
 script is `loop.workflow.js` in this folder.
@@ -24,16 +25,20 @@ ship independently. A local orchestrator does not make the skills local.
 - Runtime: **Claude Code Workflow** (local, parallel fan-out).
 - Scope this build: **orchestrator + two new pieces** (QS-diagnostic + measure-phase).
   SEMrush stays a *gated optional enrichment*, never a dependency.
-- Apply model: **CSV-to-Editor for everything.** Recommend-only. No API writes. The human
-  imports each CSV in Editor, reviews the green/yellow diff, hits Post. This is the ceiling,
-  not a temporary step.
+- Apply model: **editable Excel workbook → expert edits → converter skill → Editor CSV →
+  human imports.** Recommend-only. No API writes. The loop returns ONE `.xlsx` (so the expert
+  can edit it and send it to the client); a separate converter skill (in `google-ads-general`)
+  turns the confirmed workbook into Editor CSVs; the human imports those in Editor, reviews the
+  green/yellow diff, and hits Post. The workbook-edit + the Post are the human gates. This is the
+  ceiling, not a temporary step. (Updated 2026-06-05 from "loop emits CSVs directly" — the expert
+  needs to edit + share before import.)
 - Reuse mechanism: **one source of truth, no black-box invocation, no duplication.** The
   Workflow reaches the skills' *actual* builder code (`build()` in each `build-sheet.py` /
   `fill-sheet.py`) by loading it **directly by file path** (`importlib`). It does not copy the
   code and it does not refactor the skills. The skills stay self-contained so they keep
   installing into Cowork unchanged; the Workflow is repo-local and never ships, so it can point
   straight at the skill files. New logic the skills don't have (the two new GAQL pulls, the
-  Editor CSV builder) lives in `lib/`. A Workflow `agent()` cannot invoke a plugin skill, hence
+  review-workbook builder) lives in `lib/`. A Workflow `agent()` cannot invoke a plugin skill, hence
   by-path load of the deterministic builders + agent-driven classification on top.
 
   > **Why not refactor the skills into shims that import a shared lib?** Because Cowork plugins
@@ -116,8 +121,8 @@ workflows/optimization-loop/
     builders/
       search_terms_sheet.py    # extracted from search-terms/build-sheet.py
       asset_hygiene_sheet.py   # extracted from annonce-optimering/build-sheet.py
-      rsa_sheet.py             # extracted from responsive-search-ads/{sheet_layout,fill-sheet}.py
-      editor_csv.py            # NEW: the three Editor CSVs (negatives / keyword-expansion / RSA)
+      review_workbook.py       # NEW: the ONE editable Excel deliverable (Editor-header columns +
+                               #        review metadata + #Original for edits). Converter -> CSV later.
     schemas/
       *.json                   # the JSON contracts in §3, as human DOCS only (see execution model)
   fixtures/
@@ -131,12 +136,12 @@ workflows/optimization-loop/
 It can ONLY: spawn `agent()`s, pass JSON between them, and use plain JS built-ins. Therefore:
 
 - **Nothing in `lib/` is called by the JS.** Every Python invocation (`load.py`,
-  `editor_csv.py`, the GAQL strings) runs **inside an `agent()`** via Bash. The agent receives
+  `review_workbook.py`, the GAQL strings) runs **inside an `agent()`** via Bash. The agent receives
   findings JSON in its prompt, runs the script, and returns schema-validated JSON.
 - **Schemas are inline JS literals** in `loop.workflow.js`, passed as `agent(prompt, {schema})`.
   The `lib/schemas/*.json` files are documentation of the §3 contracts, not loaded at runtime.
 - **All file I/O is done by an agent**, not the JS: reading the prior run dir (cold-start
-  source 1), writing the CSVs, writing this run's recommendations.
+  source 1), writing the review workbook, writing this run's recommendations.
 - **`Date.now()` / `new Date()` are unavailable.** Today's date, the analysis window,
   `customer_id`, and the absolute run-dir path are passed in via the Workflow `args` parameter.
 
@@ -164,12 +169,12 @@ this). These are the contracts.
   "account_id": "string",
   "window": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" },
   "low_confidence": false,                 // true when account_conversions < 10
-  "negatives": [                           // -> editor_csv negatives
+  "negatives": [                           // -> review_workbook Negative keywords tab
     { "keyword": "string", "match_type": "EXACT|PHRASE",
       "level": "ad_group|campaign|account", "campaign": "string", "ad_group": "string|null",
       "wasted_spend_dkk": 0, "reason": "string" }
   ],
-  "winners": [                             // -> editor_csv keyword-expansion
+  "winners": [                             // -> review_workbook Nye keywords tab
     { "term": "string", "campaign": "string", "ad_group": "string",
       "conversions": 0, "cpa_dkk": 0, "already_exact": false, "reason": "string" }
   ],
@@ -270,15 +275,53 @@ search-term). So we report flagged keywords with the ad group they sit in.
 }
 ```
 
-### 3.5 `CsvBundle` (final execution output)
+### 3.5 `WorkbookBundle` (final execution output) — Excel only, NOT CSV
+
+**Decision (2026-06-05): the loop returns ONE editable Excel workbook, not CSVs.** The ads
+expert edits the workbook, can send it to the client, then runs a **separate converter skill**
+(in `google-ads-general`) that does workbook → Editor CSV. This mirrors the assembler, already
+made Excel-only (commit `eb4ebd9`: "the workbook is a lossless superset; the converter produces
+the CSVs"). Google Ads Editor imports CSV, not `.xlsx` (Editor answer 30564) — which is exactly
+why the converter exists. The loop never emits CSVs and never writes to the account.
+
 ```jsonc
 {
-  "negatives_csv_path": "string",          // Campaign, Ad Group, Keyword, Criterion Type
-  "keyword_expansion_csv_path": "string",  // Campaign, Ad Group, Keyword, Criterion Type=Exact
-  "rsa_csv_path": "string|null",           // full RSA columns; null if no challengers needed
-  "executive_summary_md": "string"         // the human-facing brief (see §5)
+  "workbook_path": "string",               // the one .xlsx deliverable
+  "tabs": ["string"],                       // which entity tabs got rows
+  "counts": { "negatives": 0, "winners": 0, "rsa_new": 0, "rsa_edits": 0 },
+  "executive_summary_md": "string",         // Danish human-facing brief (see §5)
+  "wrote_run_recommendations": true         // recommendations.json persisted for next run's measure
 }
 ```
+
+### 3.5b The workbook column contract (the interface the converter is built against)
+
+`lib/builders/review_workbook.py` builds the workbook. Tabs: **Laes mig** (instructions),
+**Negative keywords**, **Nye keywords (vindere)**, **RSA challengers**. Each entity tab splits
+its columns into two bands:
+
+- **EDITOR-BOUND columns** — exact Google Ads Editor header spelling (Editor answer 57747:
+  headers are English, case/space-insensitive). Dark-blue header. **The converter KEEPS these.**
+- **METADATA columns** — review context (Niveau, Spildt budget, Begrundelse, Konverteringer, CPA,
+  AEndringstype). Light-blue header. **The converter DROPS these.** Never go to Editor.
+
+Editor-bound header sets (the converter's KEEP list, exact spelling):
+- **Negative keywords:** `Campaign`, `Ad group`, `Keyword`, `Match type` (Match type carries the
+  Negative / Campaign negative distinction; account-level → blank Campaign + Ad group).
+- **Nye keywords (vindere):** `Campaign`, `Ad group`, `Keyword`, `Match type` (always `Exact`),
+  `Status` (`Paused`).
+- **RSA challengers:** `Campaign`, `Ad group`, `Ad type`, `Final URL`, `Path 1`, `Path 2`,
+  `Headline 1`…`Headline 15`, `Description 1`…`Description 4`, `Status`.
+
+**`#Original` — editing EXISTING entities (the loop's distinguishing need vs the assembler):**
+The assembler builds NEW campaigns (all net-new, Paused, no `#Original`). The loop optimises a
+LIVE account, so some rows EDIT an existing entity. Editor's `<Column>#Original` convention
+(answer 57747) matches an edit to the existing entity and preserves its history instead of
+creating a duplicate. So a `Headline 1#Original` / `Final URL#Original` column carrying the
+current live value appears **only on edit rows**; net-new rows have none. **The converter MUST
+preserve any `*#Original` column verbatim** — it is the difference between "edit in place" and
+"create a duplicate". Verified: `#Original` columns appear iff an edit row is present, blank on
+net-new rows.
 
 ---
 
@@ -327,24 +370,28 @@ All four agents in Stage A run concurrently in one `parallel()`:
   Mirrors `semrush-research`: detect the plan-gate, degrade to nothing, never block. Enriches
   negatives (competitor waste) + expansion (competitor gaps); never required.
 
-### Barrier → Stage B — Execute (one agent, builds the CSVs + summary)
-A single execute agent receives all Stage-A findings JSON and:
-- Builds the **negatives CSV** from `SearchTermFindings.negatives` (+ optional SEMrush waste)
-  via `editor_csv.build_negatives_csv` (dedups internally).
-- Builds the **expansion CSV** from `SearchTermFindings.winners` (+ optional SEMrush gaps) via
-  `editor_csv.build_keyword_expansion_csv`. Conservative: promote proven winners, never
-  "aggressively scale" on 2-3 conversions.
-- Builds the **RSA CSV** for each ad group with `challenger_flag` or `missing_angles`, by
-  running the RSA builder through `load.build_rsa` with the gap-brief + `headline-craft.md`.
-  New ads land **Paused**, never a `Removed` row for the old ad (§6).
+### Barrier → Stage B — Execute (one agent, builds the workbook + summary)
+A single execute agent receives all Stage-A findings JSON, assembles the
+`review_workbook.build()` input, and builds **one editable `.xlsx`** (tabs: Laes mig, Negative
+keywords, Nye keywords (vindere), RSA challengers):
+- **Negatives** from `SearchTermFindings.negatives` (+ optional SEMrush waste) → Negative
+  keywords tab (Editor columns + Niveau/Spildt budget/Begrundelse metadata; account-level →
+  blank Campaign).
+- **Winners** from `SearchTermFindings.winners` (already_exact skipped) → Nye keywords tab,
+  promoted to `Exact`, `Paused`. Conservative: never "aggressively scale" on 2-3 conversions.
+- **RSA challengers** for each ad group with `challenger_flag` or `missing_angles` → RSA tab,
+  grounded in `assetHygiene.gap_brief` + `headline-craft.md` (variation + tiebreakers, hard
+  Editor length limits respected). New challengers `Paused`. A *rewrite* of an existing ad uses
+  `#Original` columns (§3.5b) so Editor edits in place; never a `Removed` row (§6).
 - Writes this run's recommendations to the run dir (cold-start source 1 for next run).
-- Returns `CsvBundle` (paths + the executive summary).
+- Returns `WorkbookBundle` (the `.xlsx` path + counts + the executive summary).
 
-### Return — the single human gate
-The Workflow returns `CsvBundle`. The **main agent outside the Workflow** presents the bundle
-+ summary to the human, who imports each CSV in Editor, reviews the green/yellow diff, and hits
-Post. That is the only HITL gate (§6). The Workflow performs no Drive write and no API push.
-- This is the **only** HITL gate (see §6). The Workflow ends here, handing back the bundle.
+### Return — the human gates are outside the Workflow
+The Workflow returns `WorkbookBundle`. The **main agent outside the Workflow** presents the
+workbook + summary. The expert **edits the workbook** (and may send it to the client), runs the
+converter skill (workbook → Editor CSV), imports the CSVs in Editor, reviews the green/yellow
+diff, and hits Post. Those are the HITL gates (§6). The Workflow performs no Drive write and no
+API push.
 
 ---
 
@@ -368,29 +415,30 @@ Danish by default (matches every Inbound skill).
 ## 6. HITL × Workflow (the part that needs an explicit rule)
 
 Per-skill Drive write-gates **cannot fire interactively mid-Workflow** — there is no
-conversational turn inside a running script to ask "confirm to write". Resolution, matching
-the locked "CSV-to-Editor for everything" decision:
+conversational turn inside a running script to ask "confirm to write". Resolution, matching the
+locked "workbook → expert edits → converter → Editor" decision:
 
-1. **Every intermediate stage runs local-only.** No Drive writes, no Sheets, no gates. All
-   intermediate artifacts (`SearchTermFindings`, etc.) and the CSVs are written to a local run
+1. **Every stage runs local-only.** No Drive writes, no Sheets, no gates. All intermediate
+   artifacts (`SearchTermFindings`, etc.) and the final workbook are written to a local run
    directory. Nothing leaves the machine during the run.
-2. **The single checkpoint is the final CSV bundle.** The Workflow returns the bundle + the
-   summary; the human reviews locally, then imports into Editor and hits Post. That Post **is**
-   the approval, on Google's own diff surface.
+2. **Two human gates, both outside the Workflow.** (a) The expert **edits the returned workbook**
+   — deletes rows they disagree with, adjusts text/bids, decides which challengers ship — then
+   runs the converter skill. (b) After import, the expert reviews Editor's green/yellow diff and
+   **hits Post**. The Post is the final approval, on Google's own diff surface. The workbook-edit
+   step is a real, deliberate gate the expert controls — it is the reason the loop returns Excel,
+   not CSV.
 3. **No API writes, ever.** The loop never calls a Google Ads mutate. The repo `CLAUDE.md`
-   human-in-the-loop rule holds unchanged; the loop just relocates the single gate to the
-   bundle boundary instead of N per-skill prompts.
-4. **The `Removed+Enabled` trap.** A CSV that sets the old ad to `Removed` and a new one to
-   `Enabled` in one import resets the new ad's learning and drops the old ad's data from the
-   active view. The loop **never** emits a `Removed` row. It emits the new challenger as
-   `Paused` (human enables after QA) and surfaces the old ad as a *recommend-to-review*, not a
-   command. The human decides pause-vs-remove in Editor.
+   human-in-the-loop rule holds unchanged.
+4. **The `Removed+Enabled` trap.** Never set an old ad to `Removed` + a new one to `Enabled` in
+   one import (resets the new ad's learning, drops the old ad's data). The loop emits new
+   challengers as `Paused`; for a *rewrite* of an existing ad it uses the `#Original` convention
+   (§3.5b) so Editor edits in place, never duplicating. The human decides pause-vs-remove.
 
 ### v2 (not built this session): gated negative-keyword apply
 Negative keywords are the one maximally-reversible change. A future version may offer a single
 explicit "apply these N negatives?" gate that writes them via the API behind one confirmation.
 Flagged here so the contract anticipates it; **not in scope now.** Everything else stays
-CSV-only permanently.
+workbook-and-converter only.
 
 ---
 
@@ -406,7 +454,8 @@ CSV-only permanently.
    shapes already live-verified; do not re-invent).
 4. **Build the two new GAQL pulls** — `quality_score.py` (three-level labels + spend-by-QS,
    reuse ads-audit's QS query) and `change_events.py` (reuse ads-changelog's pull + collapse).
-5. **Write `editor_csv.py`** — the three CSVs, exact Editor column headers.
+5. **Write `review_workbook.py`** — the ONE editable `.xlsx`: Editor-header columns (the
+   converter's keep-list) + review metadata (drop-list) + `#Original` for edit rows.
 6. **Write `loop.workflow.js`** — `meta` block (pure literal), one `parallel()` fan-out of 4
    (measure baseline-aware + 3 diagnostics) → barrier → one execute agent → return the bundle.
    Each `agent()` gets an **inline JS-literal `schema`** (the JS cannot load `lib/schemas/`;
@@ -417,16 +466,17 @@ CSV-only permanently.
    pattern; then iterate with `resumeFromRunId` so cached `agent()` calls don't re-run.
 7. **Capture a baseline fixture** against one real account (DSC `3069826320` is the
    live-verified one) for resume + regression.
-8. **Dry-run** end-to-end against that account, local-only, no writes. Inspect the CSV bundle.
+8. **Dry-run** end-to-end against that account, local-only, no writes. Inspect the workbook
+   (tabs, Editor-header columns, metadata band, `#Original` on any edit rows) + the exec summary.
 
 ### Verification gates (honest)
 - After step 2: each existing skill's smoke test passes unchanged. If any drifts, the
   extraction broke a contract — fix before proceeding.
 - After step 6: a `--baseline` run produces `is_baseline_run: true` and no delta crash.
-- After step 8: the three CSVs open in Editor (or validate against Editor's column spec) and
-  the green/yellow diff is reviewable. **End-to-end against a real account is the gate that
-  matters — the per-stage logic is verified, the full chain is the parked unknown until this
-  passes.**
+- After step 8: the workbook opens cleanly, the Editor-bound columns carry exact Editor header
+  spelling, `#Original` appears only on edit rows, and the converter (when built) can map the
+  keep-band → Editor CSV. **End-to-end against a real account is the gate that matters — the
+  per-stage logic is verified, the full chain is the parked unknown until this passes.**
 
 ---
 
@@ -438,7 +488,8 @@ CSV-only permanently.
 - **No hardcoded copywriting magic numbers as laws.** The Optmyzr-derived numbers in
   `headline_craft.md` are applied as the existing skill applies them (variation + tiebreakers),
   not as `<20-char` hard ceilings. The one validated rule (ignore Ad Strength) is kept.
-- **No API writes.** CSV-to-Editor is the ceiling.
+- **No API writes.** Editable Excel workbook → expert edits → converter skill → Editor CSV →
+  human imports is the ceiling.
 - **No Cowork install.** This is a local dev harness; the skills ship to Cowork separately.
 
 ---
