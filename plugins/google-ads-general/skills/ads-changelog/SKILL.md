@@ -32,7 +32,7 @@ Forholdet: `change_event` ⊆ den konto-mutérende delmængde af changelog'en, m
 
 ## Trin 0 - Kontekst og skrivegrænse
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (skrivegate + sprogpolitik) og `${CLAUDE_PLUGIN_ROOT}/context/drive-map.md` (hvordan klientmapper findes på Drive) først.
+Læs `../../context/drive-map.md` (hvordan klientmapper findes på Drive) først. Skrivegate + sprogpolitik følger plugin-kontrakten (auto-loadet).
 
 **Vigtig værktøjsgrænse (afgør hele leveringsformen):** Drive-connectoren kan **kun oprette nye filer** (`create_file`), ikke appende til eller redigere et eksisterende Doc. Der findes intet `update`/`append`-værktøj til Drive. Derfor kan skillet **ikke** selv skrive ind i den eksisterende changelog. Leveringsformen er derfor:
 

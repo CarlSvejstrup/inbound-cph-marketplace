@@ -13,7 +13,7 @@ Trigger phrases: "lav en audit", "kør en audit af", "paid search audit", "Googl
 
 ## Trin 0 — Kontekst
 
-Laes `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` foer noget andet. Den indeholder write-gate-reglerne og sprogpolitikken.
+Skrivegate + sprogpolitik følger plugin-kontrakten (auto-loadet).
 
 ## Trin 1 — Intake (konversation foer data)
 
@@ -52,7 +52,7 @@ Kald alle relevante MCP-vaerktoejer for det valgte scope. Kald dem parallelt hvo
 | Keywords & negative keywords | `get_keyword_performance` + `get_search_terms_report` + `run_custom_gaql` (delte negativlister) |
 | Quality score | `get_quality_score_audit` (LAST_90_DAYS altid) |
 | Maalretning & audiences | `get_age_gender_performance` + `get_location_performance` + `run_custom_gaql` (audiences, observation/targeting-mode) |
-| Landingsider | `get_ad_performance` (udtaek unikke final URLs) + Firecrawl per URL (se Trin 3) |
+| Landingsider | `get_ad_performance` (udtaek unikke final URLs) + web_fetch per URL (se Trin 3) |
 | Feed & merchant center | `run_custom_gaql` — shopping campaigns, merchant center-link, feed-status |
 | pMax | `run_custom_gaql` — asset groups, audience signals, search themes, brand exclusions, asset-typer |
 | Display & Demand Gen | `get_campaign_performance(DISPLAY/DEMAND_GEN)` + `run_custom_gaql` (placement-ekskluderinger, kreativtyper) |
@@ -93,11 +93,11 @@ FROM user_list
 WHERE user_list.membership_status = 'OPEN'
 ```
 
-## Trin 3 — Landingsider via Firecrawl
+## Trin 3 — Landingsider via web_fetch
 
-Udtaek alle unikke final URLs fra `get_ad_performance`. Deduplikaer og tag de 10 hyppigste. For hver URL:
+Udtaek alle unikke final URLs fra `get_ad_performance`. Deduplikaer og tag de 10 hyppigste. For hver URL, kald `web_fetch`:
 - Check at siden loader (ingen fejl)
-- Udtaek primaire overskrift og CTA-tekst
+- Udtaek primaire overskrift og CTA-tekst (ordret fra siden)
 - Note om mobiloptimering (viewport meta tilstede?)
 - Vurder relevans ift. tilsvarende annonce-overskrift
 
@@ -205,7 +205,7 @@ Quality score-sektionen skal indeholde et SVG-chart der viser spend-fordeling pa
 
 ## Regler
 
-- Skriv aldrig data du ikke har fra MCP eller Firecrawl. Marker manglende data eksplicit.
+- Skriv aldrig data du ikke har fra MCP eller web_fetch. Marker manglende data eksplicit.
 - Dansk som standard for alle finding-tekster og slide-copy.
 - Ingen emojis i slides, kode eller kommentarer.
 - Ingen em-streger (--) i slide-copy. Brug komma, kolon eller omstruktuering.

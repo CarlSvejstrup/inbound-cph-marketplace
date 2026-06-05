@@ -15,7 +15,7 @@ Testet live 2026-06-03 mod de tilsluttede MCP'er:
 
 - **Semrush MCP er plan-gated** — hver rapport (`organic_research`, `overview_research`, `keyword_research`) returnerer samme stub: brugeren har ikke en Semrush-plan med MCP-adgang. **Nul data på nuværende plan.** Design ALDRIG skillet til at afhænge af Semrush; det er en upgrade-gated fremtidig forbedring til konkurrent-*opdagelse*.
 - **Google Ads MCP rækker kun til kundens EGNE konti** (under MCC'en) og har ingen konkurrent-flade: `auction_insight_domain` er `UNRECOGNIZED_FIELD` i GAQL. Ingen konkurrent-domæner, -impression share eller -annoncetekst via API'et. Kald det IKKE fra dette skill.
-- **Firecrawl er den eneste virkende eksterne datasti.** Scrape konkurrenternes egne sider med den delte ekstraktion.
+- **`web_fetch` henter konkurrenternes egne sider** (indbygget værktøj, virker i Cowork). Kør den delte ekstraktion mod hver side. Til at *opdage* konkurrent-domæner er bruger-input den primære vej (se Trin 1); en valgfri SERP-søgning kan bruges hvis firecrawl-CLI'en er tilgængelig, men gør den aldrig til en forudsætning.
 
 **Ærlig forventningsafstemning (sig det til Ian/brugeren):** vi leverer konkurrent-**positionering fra deres egne sider** — IKKE deres faktiske annoncetekster eller spend (ikke teknisk hentbart i denne stack). `ads-audit-report` behandler allerede "hvad gør konkurrenterne" som en manuel-gennemgang-placeholder; dette skill foregiver ikke andet.
 
@@ -37,24 +37,20 @@ Lakmustest: kør skillet to gange for to kunder — intet fra kørsel 1 må vær
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs `${CLAUDE_PLUGIN_ROOT}/skills/landing-page-analyzer/references/page-extraction.md` — den delte ekstraktion du kører mod konkurrent-URL'er. Dansk medmindre brugeren skriver på engelsk. Scraping af offentlige sider er en read; oplys hvilke URL'er du rammer.
+Læs `${CLAUDE_SKILL_DIR}/../landing-page-analyzer/references/page-extraction.md` — den delte ekstraktion du kører mod konkurrent-URL'er. Dansk medmindre brugeren skriver på engelsk. Scraping af offentlige sider er en read; oplys hvilke URL'er du rammer.
 
 ## Trin 1 — Intake (få AskUserQuestion-kald, mange felter)
 
 Følg hus-reglen fra `responsive-search-ads` (anbefalet-option først, "Other" altid muligt, saml felter).
 
 - **Klient + URL + kerne-ydelse + geo** — arv fra campaign-build-kørslen hvis kædet; spørg ikke igen.
-- **Konkurrent-identifikation (ask-user-primær, fordi Semrush er død):** ét `AskUserQuestion`: "Hvem er klientens 3-5 vigtigste konkurrenter?" Tilbyd en valgfri sti: "Eller lad mig finde kandidater via en SERP-søgning" → Firecrawl `search` på kerne-ydelse + geo, præsentér fundne domæner som options, brugeren bekræfter. **Auto-vælg aldrig** — brugeren bekræfter det endelige konkurrent-sæt (det er også en scope-guardrail).
+- **Konkurrent-identifikation (ask-user-primær, fordi Semrush er død):** ét `AskUserQuestion`: "Hvem er klientens 3-5 vigtigste konkurrenter?" Valgfri sti hvis firecrawl-CLI'en er tilgængelig: "Eller lad mig finde kandidater via en SERP-søgning" → firecrawl `search` på kerne-ydelse + geo, præsentér fundne domæner som options. Er CLI'en ikke til stede, så hold dig til bruger-navngivne konkurrenter. **Auto-vælg aldrig** — brugeren bekræfter det endelige konkurrent-sæt (det er også en scope-guardrail).
 
-## Trin 2 — Scrape hver konkurrent (Firecrawl)
+## Trin 2 — Hent hver konkurrent (web_fetch)
 
-For hver bekræftet konkurrent-URL: kør den delte ekstraktion, præcis som `landing-page-analyzer` gør (scrape til markdown, læs, udtræk mod `page-extraction-schema.json`), men mod konkurrentens side. Kan en side ikke hentes: marker `scraped_ok: false`, opfind intet.
+For hver bekræftet konkurrent-URL: kør den delte ekstraktion, præcis som `landing-page-analyzer` gør (hent med `web_fetch`, læs det returnerede indhold, udtræk mod `page-extraction-schema.json`), men mod konkurrentens side. Kan en side ikke hentes: marker `scraped_ok: false`, opfind intet.
 
-```bash
-firecrawl scrape "<competitor_url>" --only-main-content -o ".firecrawl/competitor-<n>.md"
-```
-
-Læs hver `.md` og udtræk felterne. `firecrawl scrape` har ingen `--schema-file`-flag (verificeret 2026-06-03) — skemaet er felt-kontrakten du udtrækker mod, ikke et CLI-argument.
+Kald `web_fetch` på `<competitor_url>` (bed om sidens fulde indhold) og udtræk felterne fra det returnerede indhold. `web_fetch` er et indbygget værktøj (virker i Cowork, ingen CLI). `page-extraction-schema.json` er felt-kontrakten du udtrækker mod, ikke et argument til værktøjet.
 
 ## Trin 3 — Syntese (skillets egentlige intelligens)
 

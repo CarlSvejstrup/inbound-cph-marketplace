@@ -29,8 +29,9 @@ from the single landing page Phase 1 scraped. So sitelink destination URLs CANNO
 and inventing paths is the same error class as fabricating keyword volume. Source them
 consciously:
   - **Operator-supplied** (default): ask the operator for the sitelink targets (text + URL).
-  - **Firecrawl site-map** (optional): `firecrawl map <domain>` to discover real URLs, then the
-    operator picks which become sitelinks. Use the proven Firecrawl pattern; never guess a path.
+  - **Sitemap discovery** (optional, only if the firecrawl CLI is available): `firecrawl map
+    <domain>` to discover real URLs, then the operator picks which become sitelinks. If the CLI
+    is absent, fall back to operator-supplied URLs; never guess a path.
   - If a sitelink's URL can't be confirmed, OMIT the sitelink — do not ship a guessed URL.
 
 ---

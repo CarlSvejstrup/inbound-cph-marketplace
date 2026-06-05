@@ -14,7 +14,7 @@ The 19 columns collapse into 6 coupled decision clusters. Locked default = Ian's
 |---|---|---|
 | Campaign type | **Search** | Operator intent. B2B lead-gen → Search. v1 is Search-only. |
 | Goal | **Leads** | Operator-stated objective; drives the bidding/conversion cluster. |
-| Campaign state | **Paused until launch QA is complete** | Always paused at emit (coupled to the tracking gate). Never ship Enabled. |
+| Campaign state | **Paused** | Always emit the literal Editor status value `Paused` (Enabled/Paused/Removed). The paused-until-QA philosophy stays in the launch-gate prose; the imported value is just `Paused`. Never ship Enabled. |
 
 ## Cluster B — Bidding ↔ Volume ↔ Budget (the only real computation — see strategy logic)
 

@@ -90,7 +90,7 @@ Hårde grænser og kvalitets-gates køres **per RSA**; fejl labelles med "RSA 2,
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` før noget andet. Den indeholder write-gate-reglerne og sprogpolitikken. At gemme filen (til Drive eller lokalt) er en ekstern write — gated bag eksplicit bekræftelse.
+At gemme filen (til Drive eller lokalt) er en ekstern write — gated bag eksplicit bekræftelse.
 
 **Sprog: alt foregår på dansk** — spørgsmål i intake, statusbeskeder, output-tabellen og næste-skridt. Skift kun til engelsk hvis brugeren skriver til dig på engelsk eller udtrykkeligt beder om det. Selve annonceteksterne skrives også på dansk (se Trin 4).
 
@@ -163,7 +163,7 @@ Ad group-navnet spørges IKKE — default er tom. Hvis Carl vil sætte en, kan h
 
 ### Mellemtrin — scrape landingssiden FØR kald 4
 
-Kør Trin 2 (Firecrawl-scrape af landingssiden) NU, før du sender kald 4. Pointen: vi vil vise konkrete options fra siden i stedet for friform-tekst, så brugeren kan klikke sig igennem. Uden scrape bliver kald 4 til 4 friform-spørgsmål og en dårligere oplevelse.
+Kør Trin 2 (web_fetch af landingssiden) NU, før du sender kald 4. Pointen: vi vil vise konkrete options fra siden i stedet for friform-tekst, så brugeren kan klikke sig igennem. Uden scrape bliver kald 4 til 4 friform-spørgsmål og en dårligere oplevelse.
 
 ### Kald 4 — Tekst-inputs (1 AskUserQuestion, 4 spørgsmål)
 
@@ -251,7 +251,7 @@ Eksempler:
 
 ## Trin 2 — Analyser landingssiden
 
-Scrape URL'en med Firecrawl. Udtræk konkret (hver linje fodrer et option-sæt i Kald 4):
+Hent URL'en med `web_fetch`. Udtræk konkret, ordret fra siden (hver linje fodrer et option-sæt i Kald 4):
 - **Produkt/ydelse** — hvad sælger de.
 - **USP-kandidater** — hvad gør de anderledes.
 - **Tone of voice** — formel, venlig, teknisk, energisk.
@@ -325,7 +325,7 @@ Tilføj senere i output (Trin 7) at top-annonce-analysen brugte Google Ads MCP (
 
 ## Trin 3 — Læs skrive-reglerne
 
-**FØR du skriver annonceteksterne:** læs `${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/references/headline-craft.md`. Den indeholder angle-fordelingen, længde-variation-målene, Sentence case-reglen, keyword-tilstedeværelse, 2026 disapproval-forbud, description-fordelingen og kvalitets-check-listen — testet på millioner af annoncer. Trin 4 nedenfor er den korte huskeliste; reference-filen er den fulde begrundelse, og den vinder ved enhver konflikt.
+**FØR du skriver annonceteksterne:** læs `references/headline-craft.md`. Den indeholder angle-fordelingen, længde-variation-målene, Sentence case-reglen, keyword-tilstedeværelse, 2026 disapproval-forbud, description-fordelingen og kvalitets-check-listen — testet på millioner af annoncer. Trin 4 nedenfor er den korte huskeliste; reference-filen er den fulde begrundelse, og den vinder ved enhver konflikt.
 
 ## Trin 4 — Generer annoncetekster
 
@@ -418,7 +418,7 @@ Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i in
 ## Trin 5 — Byg arket
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/fill-sheet.py \
+python3 ${CLAUDE_SKILL_DIR}/fill-sheet.py \
   --ads ads.json \
   --out "RSA - <klient> - <YYYY-MM-DD>.xlsx"
 ```
@@ -450,7 +450,7 @@ Lever:
 2. **Drive-link** til samme fil uploadet via connector.
 3. **En tabel** med alle 19 strenge + tegnantal, så brugeren ser alt er sikkert.
 4. **Næste skridt (manuelt, human-in-the-loop):** del .xlsx'en med kunden til review (skillen deler IKKE selv). Efter kundens rettelser går teksten ind i Google Ads Editor — men IKKE som .xlsx (det kan Editor ikke importere). Enten (a) eksportér de godkendte rækker til en CSV i Editors kolonne-skema og brug File-import, eller (b) kopiér rækkerne (kun Editor-kolonnerne) ind via "Make multiple changes" → paste. Nævn at .xlsx'en er review-laget, ikke import-filen.
-5. **Datakilder** (kort linje): landingsside (Firecrawl) + om Trin 2.5 kørte (Google Ads MCP `run_custom_gaql`, antal top-annoncer lært fra) eller blev sprunget over (ny kunde / ingen MCP).
+5. **Datakilder** (kort linje): landingsside (web_fetch) + om Trin 2.5 kørte (Google Ads MCP `run_custom_gaql`, antal top-annoncer lært fra) eller blev sprunget over (ny kunde / ingen MCP).
 
 Del aldrig filen med kunden automatisk. Send aldrig nogen mail. Præsenter linket — Carl/brugeren videresender.
 
@@ -481,5 +481,5 @@ Næste: del .xlsx'en med kunden til review. Til Editor: eksportér godkendte ræ
 ## Maintenance
 
 - Layoutet bor ÉT sted: `sheet_layout.py` (`FIELDS`, `COLUMNS`, `build_sheet`, `text_cell`, `autosize_columns`). `build-template.py` og `fill-sheet.py` importerer begge derfra — ret kun `sheet_layout.py`, så følger begge med automatisk. Ingen hardcodede celle-lister at holde i sync længere.
-- Regenerer det committede single-RSA `template.xlsx` (reference + smoke test): `python3 ${CLAUDE_PLUGIN_ROOT}/skills/responsive-search-ads/build-template.py` (kun når layoutet ændrer sig). Skillen loader IKKE filen ved kørsel — `fill-sheet.py` bygger layoutet friskt for N rækker.
+- Regenerer det committede single-RSA `template.xlsx` (reference + smoke test): `python3 ${CLAUDE_SKILL_DIR}/build-template.py` (kun når layoutet ændrer sig). Skillen loader IKKE filen ved kørsel — `fill-sheet.py` bygger layoutet friskt for N rækker.
 - Skrive-reglerne i `references/headline-craft.md` skal re-checkes hvis Google ændrer disapproval-policy eller Ad Strength-vægtning. Kilder med tal-driven evidens (Optmyzr-studiet) må ikke være over 12 måneder gamle uden ny verifikation.

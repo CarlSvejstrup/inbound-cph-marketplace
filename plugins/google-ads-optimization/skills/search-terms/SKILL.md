@@ -33,7 +33,7 @@ Negatives can live at three levels (ad group / campaign / account-shared list). 
 
 ## Trin 0 - Kontekst
 
-Read `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` first - it holds the write-gate rules and the language policy. Read `${CLAUDE_PLUGIN_ROOT}/context/drive-map.md` to find the client's Drive working folder (where the sheet should land).
+Read `../../context/drive-map.md` to find the client's Drive working folder (where the sheet should land).
 
 The Drive upload is an external write, gated behind explicit confirmation. Everything against Google Ads is read-only.
 
@@ -101,7 +101,7 @@ WHERE campaign.status = 'ENABLED' AND ad_group_criterion.status = 'ENABLED'
 
 Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`, **excluding test/duplicate campaigns** (names matching `/w2m|test|vol 2/i` - confirm against the actual campaign list). This is what makes PLACEMENT_PROBLEM detectable without false-positiving on parallel test campaigns.
 
-**2c. Client offering via Firecrawl.** Scrape the landing page / website from intake (same pattern as `ads-audit-report`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
+**2c. Client offering via web_fetch.** Fetch the landing page / website from intake with `web_fetch` (same pattern as `ads-audit-report`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
 
 **2d. Ad-group ads + landing pages** for the intent-mismatch half of PLACEMENT_PROBLEM. Without this we can only see *structural* placement issues (keyword exists in two ad groups), never *intent* issues (term is relevant and ad-group name fits, but the actual ad and LP do not address the search intent). DSC's `Grupperejser` ad group in campaign 2 has `final_urls: ["https://danskstudiecenter.dk/"]` (the front page, not a grupperejse-LP) - that is exactly the kind of thing this pull catches.
 
@@ -190,7 +190,7 @@ Steps:
 1. Write the analysis to a JSON file matching the schema in the header of `build-sheet.py`: client + account_id + period + scope + filter, `offering` (scraped), `method_notes`, `distribution` (count + spend per bucket), `rows` (every term once, each tagged with its `klassificering`), and `negatives` (the synthesised import list). The script routes rows into per-tab views by `klassificering` itself.
 2. Build the workbook (filename carries the analysed window, not the build date):
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/search-terms/build-sheet.py \
+   python3 ${CLAUDE_SKILL_DIR}/build-sheet.py \
      --in <analysis.json> \
      --out "Search Terms - <klient> - <start> til <end>.xlsx"
    ```
@@ -238,7 +238,7 @@ Deliver:
 2. **Chat summary:** spend per bucket, antal vindere, antal anbefalede negatives + samlet spildt budget, coverage %, any low-confidence flags.
 3. **Naeste skridt (manuelt, human-in-the-loop):** the ads team imports the Anbefalede-negatives tab into Editor, promotes Vindere as exact keywords, reviews Graensetilfaelde manually. The skill applies nothing automatically.
 
-End with a `## Datakilder` section listing the MCP tools called (incl. Firecrawl for the landing page).
+End with a `## Datakilder` section listing the MCP tools called (incl. web_fetch for the landing page).
 
 ## Regler
 - Read-only against Google Ads. Never write negatives back.

@@ -27,13 +27,13 @@ Carl: "just make" — så hold det enkelt. MEN to ting er korrekthed, ikke polis
 2. **Sitelink-URL'er er IKKE udledelige fra den skrabne side.** Tab 07's sitelinks peger på
    ANDRE sider (`/ai-seo-audit/`, `/kontakt/`) end den ene landingsside Phase 1 skrabede. At
    opfinde stier er samme fejlklasse som at opfinde keyword-volumen. Kilde dem bevidst:
-   operator-leveret (default), eller `firecrawl map <domæne>` → operatøren vælger. Kan en URL
+   operator-leveret (default). Valgfrit, hvis firecrawl-CLI'en er tilgængelig: `firecrawl map <domæne>` for at finde rigtige URL'er operatøren vælger fra. Kan en URL
    ikke bekræftes: UDELAD sitelinket — ship aldrig en gættet URL.
 
 ## Hård regel — INGEN API-push, gated writes
 
 Som hele campaign-build: ingen Google Ads API-push, ingen eksterne writes fra dette skill (det
-emitterer et objekt; assembler renderer CSV/workbook). `firecrawl map` (URL-discovery) er en
+emitterer et objekt; assembler renderer CSV/workbook). En valgfri `firecrawl map` (URL-discovery, kun hvis CLI'en findes) er en
 read, ikke en write — men oplys hvilket domæne der mappes.
 
 ## When to use
@@ -43,8 +43,7 @@ snippets", eller automatisk som Phase-3-trin (parallelt med rsa-copywriter) efte
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs
-`${CLAUDE_PLUGIN_ROOT}/skills/assets/references/asset-rules.md` — de verificerede Editor-CSV-
+Læs `references/asset-rules.md` — de verificerede Editor-CSV-
 fakta, de to firewalls og output-formen. Dansk medmindre brugeren skriver engelsk.
 
 ## Trin 1 — Indlæs input
@@ -61,7 +60,7 @@ Default **attachment level = campaign** (tab 07 er alt campaign-niveau).
 ## Trin 2 — Sitelinks (Firewall B gælder)
 
 Sitelinks skal pege på rigtige sider. Spørg operatøren om sitelink-targets (tekst + URL), ELLER
-tilbyd `firecrawl map <domæne>` for at finde rigtige URL'er operatøren kan vælge fra. Til hver
+tilbyd — hvis firecrawl-CLI'en er tilgængelig — `firecrawl map <domæne>` for at finde rigtige URL'er operatøren kan vælge fra (ellers ren operator-input). Til hver
 sitelink: kort tekst (~25 tegn praktisk), Final URL (bekræftet), og valgfrit 2 beskrivelses-
 linjer (par — begge eller ingen) grounded i sidens budskab. Kan en URL ikke bekræftes: udelad.
 Sæt `url_source` per sitelink (operator-supplied / firecrawl-map / omitted-unconfirmed).

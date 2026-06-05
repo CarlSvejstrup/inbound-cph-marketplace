@@ -207,7 +207,7 @@ def tab_campaign_settings(wb, strategy):
         ("Account ID", strategy.get("account_id", "")),
         ("Campaign", strategy.get("campaign", "")),
         ("Campaign type", strategy.get("campaign_type", "Search")),
-        ("Campaign state", strategy.get("campaign_state", "Paused until launch QA is complete")),
+        ("Campaign state", strategy.get("campaign_state", "Paused")),
         ("Goal", strategy.get("goal", "Leads")),
         # Two cells, not one: the numeric daily budget is what campaigns.csv needs, so it must
         # survive on its own and never be overwritten by the prose rationale (gap fix).
@@ -467,6 +467,77 @@ def tab_validation(wb, rsa_manifest):
     return failures
 
 
+# --------------------------------------------------------------------------- overview
+def write_overview(path, strategy, structuring, rsa_manifest, assets, date, adless, failures):
+    """Emit the 'Kampagne overblik' lead doc: structural facts pre-filled, semantic
+    one-liners left as {{model: ...}} slots for the skill to complete (findings are
+    semantic, not mechanical). Template + rules: references/kampagne-overblik-template.md.
+    ONE lead doc — do not also emit a separate import README."""
+    negs = structuring.get("negatives", {})
+    shared = negs.get("inherited_shared_list", {})
+    ags = structuring.get("ad_groups", [])
+    n_kw = sum(len(a.get("keywords", [])) for a in ags)
+    n_rsa = sum(1 for _ in _rsa_rows(rsa_manifest))
+    budget = strategy.get("budget_recommendation") or {}
+    lines = [
+        f"# Kampagne-overblik — {strategy.get('client', structuring.get('campaign',''))}",
+        "",
+        f"**Konto:** {strategy.get('account_id','')} · **Kampagne:** "
+        f"`{strategy.get('campaign', structuring.get('campaign',''))}` · **Dato:** {date}",
+        "**Status ved import:** Paused (aktivér først efter review + launch-QA)",
+        "",
+        "## Beslutninger (hvad bygget valgte)",
+        f"- **Struktur:** {len(ags)} ad groups, {n_kw} keywords (Exact + udvalgt Phrase, ingen "
+        f"Broad). {{{{model: én linje struktur-rationale fra structure_rationale}}}}",
+        f"- **Negativer:** delt MCC-liste \"{shared.get('name','Generelle negative søgeord')}\" "
+        f"påført by-reference (id {shared.get('shared_set_id','6688642473')}) + "
+        f"{len(negs.get('client_specific_additions', []))} klient-specifikke. "
+        f"{len(negs.get('monitor_first_candidates', []))} monitor-first-kandidater.",
+        "- **Keywords:** tema-afledte — validér volumen i Keyword Planner før aktivering.",
+        f"- **Annoncer:** {n_rsa} RSA'er.",
+        f"- **Assets:** {len(assets.get('sitelinks', []))} sitelinks, "
+        f"{len(assets.get('callouts', []))} callouts, "
+        f"{len(assets.get('structured_snippets', []))} structured snippets.",
+        f"- **Budstrategi/budget:** {strategy.get('bidding_strategy','')} · "
+        f"{budget.get('daily_dkk','')} DKK/dag" + (f" — {budget.get('rationale','')}" if budget.get('rationale') else ""),
+        "",
+        "## Vigtigste fund / flag (læs før go-live)",
+    ]
+    if adless:
+        lines.append(f"- ⚠️ Ad group(s) UDEN RSA (ingen annonce serveres): {', '.join(adless)} — "
+                     "tilføj RSA eller fjern før aktivering (tab 08).")
+    if failures:
+        lines.append(f"- ⚠️ {failures} felt(er) over hård tegngrænse — se fane 09 Validering (rød). "
+                     "Ret før import.")
+    lines += [
+        "{{model: 2-5 one-liner-fund fra fane 08 + 09 + input-objekterne — fx udeladte "
+        "usikre sitelink-URL'er, snippet-header-kolonne UNVERIFIED, tracking-gate, "
+        "overlappende ad groups der skal pauses. Hvis intet blokerende: \"Ingen blokerende "
+        "fund — klar til review.\"}}",
+        "",
+        "## Sådan importerer du (bulk-upload til Google Ads Editor)",
+        f"1. Åbn **Google Ads Editor**, vælg kontoen ({strategy.get('account_id','')}).",
+        "2. **Account → Import → From file** med Editor-CSV'erne. (Editor importerer CSV, ikke "
+        ".xlsx — denne workbook er review-laget; Editor-CSV'erne genereres fra den godkendte "
+        "workbook af `google-ads-general`-konverteren.)",
+        "3. Importér i rækkefølge, kør **Check Changes** efter hver: campaigns → ad groups → "
+        "keywords → ads (RSA) → assets → negative keywords.",
+        f"4. **Tilknyt den delte negativliste** \"{shared.get('name','Generelle negative søgeord')}\" "
+        f"(id {shared.get('shared_set_id','6688642473')}) til kampagnen — den er IKKE i nogen CSV.",
+        "5. **Manuelt efter import:** sprog = Dansk, Denmark = Presence (ikke Presence-or-Interest), "
+        "verificér leadgen-konverteringshandlingen.",
+        "6. Kør **Check Changes**, løs alle røde fejl, verificér status = **Paused**, derefter Post Changes.",
+        "",
+        "## Før go-live (launch-gate — fuld liste i workbook fane 08)",
+        "{{model: Must-pass-rækkerne fra fane 08 som one-liners}}",
+        "",
+        "---",
+        "Genereret af campaign-build assembler. Workbook = detaljen; dette = forsiden. Intet pushet til kontoen.",
+    ]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 # --------------------------------------------------------------------------- main
 def load_json(path):
     with open(path, encoding="utf-8") as f:
@@ -480,6 +551,7 @@ def main():
     ap.add_argument("--rsa", required=True, help="rsa manifest json")
     ap.add_argument("--assets", required=True, help="assets.json")
     ap.add_argument("--workbook", required=True, help="output .xlsx path")
+    ap.add_argument("--overview", default="", help="output 'Kampagne overblik.md' path (optional)")
     ap.add_argument("--date", default="", help="deliverable date (passed in; script can't call now)")
     args = ap.parse_args()
 
@@ -507,8 +579,14 @@ def main():
     failures = tab_validation(wb, rsa_manifest)
     wb.save(args.workbook)
 
+    overview_path = args.overview
+    if overview_path:
+        write_overview(overview_path, strategy, structuring, rsa_manifest, assets,
+                       args.date, adless_ad_groups, failures)
+
     print(json.dumps({
         "workbook": args.workbook,
+        "overview": overview_path or None,
         "validation_failures": failures,
         "adless_ad_groups": adless_ad_groups,
         "note": "Excel-only. The workbook is the client-confirmation artifact; Editor CSVs are "

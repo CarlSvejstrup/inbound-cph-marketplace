@@ -190,7 +190,7 @@ Because these live in the .xlsx layer (not in CSV values), they survive the Driv
 
 ## Skill flow (maps to SKILL.md steps)
 
-- **Trin 0 - Kontekst:** read `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + language). Read `context/drive-map.md` for the client folder.
+- **Trin 0 - Kontekst:** the plugin contract (write-gate + language) is auto-loaded. Read `../../context/drive-map.md` for the client folder.
 - **Trin 1 - Intake (one question at a time):**
   1. Client name -> match against `list_accessible_accounts`, confirm "Fandt [navn] (ID: X) - rigtig konto?".
   2. Date range (default LAST_30_DAYS; offer 90).

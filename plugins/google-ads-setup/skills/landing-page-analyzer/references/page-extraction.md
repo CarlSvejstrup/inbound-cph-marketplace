@@ -52,7 +52,7 @@ If the page cannot be fetched: say so and stop. Do not invent any field.
 {
   "source_url": "https://...",
   "scraped_at": "<ISO-8601, stamp after the run>",
-  "scrape_tool": "firecrawl scrape --only-main-content + LLM extract",
+  "scrape_tool": "web_fetch + LLM extract",
   "product_service": "string",
   "brand": { "name": "string", "logo_text": "string|null" },
   "usp_candidates": ["string", "..."],
@@ -76,24 +76,22 @@ the structuring gate still needs.
 
 ## How to run the extraction
 
-Use the **proven pattern from the shipped skills** (`responsive-search-ads` Trin 2,
-`ads-audit-report` Trin 3): scrape the page to markdown, then YOU (the model) extract the fields
-below from that markdown. The extraction is LLM reading, not a CLI schema flag.
+Fetch the page with the built-in **`web_fetch`** tool, then YOU (the model) extract the
+fields below from the returned page content. The extraction is LLM reading, not a CLI flag,
+and `web_fetch` works in Cowork (no CLI dependency).
 
-```bash
-firecrawl scrape "<url>" --only-main-content -o .firecrawl/page.md
-```
+Call `web_fetch` on the URL, asking for the page's full content (product/service, USPs,
+on-page CTAs, trust signals **with their exact numbers**, any active offer + expiry, brand,
+language). Then populate the output JSON shape, applying the three firewall rules. The
+`page-extraction-schema.json` in this directory is the **field contract you extract against**
+(and a validation target) — it is NOT passed to the tool.
 
-Then read `.firecrawl/page.md` and populate the output JSON shape by reading the page,
-applying the three firewall rules. The `page-extraction-schema.json` in this directory is
-the **field contract you extract against** (and a validation target) — it is NOT passed to
-the CLI. `firecrawl scrape` has no `--schema-file` flag (verified 2026-06-03); that flag
-lives on `firecrawl agent`, which we do not use here (autonomous multi-page, more credits,
-overkill for one known URL).
+**Verbatim guarantee (load-bearing).** Firewall rule 1 (trust signals verbatim, never
+invented) depends on you reading the page's ACTUAL text. If a `web_fetch` response comes back
+as a short summary that has dropped the concrete numbers/claims/CTAs, fetch again with an
+explicit instruction to return the raw page text with those intact. Never fill a trust number
+or offer from memory or inference — if the page content you got doesn't contain it, the field
+is empty.
 
-Optional: `--query "<prompt>"` (`-Q`) asks a focused question about the page, and a
-multi-format scrape (`--format markdown,summary`) returns JSON with a summary — but the
-baseline is markdown-scrape + LLM-extract, matching the shipped skills exactly.
-
-Reads are free under the write-gate; scraping a public page needs no approval, but disclose
-which URL was hit. The raw scrape is candidate data; the firewall is yours to enforce.
+Reads are free under the write-gate; fetching a public page needs no approval, but disclose
+which URL was hit. The fetched content is candidate data; the firewall is yours to enforce.

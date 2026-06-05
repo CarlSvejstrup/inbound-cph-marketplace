@@ -19,15 +19,15 @@ Trigger-fraser: "analyser landingsside", "udtræk positionering fra [URL]", "lan
 
 ## How it works (architecture — read once)
 
-Firecrawl-`scrape` til markdown → DU (modellen) udtrækker felterne fra markdown'en → de tre firewall-regler anvendes → struktureret JSON emitteres. Dette er præcis samme mønster som de shippede skills (`responsive-search-ads` Trin 2, `ads-audit-report` Trin 3): scrape til markdown, læs, udtræk. Ingen scripts nødvendige. Kører i Cowork og lokalt — eneste forudsætning er `firecrawl`-CLI'en.
+`web_fetch` på URL'en → DU (modellen) udtrækker felterne fra det hentede sideindhold → de tre firewall-regler anvendes → struktureret JSON emitteres. Ingen scripts nødvendige, ingen CLI — `web_fetch` er et indbygget værktøj der virker i Cowork.
 
-**Vigtigt:** `firecrawl scrape` har INGEN `--schema-file`-flag (verificeret 2026-06-03) — det flag bor på `firecrawl agent`, som vi ikke bruger her. `page-extraction-schema.json` er felt-kontrakten du udtrækker *mod* (og kan validere mod), ikke et CLI-argument.
+**Vigtigt — verbatim-udtræk:** udtræk felterne fra det FAKTISKE sideindhold `web_fetch` returnerer, ikke fra et resumé. Trust-tal og claims skal være ordrette fra siden (firewall-regel 1). Hvis `web_fetch` kun giver et resumé uden de konkrete tal/claims, så hent siden igen med en præcis instruktion om at returnere den rå tekst med tal og CTA'er intakt — gæt aldrig et tal. `page-extraction-schema.json` er felt-kontrakten du udtrækker *mod*, ikke et argument til værktøjet.
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` før noget andet (write-gate + sprogpolitik). **At scrape en offentlig side er en read, ikke en ekstern write — ingen write-gate.** Men oplys hvilken URL du rammer. Alt foregår på dansk medmindre brugeren skriver på engelsk.
+**At scrape en offentlig side er en read, ikke en ekstern write — ingen write-gate.** Men oplys hvilken URL du rammer. Alt foregår på dansk medmindre brugeren skriver på engelsk.
 
-Læs derefter `${CLAUDE_PLUGIN_ROOT}/skills/landing-page-analyzer/references/page-extraction.md` — den definerer felterne, de tre firewall-regler og output-formen. Den vinder ved enhver konflikt med dette skill.
+Læs derefter `${CLAUDE_SKILL_DIR}/../landing-page-analyzer/references/page-extraction.md` — den definerer felterne, de tre firewall-regler og output-formen. Den vinder ved enhver konflikt med dette skill.
 
 ## Trin 1 — Intake (minimal)
 
@@ -40,13 +40,9 @@ Option-præsentation og menneske-godkendelse af det udtrukne ligger IKKE her —
 
 ## Trin 2 — Scrape + udtræk
 
-Kør ekstraktionen som beskrevet i `references/page-extraction.md` — scrape til markdown, læs den, udtræk felterne:
+Kør ekstraktionen som beskrevet i `references/page-extraction.md` — hent siden med `web_fetch`, læs det returnerede indhold, udtræk felterne:
 
-```bash
-firecrawl scrape "<final_url>" --only-main-content -o .firecrawl/page.md
-```
-
-Læs `.firecrawl/page.md` og udfyld felterne i `page-extraction-schema.json` ved at læse siden. Brug IKKE `firecrawl agent` (autonom multi-side, flere credits). Hvis siden ikke kan hentes: sig det og stop — vi opfinder ikke felter.
+Kald `web_fetch` på `<final_url>` (bed om sidens fulde indhold — produkt/ydelse, USP'er, CTA'er, trust-tal med konkrete tal, evt. tilbud + udløb, brand, sprog). Udfyld så felterne i `page-extraction-schema.json` ved at læse det hentede indhold. Hvis siden ikke kan hentes: sig det og stop — vi opfinder ikke felter. Husk verbatim-reglen (se "How it works"): trust-tal/claims ordret fra siden.
 
 Anvend derefter de tre firewall-regler fra reference-filen på råudtrækket:
 1. Trust-signaler er verbatim; `has_numbers` kun når der står et brugbart tal. Intet tal → tom liste, ingen opfundne claims.
@@ -71,8 +67,8 @@ Lever:
 
 ```
 Landingsside analyseret: https://acme.dk/ydelse
-Værktøj: firecrawl scrape --only-main-content (markdown) + LLM-udtræk
-JSON: .firecrawl/landing-page-analysis.json
+Værktøj: web_fetch + LLM-udtræk
+JSON: landing-page-analysis.json
 
 | Felt | Værdi |
 |---|---|
@@ -89,4 +85,4 @@ Konfidens: high. Klar til structuring + RSA.
 ## Maintenance
 
 - Feltlisten, firewall-reglerne og JSON-formen bor ÉT sted: `references/page-extraction.md` + `page-extraction-schema.json`. Ret kun dem; alle tre forbrugere (dette skill, `competitor-research`, senere RSA Trin 2) følger med.
-- `firecrawl scrape --format branding` blev overvejet til brand/logo men er ikke verificeret på danske SMB-sider — `json`-skemaet udtrækker allerede `brand`. Spot-test `branding` før det evt. tilføjes.
+- Henter via `web_fetch` (indbygget værktøj, virker i Cowork). Hvis et `web_fetch`-svar er for sammenfattet til at bære de ordrette trust-tal/claims, hent igen med en præcis instruktion om rå sidetekst — verbatim-reglen er ikke til forhandling.

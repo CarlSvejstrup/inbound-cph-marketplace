@@ -1,6 +1,6 @@
 # Inbound CPH — Google Ads operating contract
 
-This file is the canonical operating contract for every Inbound CPH user running the Google Ads skills (the `google-ads-setup` and `google-ads-optimization` plugins share this contract). Every skill in this plugin reads `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (this file) and the `context/*.md` files when invoked, so the contract applies whenever a skill runs.
+This file is the canonical operating contract for every Inbound CPH user running the Google Ads skills (the `google-ads-setup` and `google-ads-optimization` plugins share this contract). This contract is auto-loaded with the plugin, so it applies whenever a skill runs — skills do not need to (and no longer) explicitly read it. The `context/*.md` files are referenced by relative path where a skill needs them.
 
 ## Hard rule: human-in-the-loop on every write
 

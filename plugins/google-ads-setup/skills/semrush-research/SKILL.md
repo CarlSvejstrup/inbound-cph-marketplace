@@ -41,8 +41,7 @@ trin i en campaign-build-kørsel HVIS Semrush-adgang er til stede.
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs
-`${CLAUDE_PLUGIN_ROOT}/skills/semrush-research/references/semrush-contract.md` — MCP-formen,
+Læs `references/semrush-contract.md` — MCP-formen,
 gaten, per-familie-gating, output-JSON, degraderings-reglerne og bind-on-access-checklisten.
 
 ## Trin 1 — Intake (minimal)

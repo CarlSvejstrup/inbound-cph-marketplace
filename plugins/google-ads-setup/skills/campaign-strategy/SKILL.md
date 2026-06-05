@@ -23,7 +23,7 @@ Trigger-fraser: "kampagne-strategi", "campaign settings til [klient]", "opsæt k
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs `${CLAUDE_PLUGIN_ROOT}/skills/campaign-strategy/references/campaign-settings-defaults.md` — de låste defaults, de 6 klynger og bud/budget-logikken. Den vinder ved konflikt. Dansk medmindre brugeren skriver på engelsk.
+Læs `references/campaign-settings-defaults.md` — de låste defaults, de 6 klynger og bud/budget-logikken. Den vinder ved konflikt. Dansk medmindre brugeren skriver på engelsk.
 
 ## Trin 1 — Intake (få AskUserQuestion-kald, mange felter)
 
@@ -55,7 +55,7 @@ Skriv det strukturerede objekt (keyet til tab-01's 19 kolonner) til kørslens ar
   "account_id": "9143889167",
   "campaign": "IC | GSN | AI-SEO",
   "campaign_type": "Search",
-  "campaign_state": "Paused until launch QA is complete",
+  "campaign_state": "Paused",
   "goal": "Leads",
   "budget_recommendation": { "daily_dkk": 500, "rationale": "...CPC×clicks...", "review_after_days": 14 },
   "bidding_strategy": "Maximize Conversions",

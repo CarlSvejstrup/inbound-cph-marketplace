@@ -39,8 +39,7 @@ campaign-build-kørsel når Phase-1 research er klar.
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs
-`${CLAUDE_PLUGIN_ROOT}/skills/structuring/references/structuring-rules.md` — de verificerede
+Læs `references/structuring-rules.md` — de verificerede
 regler for ad groups, keywords og negatives + output-formen. Dansk medmindre brugeren
 skriver på engelsk.
 

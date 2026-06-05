@@ -37,7 +37,7 @@ En **læse-skill**: henter per-asset data via Google Ads MCP (`run_custom_gaql`)
 
 ## Trin 0 — Kontekst
 
-Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` før noget andet (write-gate, sprogpolitik). At gemme filen er en ekstern write — gated bag eksplicit bekræftelse.
+At gemme filen er en ekstern write — gated bag eksplicit bekræftelse.
 
 **Sprog: alt på dansk** — intake-spørgsmål, statusbeskeder, output-tabellen, næste-skridt. Skift kun til engelsk hvis brugeren skriver på engelsk.
 
@@ -128,7 +128,7 @@ Vinkel-navnene SKAL være fra vinkel-taksonomien i `responsive-search-ads/refere
 Skriv en `analysis.json` efter skemaet i toppen af `build-sheet.py` (felter: `client`, `account_id`, `period`, `scope`, `min_impressions`, `method_notes`, `ad_groups`, `assets`, `gap_brief`).
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/annonce-optimering/build-sheet.py \
+python3 ${CLAUDE_SKILL_DIR}/build-sheet.py \
   --in analysis.json \
   --out "Annonce-optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
