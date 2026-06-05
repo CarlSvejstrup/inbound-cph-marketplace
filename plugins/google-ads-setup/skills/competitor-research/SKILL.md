@@ -113,5 +113,5 @@ Lever: differentierings-listen, "undgå disse commoditiserede claims"-listen, og
 ## Maintenance
 
 - Ekstraktionen bor i `landing-page-analyzer/references/page-extraction.md` — ret den ÉT sted; dette skill følger med. Vinkel-taksonomien bor i `responsive-search-ads/references/headline-craft.md`.
-- Hvis Semrush-planen opgraderes: Semrush bliver den stærke sti til konkurrent-*opdagelse* + keyword-gap. Tilføj den som en valgfri discovery-kilde i Trin 1 — gør den aldrig til en afhængighed.
+- Hvis Semrush-planen opgraderes: `semrush-research`-skillet (samme plugin) bliver den stærke sti til konkurrent-*opdagelse* + keyword-gap via `organic_research`. Tilføj dens output som en valgfri discovery-kilde i Trin 1 — gør den aldrig til en afhængighed (dette skill forbliver Firecrawl-primært).
 - **Ingen scripts** — output er ren JSON-syntese (LLM-ræsonnement), ingen beregning. Hold det script-frit.

@@ -67,10 +67,14 @@ source in this stack.
 - Google Ads MCP exposes only existing-campaign keyword data (`keyword_view` GAQL,
   `get_keyword_performance`, search-terms report). There is **no Keyword Planner
   ideas/volume surface** (KeywordPlanIdeaService is not a GAQL resource).
-- Semrush MCP `keyword_research` is plan-gated (no data) — verified Phase 1.
+- Semrush MCP `keyword_research` is plan-gated (no data) — verified Phase 1. **If Semrush
+  access is later granted**, the `semrush-research` skill emits volume/difficulty/CPC per
+  keyword; consume its `keyword_data[]` (rows with `source: semrush`) to ground the selection.
+  Until then it returns all-`UNAVAILABLE` and this theme-derived path stands. Never a dependency.
 
 So generate keyword candidates from the **landing-page-analyzer + competitor-research
-output + theme**. Group them by intent into the ad groups from §1.
+output + theme** (+ `semrush-research` volume data when available). Group them by intent into
+the ad groups from §1.
 
 **Honesty rule (load-bearing):** generated keywords are **theme-derived, NOT
 volume-ranked**. The skill MUST say so and route volume validation to the human (Keyword
