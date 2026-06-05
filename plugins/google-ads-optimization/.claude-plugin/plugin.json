@@ -1,0 +1,14 @@
+{
+  "name": "google-ads-optimization",
+  "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. ads-audit (full paid-search audit → slide deck + PDF), annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), search-terms (search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns from scratch, see google-ads-setup. Danish-default.",
+  "version": "1.0.0",
+  "author": { "name": "Inbound CPH" },
+  "userConfig": {
+    "inbound_root_folder_id": {
+      "type": "string",
+      "title": "Inbound CPH Drive folder ID",
+      "description": "The Google Drive folder ID for the inbound-cph/ root folder where all client folders live. Defaults to the shared agency folder. Override only if you have a different mount.",
+      "default": "17JwnWKToZSJUSCURjS9PzzBeqe6_gPfi"
+    }
+  }
+}

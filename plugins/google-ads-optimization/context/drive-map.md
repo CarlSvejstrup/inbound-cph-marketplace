@@ -12,7 +12,7 @@ When a skill needs to read from Drive, it should use the Drive search/read tools
 
 ## Root layout
 
-The `inbound-cph/` folder contains one subfolder per client at the top level. Each subfolder name matches the client identifier used in skill invocations (`/inbound-cph:client-brief nordkap-friluft` → folder `nordkap-friluft/`).
+The `inbound-cph/` folder contains one subfolder per client at the top level. Each subfolder name matches the client identifier used in skill invocations (e.g. client `nordkap-friluft` → folder `nordkap-friluft/`).
 
 For demo and evaluation, the canonical client is **Nordkap Friluft**, in folder `nordkap-friluft/` (folder ID `1Ca6_V4v57h7NDVQS0NRI-yP47gh_QTa9`).
 

@@ -3,9 +3,14 @@
   "owner": { "name": "Carl Svejstrup" },
   "plugins": [
     {
-      "name": "inbound-cph",
-      "source": "./plugins/inbound-cph",
-      "description": "Kunde Specialist skills for Inbound CPH client work"
+      "name": "google-ads-setup",
+      "source": "./plugins/google-ads-setup",
+      "description": "Build a new Google Ads campaign end-to-end: research, structure, creative, assembled workbook + Editor CSVs (and the RSA copy engine)."
+    },
+    {
+      "name": "google-ads-optimization",
+      "source": "./plugins/google-ads-optimization",
+      "description": "Optimize live Google Ads accounts: paid-search audit, post-launch RSA asset-hygiene, search-terms analysis + negative-keyword mining."
     }
   ]
 }

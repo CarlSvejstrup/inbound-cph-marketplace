@@ -1,0 +1,14 @@
+{
+  "name": "google-ads-setup",
+  "description": "Google Ads campaign SETUP / build skills for Inbound CPH: take a new client from research to a launch-ready campaign. Phase-1 research (landing-page-analyzer, competitor-research, campaign-strategy), Phase-2 structuring (ad-groups + keywords + negatives gate), Phase-3 creative (rsa-copywriter + assets), Phase-4 assembler (merges all four into the 10-tab workbook + Editor CSVs, no API push), plus responsive-search-ads (the RSA copy engine the build reuses). Initialization-focused: no live-account optimization here (see google-ads-optimization). Danish-default.",
+  "version": "1.0.0",
+  "author": { "name": "Inbound CPH" },
+  "userConfig": {
+    "inbound_root_folder_id": {
+      "type": "string",
+      "title": "Inbound CPH Drive folder ID",
+      "description": "The Google Drive folder ID for the inbound-cph/ root folder where all client folders live. Defaults to the shared agency folder. Override only if you have a different mount.",
+      "default": "17JwnWKToZSJUSCURjS9PzzBeqe6_gPfi"
+    }
+  }
+}

@@ -115,6 +115,8 @@ Saml `manglende_vinkler` per ad group til en `gap_brief`-liste. For hver: et kon
 
 Dette skill *producerer* gap-brief'et; `responsive-search-ads` *forbruger* det. Samme form i begge skills. **Medium: brugeren kopierer det ind manuelt** i den næste kørsel — vi skriver det IKKE til en fil de to skills deler, og forbrugeren parser hverken xlsx-fanen eller `analysis.json`. Det holder de to Cowork-kørsler løst koblet.
 
+> **Bemærk — loopet krydser nu to plugins:** `annonce-optimering` bor i `google-ads-optimization`, mens `responsive-search-ads` bor i `google-ads-setup`. Fordi medium er manuel paste (ingen kode-/fil-kobling), virker loopet uændret på tværs af plugin-grænsen — men begge plugins skal være installeret for at lukke build→operate→iterate-loopet.
+
 Ud over `gap_brief`-feltet i `analysis.json` (til arkets Gap-brief-fane), så **udskriv gap-brief'et i dit svar** i denne kopiér-klare form, én linje per ad group:
 ```
 - Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>

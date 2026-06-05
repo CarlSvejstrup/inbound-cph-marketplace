@@ -134,6 +134,8 @@ Saml i samme kald:
 
 `annonce-optimering` *producerer* dette; `responsive-search-ads` *forbruger* det. Samme form i begge skills, så loopet er dokumenteret ens i begge ender. **Medium: brugeren indsætter det manuelt** i chatten når kørslen starter — vi parser hverken xlsx-fanen eller `analysis.json`. Det holder de to Cowork-kørsler løst koblet.
 
+> **Bemærk — loopet krydser nu to plugins:** `responsive-search-ads` bor i `google-ads-setup`, mens `annonce-optimering` (producenten) bor i `google-ads-optimization`. Manuel paste krydser plugin-grænsen uden problemer, men begge plugins skal være installeret for at lukke loopet.
+
 Formen er en liste per ad group:
 ```
 - Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>
