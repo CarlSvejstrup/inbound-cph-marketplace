@@ -77,7 +77,7 @@ the structuring gate still needs.
 ## How to run the extraction
 
 Use the **proven pattern from the shipped skills** (`responsive-search-ads` Trin 2,
-`ads-audit` Trin 3): scrape the page to markdown, then YOU (the model) extract the fields
+`ads-audit-report` Trin 3): scrape the page to markdown, then YOU (the model) extract the fields
 below from that markdown. The extraction is LLM reading, not a CLI schema flag.
 
 ```bash

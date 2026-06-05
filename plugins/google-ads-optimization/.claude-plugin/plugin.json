@@ -1,7 +1,7 @@
 {
   "name": "google-ads-optimization",
-  "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. ads-audit (full paid-search audit → slide deck + PDF), annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), search-terms (search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list), ads-aendringslog (build a changelog entry from Google Ads' own change-history, per client or per specialist across their accounts, collapse bulk uploads, format-matched draft to paste into the client's Drive changelog). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns from scratch, see google-ads-setup. Danish-default.",
-  "version": "1.1.0",
+  "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), search-terms (search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns see google-ads-setup; for audit reports + change-logs see google-ads-general. Danish-default.",
+  "version": "2.0.0",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

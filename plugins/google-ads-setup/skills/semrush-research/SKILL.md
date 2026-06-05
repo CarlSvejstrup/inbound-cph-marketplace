@@ -97,7 +97,7 @@ til tema-afledt (structuring's eksisterende sti).
 - **Aldrig en afhængighed.** Hvis du nogensinde gør structuring/campaign-strategy afhængig af
   Semrush-data der KUNNE være gated, har du brudt degraderings-kontrakten.
 - **Setup-only i v1.** Optimerings-brug (organic keyword-gap + konkurrent-annoncetekst ind i
-  search-terms/ads-audit) er udskudt — og cross-plugin-grænsen betyder at optimization ville
+  search-terms/ads-audit-report) er udskudt — og cross-plugin-grænsen betyder at optimization ville
   kræve sin egen kopi, ikke en delt reference ind i setup.
 
 ## Maintenance

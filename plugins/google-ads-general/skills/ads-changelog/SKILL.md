@@ -1,9 +1,9 @@
 ---
-name: ads-aendringslog
-description: Generér en changelog-/optimeringslog-tekst fra Google Ads' egen ændringshistorik (change_event) for en periode, og udkast den klar til at sætte ind i klientens changelog på Drive. To tilstande - (1) PER KUNDE - alle ændringer på én konto i perioden, eller (2) PER PERSON - alt hvad én specialist (f.eks. Rikke) har lavet på tværs af sine konti, fanet ud til hver kundes changelog. Kollapser bulk-uploads til én linje (561 events = "tilføjede negativ-liste (557 ord)"), bevarer hvem der lavede ændringen (også eksterne bureauer/Google-anbefalinger), og tilføjer en _Hvorfor:_-placeholder fordi API'et kun kender "hvad", ikke "hvorfor". Read-only mod Google Ads. Skriver IKKE til Drive selv (connectoren kan ikke appende til et eksisterende Doc) - leverer en formatmatchet tekstblok som mennesket sætter ind. Kan køres dagligt/ugentligt. Brug når brugeren siger "lav changelog", "ads-ændringslog", "log hvad der er lavet på [kunde]", "hvad har [person] lavet i denne uge", "ugentlig ændringslog", "optimeringslog fra Ads", eller "log ændringerne". Svarer på dansk.
+name: ads-changelog
+description: Generér en changelog-/optimeringslog-tekst fra Google Ads' egen ændringshistorik (change_event) for en periode, og udkast den klar til at sætte ind i klientens changelog på Drive. To tilstande - (1) PER KUNDE - alle ændringer på én konto i perioden, eller (2) PER PERSON - alt hvad én specialist (f.eks. Rikke) har lavet på tværs af sine konti, fanet ud til hver kundes changelog. Kollapser bulk-uploads til én linje (561 events = "tilføjede negativ-liste (557 ord)"), bevarer hvem der lavede ændringen (også eksterne bureauer/Google-anbefalinger), og tilføjer en _Hvorfor:_-placeholder fordi API'et kun kender "hvad", ikke "hvorfor". Read-only mod Google Ads. Skriver IKKE til Drive selv (connectoren kan ikke appende til et eksisterende Doc) - leverer en formatmatchet tekstblok som mennesket sætter ind. Kan køres dagligt/ugentligt. Brug når brugeren siger "lav changelog", "ads-changelog", "ads-ændringslog", "log hvad der er lavet på [kunde]", "hvad har [person] lavet i denne uge", "ugentlig changelog", "optimeringslog fra Ads", eller "log ændringerne". Svarer på dansk.
 ---
 
-# ads-aendringslog
+# ads-changelog
 
 Byg en changelog-tekst direkte fra Google Ads' indbyggede ændringshistorik (`change_event`-ressourcen, samme data som **Værktøjer → Ændringshistorik** i UI'et), og lever den klar til at sætte ind i klientens optimeringslog/changelog på Drive.
 
@@ -88,7 +88,7 @@ LIMIT 9000
 ### Feltregler (verificeret mod live data)
 - **`change_date_time`** er sekund-præcist; brug `[0:10]` for dag, `[0:16]` for minut.
 - **Bulk-kollaps:** grupper på (`change_date_time`, `change_resource_type`) - rækker med identisk timestamp + type = én bulk-handling. Tæl medlemmer for "(N ord/keywords)".
-- **`user_email`** kan være en person (`cri@inboundcph.dk`), et eksternt bureau (`toufik.charef@upscale-ads.com`, `adam.malmstedt@mildmedia.se`), `Recommendations Auto-Apply`, eller `INTERNAL_TOOL`/"Low activity system bulk change". **Bevar den ordret** - "hvem" er en del af loggen. I PER KUNDE-tilstand: hvis ændringen er lavet af en ANDEN end den primære specialist, annotér det (som changelog'en allerede gør: "26.02.26 (Rikke)").
+- **`user_email`** kan være en specialist (`specialist@bureau.dk`), et **eksternt bureau** (f.eks. `navn@eksternt-bureau.com`), `Recommendations Auto-Apply`, eller `INTERNAL_TOOL`/"Low activity system bulk change". **Bevar den ordret** - "hvem" er en del af loggen. I PER KUNDE-tilstand: hvis ændringen er lavet af en ANDEN end den primære specialist, annotér det (som changelog'en allerede gør: "DD.MM.ÅÅ (Specialist)").
 - **Stort svar:** tunge konti (bulk-dage) kan sprænge token-loftet. Hent da kun `change_date_time`, `change_resource_type`, `resource_change_operation`, `changed_fields` (drop campaign/ad_group navne) og aggregér; eller pagér. Rapportér aldrig et trunkeret tal som om det var fuldt.
 - **`changed_fields`** afslører handlingens natur: `amountMicros` = budgetændring; `keyword.text` + `negative` = negativt keyword; `responsiveSearchAd.headlines` = annoncetekst-redigering; `status` = pause/aktivér.
 

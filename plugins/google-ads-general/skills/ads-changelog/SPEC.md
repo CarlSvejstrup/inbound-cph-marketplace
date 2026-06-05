@@ -1,4 +1,4 @@
-# ads-aendringslog - design rationale
+# ads-changelog - design rationale
 
 Companion to `SKILL.md` (the runnable contract). This file is the why.
 

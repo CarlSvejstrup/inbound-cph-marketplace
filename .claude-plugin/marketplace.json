@@ -10,7 +10,12 @@
     {
       "name": "google-ads-optimization",
       "source": "./plugins/google-ads-optimization",
-      "description": "Optimize live Google Ads accounts: paid-search audit, post-launch RSA asset-hygiene, search-terms analysis + negative-keyword mining."
+      "description": "Optimize live Google Ads accounts: post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining."
+    },
+    {
+      "name": "google-ads-general",
+      "source": "./plugins/google-ads-general",
+      "description": "General Google Ads reporting: full audit reports (slide deck + PDF) and change-log generation from Ads change-history."
     }
   ]
 }

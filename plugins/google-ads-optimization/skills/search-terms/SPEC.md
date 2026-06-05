@@ -18,7 +18,7 @@ Output is an eight-tab `.xlsx` (Oversigt, Alle search terms, the five per-bucket
 
 Run a focused, action-oriented search terms analysis for one Google Ads client and deliver a colour-coded spreadsheet that tells the ads team exactly what to do: which terms to keep, promote, re-place, or block.
 
-This is the deep, single-purpose version of the "Keywords & negative keywords" module in `ads-audit`. ads-audit gives a broad diagnosis across 12 modules; this skill does one thing thoroughly and hands back a worklist, not a slide deck.
+This is the deep, single-purpose version of the "Keywords & negative keywords" module in `ads-audit-report`. ads-audit-report gives a broad diagnosis across 12 modules; this skill does one thing thoroughly and hands back a worklist, not a slide deck.
 
 Read-only against Google Ads. The skill never writes negatives back to the account. It analyses and recommends. The ads team applies changes manually in Google Ads / Editor. (Matches the human-in-the-loop hard rule.)
 

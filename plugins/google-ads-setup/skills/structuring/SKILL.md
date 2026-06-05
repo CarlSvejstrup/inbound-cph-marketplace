@@ -137,7 +137,7 @@ Lever en kort, godkendelses-klar opsummering:
 - **Konsolidering ≠ broad match.** Få ad groups giver data-fordelen UDEN at låse broad op.
   Bland dem ikke. (Hvis Carl/Rikke nogensinde vil revurdere: i litteraturen parres de to
   næsten altid — men no-Broad-låsen holder som default.)
-- **ads-audit-overlap:** kører en audit forud på en eksisterende konto, kan dens
+- **ads-audit-report-overlap:** kører en audit forud på en eksisterende konto, kan dens
   search-terms-data fodre monitor-first-listen med ægte observeret spild — en berigende
   input, ikke en afhængighed.
 

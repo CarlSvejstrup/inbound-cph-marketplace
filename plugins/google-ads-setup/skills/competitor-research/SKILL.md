@@ -17,7 +17,7 @@ Testet live 2026-06-03 mod de tilsluttede MCP'er:
 - **Google Ads MCP rækker kun til kundens EGNE konti** (under MCC'en) og har ingen konkurrent-flade: `auction_insight_domain` er `UNRECOGNIZED_FIELD` i GAQL. Ingen konkurrent-domæner, -impression share eller -annoncetekst via API'et. Kald det IKKE fra dette skill.
 - **Firecrawl er den eneste virkende eksterne datasti.** Scrape konkurrenternes egne sider med den delte ekstraktion.
 
-**Ærlig forventningsafstemning (sig det til Ian/brugeren):** vi leverer konkurrent-**positionering fra deres egne sider** — IKKE deres faktiske annoncetekster eller spend (ikke teknisk hentbart i denne stack). `ads-audit` behandler allerede "hvad gør konkurrenterne" som en manuel-gennemgang-placeholder; dette skill foregiver ikke andet.
+**Ærlig forventningsafstemning (sig det til Ian/brugeren):** vi leverer konkurrent-**positionering fra deres egne sider** — IKKE deres faktiske annoncetekster eller spend (ikke teknisk hentbart i denne stack). `ads-audit-report` behandler allerede "hvad gør konkurrenterne" som en manuel-gennemgang-placeholder; dette skill foregiver ikke andet.
 
 ## When to use
 

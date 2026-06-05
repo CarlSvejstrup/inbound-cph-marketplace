@@ -19,7 +19,7 @@ Trigger-fraser: "analyser landingsside", "udtræk positionering fra [URL]", "lan
 
 ## How it works (architecture — read once)
 
-Firecrawl-`scrape` til markdown → DU (modellen) udtrækker felterne fra markdown'en → de tre firewall-regler anvendes → struktureret JSON emitteres. Dette er præcis samme mønster som de shippede skills (`responsive-search-ads` Trin 2, `ads-audit` Trin 3): scrape til markdown, læs, udtræk. Ingen scripts nødvendige. Kører i Cowork og lokalt — eneste forudsætning er `firecrawl`-CLI'en.
+Firecrawl-`scrape` til markdown → DU (modellen) udtrækker felterne fra markdown'en → de tre firewall-regler anvendes → struktureret JSON emitteres. Dette er præcis samme mønster som de shippede skills (`responsive-search-ads` Trin 2, `ads-audit-report` Trin 3): scrape til markdown, læs, udtræk. Ingen scripts nødvendige. Kører i Cowork og lokalt — eneste forudsætning er `firecrawl`-CLI'en.
 
 **Vigtigt:** `firecrawl scrape` har INGEN `--schema-file`-flag (verificeret 2026-06-03) — det flag bor på `firecrawl agent`, som vi ikke bruger her. `page-extraction-schema.json` er felt-kontrakten du udtrækker *mod* (og kan validere mod), ikke et CLI-argument.
 

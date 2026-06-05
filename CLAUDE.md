@@ -2,9 +2,10 @@
 
 Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against Inbound CPH's Google Ads work.
 
-This repo is a **marketplace with two plugins**:
+This repo is a **marketplace with three plugins**:
 - **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → assembled review workbook + Editor CSVs).
-- **`google-ads-optimization`** — optimize a LIVE Google Ads account (audit, RSA asset-hygiene, search-terms, change-log).
+- **`google-ads-optimization`** — optimize a LIVE Google Ads account (RSA asset-hygiene, search-terms).
+- **`google-ads-general`** — standalone reporting deliverables (audit reports, change-logs).
 
 Each plugin also carries its own `CLAUDE.md` (a copy of the same operating contract) loaded via `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` when a skill runs. This repo-root file is the canonical version; the plugin copies refine, never override. Skill-level `SKILL.md` files refine further, never override.
 
@@ -76,12 +77,17 @@ But every skill that produces an artifact or recommendation stops at "here's the
 
 | Skill | Purpose | Writes? |
 |---|---|---|
-| `ads-audit` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
 | `annonce-optimering` | Post-launch RSA asset-hygiene → gap-brief | Gated — sheet save |
 | `search-terms` | Search-terms analysis → sheet + negative-keyword list | Gated — sheet save |
-| `ads-aendringslog` | Change-history → format-matched changelog draft | Gated — Drive paste |
 
-Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. The two are reinforcing, not redundant. All Google Ads MCP use is read-only.
+### google-ads-general — standalone reporting
+
+| Skill | Purpose | Writes? |
+|---|---|---|
+| `ads-audit-report` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
+| `ads-changelog` | Change-history → format-matched changelog draft | Gated — Drive paste |
+
+Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. They are reinforcing, not redundant. All Google Ads MCP use is read-only.
 
 ---
 

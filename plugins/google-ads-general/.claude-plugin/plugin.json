@@ -1,0 +1,14 @@
+{
+  "name": "google-ads-general",
+  "description": "Google Ads GENERAL reporting skills for Inbound CPH: standalone deliverables that aren't tied to building or tuning a single campaign. ads-audit-report (full paid-search audit → polished HTML slide deck + rendered PDF), ads-changelog (build a changelog/optimeringslog entry from Google Ads' own change-history — per client, or per specialist across their accounts — collapse bulk uploads, format-matched draft to paste into the client's Drive changelog). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns see google-ads-setup; for live-account tuning see google-ads-optimization. Danish-default.",
+  "version": "1.0.0",
+  "author": { "name": "Inbound CPH" },
+  "userConfig": {
+    "inbound_root_folder_id": {
+      "type": "string",
+      "title": "Inbound CPH Drive folder ID",
+      "description": "The Google Drive folder ID for the inbound-cph/ root folder where all client folders live. Defaults to the shared agency folder. Override only if you have a different mount.",
+      "default": "17JwnWKToZSJUSCURjS9PzzBeqe6_gPfi"
+    }
+  }
+}

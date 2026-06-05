@@ -1,11 +1,12 @@
 # inbound-cph-marketplace
 
-Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **two plugins**, installed per user and updated via `/plugin update`:
+Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **three plugins**, installed per user and updated via `/plugin update`:
 
 - **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → assembled review workbook + Editor CSVs).
-- **`google-ads-optimization`** — optimize a LIVE Google Ads account (paid-search audit, post-launch RSA asset-hygiene, search-terms analysis + negative-keyword mining).
+- **`google-ads-optimization`** — optimize a LIVE Google Ads account (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining).
+- **`google-ads-general`** — standalone reporting deliverables: full audit reports (slide deck + PDF) and change-log generation from Ads change-history.
 
-Both share one operating contract (`CLAUDE.md`) and company context (`context/`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account; humans import the artifacts after approval.
+All share one operating contract (`CLAUDE.md`) and company context (`context/`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account; humans import the artifacts after approval.
 
 ## Install
 
@@ -15,9 +16,10 @@ In Cowork (or any Claude Code surface), add the marketplace once, then install w
 /plugin marketplace add CarlSvejstrup/inbound-cph-marketplace
 /plugin install google-ads-setup@inbound-cph
 /plugin install google-ads-optimization@inbound-cph
+/plugin install google-ads-general@inbound-cph
 ```
 
-The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbound-cph`. Install both for the full build→operate→iterate loop (the `annonce-optimering` → `responsive-search-ads` gap-brief loop spans the two plugins via manual paste, so both must be present to close it).
+The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbound-cph`. The `annonce-optimering` (optimization) → `responsive-search-ads` (setup) gap-brief loop spans plugins via manual paste, so install both setup + optimization to close the full build→operate→iterate loop.
 
 ## Skills shipped
 
@@ -35,14 +37,19 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 | `assembler` | Merges all the above into Ian's 10-tab review workbook + per-entity Editor CSVs (no API push) |
 | `responsive-search-ads` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards |
 
-### google-ads-optimization (4 skills) — optimize a live account
+### google-ads-optimization (2 skills) — optimize a live account
 
 | Skill | Purpose |
 |---|---|
-| `ads-audit` | Full paid-search audit → polished HTML slide deck + PDF |
 | `annonce-optimering` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief |
 | `search-terms` | Search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list |
-| `ads-aendringslog` | Auto-build a changelog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
+
+### google-ads-general (2 skills) — standalone reporting
+
+| Skill | Purpose |
+|---|---|
+| `ads-audit-report` | Full paid-search audit → polished HTML slide deck + rendered PDF report |
+| `ads-changelog` | Build a changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
 
 ## Data integration
 
@@ -63,7 +70,7 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 
 ```
 .claude-plugin/
-  marketplace.json                # marketplace "inbound-cph", lists both plugins
+  marketplace.json                # marketplace "inbound-cph", lists all three plugins
 plugins/
   google-ads-setup/
     .claude-plugin/plugin.json
@@ -74,7 +81,12 @@ plugins/
     .claude-plugin/plugin.json
     CLAUDE.md                     # same contract (copy)
     context/
-    skills/                       # ads-audit, annonce-optimering, search-terms, ads-aendringslog
+    skills/                       # annonce-optimering, search-terms
+  google-ads-general/
+    .claude-plugin/plugin.json
+    CLAUDE.md                     # same contract (copy)
+    context/
+    skills/                       # ads-audit-report, ads-changelog
 docs/
   project-status.md, session-handoff.md, ...
 ```

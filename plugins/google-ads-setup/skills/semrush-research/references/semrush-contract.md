@@ -149,6 +149,6 @@ These stay TRUE while gated; the branches + intake wiring activate only once bou
   rule). Disclose which domain/keyword was queried.
 - **Never a dependency.** Semrush enriches Phase-1 research; its absence never blocks the build.
 - **Setup-only in v1.** Optimization-plugin use (organic keyword-gap + competitor ad copy into
-  search-terms/ads-audit) is deferred — and note the cross-plugin boundary: `${CLAUDE_PLUGIN_ROOT}`
+  search-terms/ads-audit-report) is deferred — and note the cross-plugin boundary: `${CLAUDE_PLUGIN_ROOT}`
   resolves only within one plugin, so optimization would need its own copy/skill, not a shared
   reference into setup.

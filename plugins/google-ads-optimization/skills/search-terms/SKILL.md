@@ -5,7 +5,7 @@ description: Run a focused Google Ads search terms analysis for one client and d
 
 # search-terms
 
-Produce an action-oriented search terms analysis for one Google Ads account and deliver it as a colour-coded Google Sheet. The deep, single-purpose version of the keyword module in `ads-audit`: one job, done thoroughly, output as a worklist the ads team can act on.
+Produce an action-oriented search terms analysis for one Google Ads account and deliver it as a colour-coded Google Sheet. The deep, single-purpose version of the keyword module in `ads-audit-report`: one job, done thoroughly, output as a worklist the ads team can act on.
 
 Read-only against Google Ads. The skill analyses and recommends. It never writes negative keywords back to the account. The ads team applies changes manually in Google Ads / Editor.
 
@@ -101,7 +101,7 @@ WHERE campaign.status = 'ENABLED' AND ad_group_criterion.status = 'ENABLED'
 
 Build a map: `normalised_keyword -> [{campaign, ad_group, match_type}]`, **excluding test/duplicate campaigns** (names matching `/w2m|test|vol 2/i` - confirm against the actual campaign list). This is what makes PLACEMENT_PROBLEM detectable without false-positiving on parallel test campaigns.
 
-**2c. Client offering via Firecrawl.** Scrape the landing page / website from intake (same pattern as `ads-audit`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
+**2c. Client offering via Firecrawl.** Scrape the landing page / website from intake (same pattern as `ads-audit-report`). Extract what the client sells: products/services, target segments, destinations, key categories. This grounds the IRRELEVANT calls and fills the "Klientens udbud" block in Oversigt. If scraping fails, fall back to the offering the user described in intake; never invent it.
 
 **2d. Ad-group ads + landing pages** for the intent-mismatch half of PLACEMENT_PROBLEM. Without this we can only see *structural* placement issues (keyword exists in two ad groups), never *intent* issues (term is relevant and ad-group name fits, but the actual ad and LP do not address the search intent). DSC's `Grupperejser` ad group in campaign 2 has `final_urls: ["https://danskstudiecenter.dk/"]` (the front page, not a grupperejse-LP) - that is exactly the kind of thing this pull catches.
 

@@ -30,7 +30,7 @@ Læs `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` (write-gate + sprog). Læs `${CLAUDE_PLUG
 Følg hus-reglen (`responsive-search-ads` L97-104): hvert felt via `AskUserQuestion`, den låste tab-01-værdi vist som **første option `(Anbefalet)`**, "Other" altid muligt. Mål: 2-3 kald.
 
 - **Kald 1** — klient + URL + konto-match + mål + kampagnetype.
-  - Konto-match: spørg klientnavn → kør stille `list_accessible_accounts` → bekræft "Fandt [Kontonavn] (ID: …) — rigtigt?" (samme mønster som `ads-audit` Trin 1a). Arv klient/URL fra campaign-build-kørslen hvis kædet.
+  - Konto-match: spørg klientnavn → kør stille `list_accessible_accounts` → bekræft "Fandt [Kontonavn] (ID: …) — rigtigt?" (samme mønster som `ads-audit-report` Trin 1a). Arv klient/URL fra campaign-build-kørslen hvis kædet.
   - Mål default **Leads**; kampagnetype default **Search** (v1 er Search-only).
 - **Kald 2** — budget-intent (bekræft 500 DKK/dag eller overstyr) + bekræft den låste targeting-blok (geo/sprog/netværk/match-types som forhåndsvalgte defaults) + tracking-verificeret ja/nej.
 - **Kald 3** — bekræft det samlede kampagnenavn (RSA Kald 3-mønster) efter navne-templaten i reference-filen.
@@ -83,7 +83,7 @@ Lever: stien til objektet + en kort tabel med de 6 klyngers valg (type/mål, bud
 ## Risici / noter
 
 - **Sprog-akse:** `languages` (audience-targeting) ≠ RSA-copy-sprog (default dansk). Bland dem ikke når begge skills kører i samme session.
-- **ads-audit-overlap:** ads-audit er *diagnostisk på en eksisterende konto*; campaign-strategy er *generativ for en ny kampagne*. De deler kun `list_accessible_accounts` + MCP-plumbing. Kører en audit forud, kan den levere conversion-volumen-signalet der flytter bud fra Maximize Conversions (cold) mod Target CPA (warm) — en *berigende input*, ikke en afhængighed.
+- **ads-audit-report-overlap:** ads-audit-report er *diagnostisk på en eksisterende konto*; campaign-strategy er *generativ for en ny kampagne*. De deler kun `list_accessible_accounts` + MCP-plumbing. Kører en audit forud, kan den levere conversion-volumen-signalet der flytter bud fra Maximize Conversions (cold) mod Target CPA (warm) — en *berigende input*, ikke en afhængighed.
 - **Navne-token-uoverensstemmelse:** Ians `IC | GSN | AI-SEO` (3 tokens) matcher ikke RSA-templaten (5 tokens). Reproducér den bekræftede operator-navn; tilbyd 5-token-formen som anbefalet. Resolv én gang — structuring + rsa-copywriter genbruger samme konvention.
 
 ## Maintenance

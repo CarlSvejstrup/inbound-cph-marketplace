@@ -1,9 +1,9 @@
 ---
-name: ads-audit
-description: Run a full Google Ads paid search audit for a client and output a polished HTML slide deck (dark-navy Inbound design system) plus a rendered PDF. Use when the user says "lav en audit af [klient]", "kør en Google Ads audit", "audit [klient]", or asks for a paid search review.
+name: ads-audit-report
+description: Run a full Google Ads paid search audit for a client and output a polished HTML slide deck (dark-navy Inbound design system) plus a rendered PDF audit report. Use when the user says "lav en audit af [klient]", "kør en Google Ads audit", "lav en audit-rapport", "audit [klient]", "ads audit report", or asks for a paid search review.
 ---
 
-# ads-audit
+# ads-audit-report
 
 Produce a complete paid search audit for a Google Ads account and output it as a professional slide deck.
 
