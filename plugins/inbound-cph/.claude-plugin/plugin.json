@@ -1,7 +1,7 @@
 {
   "name": "inbound-cph",
-  "description": "Kunde Specialist skills for Inbound CPH: client briefs, proactivity scans, weekly pulses, voice checks, onboarding, Google Ads audit, RSA annoncetekster (ad-copy generation), search terms analysis, post-launch RSA asset-hygiene diagnostics, campaign-build Phase-1 research (landing-page-analyzer, competitor-research, campaign-strategy), and Phase-2 structuring (ad-groups + keywords + negatives gate) (Danish-default)",
-  "version": "0.11.0",
+  "description": "Kunde Specialist skills for Inbound CPH: client briefs, proactivity scans, weekly pulses, voice checks, onboarding, Google Ads audit, RSA annoncetekster (ad-copy generation), search terms analysis, post-launch RSA asset-hygiene diagnostics, campaign-build Phase-1 research (landing-page-analyzer, competitor-research, campaign-strategy), Phase-2 structuring (ad-groups + keywords + negatives gate), and Phase-3 creative (rsa-copywriter reusing responsive-search-ads, assets) (Danish-default)",
+  "version": "0.12.0",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {
