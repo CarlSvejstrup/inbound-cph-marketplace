@@ -17,8 +17,9 @@ Carl: "just make" — så hold det enkelt. MEN to ting er korrekthed, ikke polis
 `references/asset-rules.md`, læs den, den vinder ved konflikt):
 
 1. **Opfind ALDRIG asset-tekst.** Callouts, sitelink-beskrivelser og snippet-værdier er
-   FAKTUELLE claims. Generér KUN fra landing-page-analyzer-output (`usp_candidates`,
-   `trust_signals` verbatim, `product_service`, services) + intake. Aldrig en plausibel men
+   FAKTUELLE claims. Generér KUN fra landing-page-analyzer-output (dens faktiske felter:
+   `usp_candidates`, `trust_signals` verbatim, `product_service`, `on_page_ctas`,
+   `active_offer`, `tone`) + intake. Aldrig en plausibel men
    ugrounded callout ("Markedsledende", "Bedste pris"). Trust-tal verbatim fra siden/intake —
    aldrig opfundet (samme regel som RSA). Hver callout + snippet SKAL have et `grounded_in`-felt
    der navngiver analyzer-feltet claimet kom fra; ingen grounding → emit ikke.

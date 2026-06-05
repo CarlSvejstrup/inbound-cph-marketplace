@@ -127,18 +127,26 @@ def guard_rsa_paths_and_join(structuring, rsa_manifest):
             + "\n  ".join(str(m) for m in missing)
         )
     known = {_ag_name(ag) for ag in structuring.get("ad_groups", [])}
+    rsa_ags = set()
     orphans = []
     for art in rsa_manifest.get("rsa_artifacts", []):
         with open(art["ads_json"], encoding="utf-8") as f:
             ag = json.load(f).get("ad_group") or art.get("ad_group", "")
+        if ag:
+            rsa_ags.add(ag)
         if ag and ag not in known:
             orphans.append(ag)
     if orphans:
+        # Hard-exit: ads.csv would reference an ad group adgroups.csv never creates.
         raise SystemExit(
             "STOP: RSA ad_group(s) do not match any structuring ad-group name (ads.csv would "
             f"reference an ad group adgroups.csv never creates): {sorted(set(orphans))}. "
             f"Known ad groups: {sorted(known)}."
         )
+    # Reverse direction is NOT a hard error (operator may build keywords first, ads later):
+    # a structuring ad group with no RSA ships as a keywords-only group. Surface it as a
+    # Must-pass launch gate in tab 08 instead of silently shipping a non-functional group.
+    return sorted(known - rsa_ags)  # ad-less ad groups
 
 
 def guard_positive_match_types(structuring):
@@ -359,7 +367,7 @@ def tab_assets(wb, assets):
     _autosize(ws)
 
 
-def tab_launch_qa(wb, strategy, structuring):
+def tab_launch_qa(wb, strategy, structuring, adless_ad_groups=None):
     ws = wb.create_sheet("08 Launch QA")
     _write_header(ws, ["Priority", "Check", "Owner", "Launch gate"])
     nets = strategy.get("networks", {})
@@ -389,6 +397,15 @@ def tab_launch_qa(wb, strategy, structuring):
         ("Post-launch", "Search terms reviewed after 7, 14 and 30 days",
          "Paid search", "Post-launch"),
     ]
+    # An ad group with keywords but no RSA is non-functional (no ad serves). Not a hard
+    # error (operator may add ads later), but it must NOT ship silently — surface it.
+    if adless_ad_groups:
+        rows.insert(0, (
+            "Critical",
+            "Ad group(s) have keywords but NO RSA — no ad will serve. Add an RSA or remove "
+            f"the ad group before enabling: {', '.join(adless_ad_groups)}",
+            "Paid search", "Must pass",
+        ))
     for r in rows:
         ws.append(list(r))
     _autosize(ws)
@@ -548,7 +565,7 @@ def main():
     # Reconcile + guards FIRST (fail loud before writing anything).
     assert_campaign_consistent(strategy, structuring, rsa_manifest, assets)
     guard_positive_match_types(structuring)
-    guard_rsa_paths_and_join(structuring, rsa_manifest)
+    adless_ad_groups = guard_rsa_paths_and_join(structuring, rsa_manifest)
 
     # Build the 10-tab workbook.
     wb = openpyxl.Workbook()
@@ -560,7 +577,7 @@ def main():
     tab_monitor(wb, structuring)
     tab_rsas(wb, structuring, rsa_manifest)
     tab_assets(wb, assets)
-    tab_launch_qa(wb, strategy, structuring)
+    tab_launch_qa(wb, strategy, structuring, adless_ad_groups)
     failures = tab_validation(wb, rsa_manifest)
     wb.save(args.workbook)
 
@@ -570,6 +587,7 @@ def main():
         "workbook": args.workbook,
         "csvs": written,
         "validation_failures": failures,
+        "adless_ad_groups": adless_ad_groups,
         "note": "No API push. Human imports the CSVs into Editor after approval. "
                 "Shared negative list 6688642473 applied by reference (tab 08), not in any CSV.",
     }, ensure_ascii=False, indent=2))

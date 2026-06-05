@@ -96,7 +96,7 @@ headers auto-map on any install (verified answer 57747). UTF-8 (Danish æ/ø/å 
 - **negatives.csv:** client-specific additions ONLY. `Campaign`, `Ad group` (blank for
   campaign-level), `Keyword`, `Type` (`Campaign negative` for campaign-level / `Negative` for
   ad-group-level). Match type via the keyword text syntax or the Type column — pick ONE.
-- **ads.csv (RSA):** the Editor RSA columns (Campaign, Ad Group, Ad type, Headline 1-15,
+- **ads.csv (RSA):** the Editor RSA columns (Campaign, Ad group, Ad type, Headline 1-15,
   Description 1-4, Path 1-2, Final URL). Reuse the RSA column set from `sheet_layout.py` FIELDS
   (drop LEN/Vinkel/Hypotese).
 - **assets.csv:** `Campaign`, `Ad group` (blank=campaign-level; `<Account-level>` literal for

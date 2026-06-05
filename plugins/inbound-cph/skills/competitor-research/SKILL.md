@@ -99,6 +99,13 @@ Skriv `competitor-research.json` til kørslens artefakt-mappe (lokal arbejdsfil,
 
 `source` er `"user-named"` eller `"firecrawl-serp"`.
 
+**NB — per-konkurrent `trust_signals`/`active_offer` er bevidst SAMMENFATTEDE strenge**, ikke
+den strukturerede `{claim, has_numbers}` / `{present, text, expiry}`-form fra den delte
+page-extraction-kontrakt. Den strukturerede firewall gælder KUNDENS side (landing-page-analyzer).
+Downstream (structuring + rsa-copywriter) læser KUN `synthesis`-blokken
+(`differentiator_list`/`sea_of_sameness`/`positioning_gaps`/`angle_recommendations`) — aldrig
+konkurrenternes trust/offer — så den fladere form her er uskadelig.
+
 ## Trin 5 — Output + handoff
 
 Lever: differentierings-listen, "undgå disse commoditiserede claims"-listen, og en kort tabel per konkurrent. Oplys datakilder ærligt (kun Firecrawl; Semrush utilgængelig; annoncetekst ikke hentbar). Slut med at slå scope-grænsen fast: analyseret de navngivne konkurrenter for DENNE kørsel alene.

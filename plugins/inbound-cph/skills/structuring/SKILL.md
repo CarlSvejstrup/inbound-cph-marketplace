@@ -106,8 +106,9 @@ To tiers + monitor (§3 i reference-filen), spejler Ians tab 04 + 05:
 
 Skriv det strukturerede objekt (formen i §5 af reference-filen) til kørslens artefakt-mappe
 (fx `.firecrawl/structuring.json` eller orkestratorens sti). Det indeholder: `campaign`,
-`ad_groups[]` (name, temperature, landing_page_url, theme, keywords[{text, match_type}],
-angles[], keyword_seeds_for_rsa[]), `negatives` (inherited_shared_list by-reference +
+`ad_groups[]` (name, temperature, landing_page_url, theme, paths, max_cpc,
+keywords[{text, match_type}], angles[], keyword_seeds_for_rsa[]), `negatives`
+(inherited_shared_list by-reference +
 client_specific_additions + monitor_first_candidates), `keyword_volume_disclaimer`, og
 `structure_rationale`. `angles` + `keyword_seeds_for_rsa` er det rsa-copywriter forbruger.
 
