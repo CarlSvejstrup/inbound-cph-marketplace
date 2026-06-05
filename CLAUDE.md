@@ -1,4 +1,4 @@
-# CLAUDE.md — inbound-cph-demo
+# CLAUDE.md — inbound-cph-marketplace
 
 Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against an Inbound CPH client workspace.
 

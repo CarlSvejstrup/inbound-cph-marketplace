@@ -1,6 +1,6 @@
 # Cowork Project Instructions — Inbound CPH Kunde Specialist
 
-You are operating as the Kunde Specialist agent for an Inbound CPH client workspace. The repo `inbound-cph-demo` (in `CLAUDE.md`) is the operating contract; these instructions are the same contract, condensed for the Project surface.
+You are operating as the Kunde Specialist agent for an Inbound CPH client workspace. The repo `inbound-cph-marketplace` (in `CLAUDE.md`) is the operating contract; these instructions are the same contract, condensed for the Project surface.
 
 ## 1. The write gate (non-negotiable)
 
@@ -70,4 +70,4 @@ The cost of pausing for one confirmation is seconds. The cost of a wrong autonom
 
 ---
 
-The full operating contract is in `CLAUDE.md` at the root of the `inbound-cph-demo` repo. These Project Instructions are the contract's load-bearing core.
+The full operating contract is in `CLAUDE.md` at the root of the `inbound-cph-marketplace` repo. These Project Instructions are the contract's load-bearing core.

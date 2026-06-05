@@ -1,4 +1,4 @@
-# Contributing to inbound-cph-demo
+# Contributing to inbound-cph-marketplace
 
 ## Quickstart
 

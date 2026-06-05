@@ -4,8 +4,8 @@
 
 - **Branch:** main, all changes pushed.
 - **Latest version:** v0.4.0 (commit `9a3ba03`).
-- **Repo:** https://github.com/CarlSvejstrup/inbound-cph-demo (public).
-- **Plugin marketplace:** live, installable via `/plugin marketplace add CarlSvejstrup/inbound-cph-demo`.
+- **Repo:** https://github.com/CarlSvejstrup/inbound-cph-marketplace (public).
+- **Plugin marketplace:** live, installable via `/plugin marketplace add CarlSvejstrup/inbound-cph-marketplace`.
 
 ## What changed this session
 
@@ -77,7 +77,7 @@ See `docs/project-status.md` for the full backlog. Top three for the next sessio
 ## Resume commands
 
 ```bash
-cd ~/code/personal/inbound-cph-demo
+cd ~/code/personal/inbound-cph-marketplace
 git status
 git log --oneline -10
 cat plugins/inbound-cph/.claude-plugin/plugin.json   # current version

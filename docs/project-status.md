@@ -1,4 +1,4 @@
-# Project status — inbound-cph-demo
+# Project status — inbound-cph-marketplace
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
@@ -9,10 +9,10 @@ Last updated: 2026-05-29, after v0.9.0.
 ### M1 — Plugin marketplace bootstrap
 **Status:** Done
 
-- Repo on GitHub (public): `CarlSvejstrup/inbound-cph-demo`
+- Repo on GitHub (public): `CarlSvejstrup/inbound-cph-marketplace`
 - `.claude-plugin/marketplace.json` valid
 - `plugins/inbound-cph/.claude-plugin/plugin.json` valid
-- Installable via `/plugin marketplace add CarlSvejstrup/inbound-cph-demo`
+- Installable via `/plugin marketplace add CarlSvejstrup/inbound-cph-marketplace`
 - Versioning: explicit semver, currently v0.9.0
 
 ### M2 — Core skills
