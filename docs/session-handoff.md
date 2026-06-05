@@ -1,6 +1,47 @@
-# Session handoff — 2026-04-27 (evening update)
+# Session handoff — 2026-06-05 (optimization-loop build)
 
-## Current state
+## Current state (2026-06-05)
+
+- **Branch:** `feat/optimization-loop` (NOT merged to main yet). Commits `76eb7e3`, `e5236c3`
+  + a pending docs/README commit. Not pushed.
+- **Marketplace:** 3 plugins — `google-ads-setup` (9 skills), `google-ads-optimization`
+  (2 skills), `google-ads-general` (2 skills). Repo
+  https://github.com/CarlSvejstrup/inbound-cph-marketplace.
+- **New this session — the optimization loop** (`workflows/optimization-loop/`): a *local*
+  Claude Code Workflow (NOT a Cowork plugin) that diagnoses a live account in parallel and
+  chains findings into Editor CSVs. Recommend-only.
+
+### Optimization-loop build status
+
+- **DONE + verified:** the shared lib (`lib/builders/load.py` by-path loader = cell-identical
+  to the skills' own output; `lib/gaql/*` live-verified queries + the LAST_90_DAYS guard;
+  `quality_score.py` + `change_events.py` verified against live DSC 2026-06-05;
+  `editor_csv.py` asserted). The skills are NOT modified (by-path reuse). `SPEC.md` is the
+  design contract.
+- **DONE + PASSED:** `smoke.workflow.js` proved the agent→Bash/MCP→schema-JSON pattern against
+  live DSC (3069826320) — real analysis: 8 negatives (incl. a struktur self-competition
+  finding), 6 winners, significance gate fired (601 conv → low_confidence=false). Saved as
+  `fixtures/dsc-smoke-search-terms.json`.
+- **IN FLIGHT at handoff:** the FULL `loop.workflow.js` end-to-end run on DSC (Workflow task
+  `w5j3aj0ln`, run `wf_b215523d-8ef`). 4 parallel agents launched cleanly. This is the parked
+  unknown — the measure/asset-hygiene/QS/execute stages are not yet verified end-to-end until
+  this run lands. Check its result; inspect the CSV bundle in
+  `workflows/optimization-loop/runs/2026-06-05-3069826320/`.
+- **Resume:** `Workflow({scriptPath: ".../loop.workflow.js", resumeFromRunId: "wf_b215523d-8ef"})`
+  returns cached agents. To re-run fresh, see `README.md`.
+
+### Suggested next tasks
+
+1. Inspect the full-run CSV bundle + Danish exec summary; fix any stage that drifted.
+2. If clean: a second run with `prior_run_dir` pointed at the first run's dir, to exercise the
+   measure stage's "what we proposed / what was applied / did it move" comparison (not just
+   baseline).
+3. Decide merge: `feat/optimization-loop` → main once the full run is verified.
+4. Refresh the stale M-series sections below + `docs/project-status.md` for the 3-plugin reality.
+
+---
+
+## Historical handoff — 2026-04-27 (v0.4.0, single-plugin era — STALE, kept for history)
 
 - **Branch:** main, all changes pushed.
 - **Latest version:** v0.4.0 (commit `9a3ba03`).
