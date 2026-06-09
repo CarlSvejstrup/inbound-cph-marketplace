@@ -54,31 +54,43 @@ another skill that turns Excel into CSV for Editor" Carl asked for). Pure transf
   stage calls only `review_workbook.py`, never the loader. (This is what de-risked the loop→plugin
   port: no cross-plugin imports remain.)
 
-### THE headline open item — the loop is still NOT a plugin
+### THE headline ask — DONE: the loop now ships as a plugin skill
 
-Carl's top ask this session was **"I want it as a plugin!"** The *converter* shipped as a plugin
-skill ✅, but the **optimization loop itself is still `workflows/optimization-loop/`, a local Claude
-Code Workflow — NOT a Cowork plugin.** This was a deliberate sequencing call (ship + verify the
-converter first; port the loop after its end-to-end run clears), so it is **deferred, not done.**
-Good news: the Excel refactor already removed the original blocker (the dead `load.py` cross-plugin
-coupling), so the port is now realistic — a skill runs in the main loop and CAN spawn agents /
-invoke skills, unlike a Workflow agent. Porting plan: move the `lib/` (gaql + review_workbook) into
-a new `google-ads-optimization` skill, run the diagnostics sequentially or via sub-agents, bundle
-`headline-craft.md`. **Port VALIDATED logic** — clear the two gates below first.
+Carl's top ask this session was **"I want it as a plugin!"** ✅ **Shipped** (commit `ef0b9b0`,
+pushed). The optimization loop is now a Cowork plugin skill:
+`plugins/google-ads-optimization/skills/optimering-loop/` (plugin v2.1.0). It runs the whole
+diagnose→workbook loop in one go (search-terms + asset-hygiene + QS, one sub-agent each, parallel)
+→ ONE editable Excel workbook → `editor-csv-export` makes the CSVs. It **bundles its own copies** of
+the verified lib (gaql + review_workbook + taxonomy) + headline-craft — Cowork plugins are
+self-contained. **This skill is canonical; the local Workflow (`workflows/optimization-loop/`) is
+marked superseded** (kept as the throwaway prototype; dead `load.py` not carried over). Don't
+maintain both.
 
-### Two trust gates before the loop runs on a live account
+**Scope honesty:** v1 = diagnose→workbook. The **measure / closed-loop phase is v2** (needs a
+run-persistence design: where does a run's `recommendations.json` live so the next run can compare
+proposed/applied/did-it-move). SKILL.md says so explicitly. So "it's a plugin" is true; "the closed
+loop is a plugin" is not yet — v1 is the diagnose-loop.
 
-1. **The parked unknown (still open):** a full `loop.workflow.js` run that reaches the **execute
-   stage and writes the workbook** has never completed. Drive `review_workbook.py` directly (pure
-   function, seconds) to eyeball workbooks — done this session — but the full diagnostics→execute
-   chain on a live account is unverified. Re-run fresh (see `README.md`); diagnostics are cheap.
-2. **The Editor edit-row round-trip (NEW gate):** no CSV has been imported into real Editor yet.
-   The honest acceptance test is one manual import. Because the converter's `#Original` passthrough
-   is the riskiest piece, the round-trip must **specifically import an edit row** (not just net-new
-   negatives/keywords) and confirm Editor matches + edits in place + does NOT clobber unspecified
-   headlines. (The loop sidesteps this for RSAs by going net-new; it still matters if any future
-   editable-entity tab uses `#Original`.) Also resolve the UNVERIFIED snippet-header CSV column
-   name on the same round-trip.
+**The parked unknown is CLEARED.** The bundled Python pipeline was verified end-to-end against live
+DSC (3069826320) this session: gaql queries ran live (177 search terms → 16 winners, 27 negatives,
+138.5 acct conv), QS normalized (avg 6.5, keyword-grain, LP flag), `review_workbook` built a real
+workbook (account-level `wikipedia` fanned across 3 active campaigns, a net-new Bali RSA
+challenger), and `editor-csv-export` converted it to correct CSVs. The diagnostics→workbook→CSV
+chain works on a live account.
+
+### Trust gates remaining (Python pipeline is proven; these are the surfaces it hasn't touched)
+
+1. **Live Cowork run of the SKILL.md orchestration.** The bundled *Python* is verified against live
+   DSC (above). What's NOT yet run is the **SKILL.md prose driving the main-loop agent** through
+   intake → spawn 3 sub-agents → assemble → build, installed in Cowork. SKILL.md-as-orchestration
+   can't be unit-tested; it joins the other skills' "parked Cowork-run" unknown. Install via
+   `/plugin` and run it on one account.
+2. **The Editor import round-trip.** No CSV has been imported into real Editor yet. The honest
+   acceptance test is one manual import. The loop's RSAs are net-new (no `#Original`), so the
+   highest-risk case is now the assembler's CSVs — but if you ever rely on `#Original` for an
+   editable entity, the round-trip must **specifically import an edit row** and confirm in-place
+   match + no headline clobber. Also resolve the UNVERIFIED snippet-header CSV column name then.
+3. **(v2) measure-phase run-persistence design** — before the closed loop can compare runs.
 
 ### Next session — TWO tracks (Carl, 2026-06-05, still current)
 
@@ -88,11 +100,12 @@ a new `google-ads-optimization` skill, run the diagnostics sequentially or via s
 - **User-friendliness + UI** (Ian made something here) + **the customer-facing part**.
 
 **Track 2 — OPTIMIZATION (dial in + test).** The loop.
-- **Port it to a plugin** (the headline item above) once validated.
-- **Run it end-to-end** (gate 1) and the **Editor edit-row round-trip** (gate 2).
+- ~~Port it to a plugin~~ — **DONE** (`optimering-loop`, commit `ef0b9b0`). Python verified live.
+- **Live Cowork run of the SKILL.md orchestration** (gate 1) + the **Editor import round-trip**
+  (gate 2). Install via `/plugin`, run on one account, watch the 3 sub-agents → workbook.
 - **Find what works / what doesn't** on a real account; where to optimize the loop itself.
-- Then a **second run with `prior_run_dir`** set, to exercise the measure stage's
-  proposed/applied/did-it-move comparison (not just baseline).
+- **v2: design measure-phase run-persistence** (where runs persist) → then the closed loop with
+  proposed/applied/did-it-move comparison (not just diagnose).
 
 **Plumbing:** refresh the stale M-series sections below + `docs/project-status.md` for the
 3-plugin / converter reality.
