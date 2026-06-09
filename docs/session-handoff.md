@@ -66,17 +66,25 @@ self-contained. **This skill is canonical; the local Workflow (`workflows/optimi
 marked superseded** (kept as the throwaway prototype; dead `load.py` not carried over). Don't
 maintain both.
 
-**Scope honesty:** v1 = diagnose→workbook. The **measure / closed-loop phase is v2** (needs a
-run-persistence design: where does a run's `recommendations.json` live so the next run can compare
-proposed/applied/did-it-move). SKILL.md says so explicitly. So "it's a plugin" is true; "the closed
-loop is a plugin" is not yet — v1 is the diagnose-loop.
+**Scope honesty (two layers):** (a) v1 = diagnose→workbook; the **measure / closed-loop phase is
+v2** (needs a run-persistence design: where a run's `recommendations.json` lives so the next run can
+compare proposed/applied/did-it-move). (b) Even within v1, only the **deterministic pipeline** is
+verified (see below) — the **analytical layer (classification + significance + asset-hygiene
+derivation) has not been run.** So "it's a plugin" is true and the plumbing is proven; "the loop's
+analysis is proven" is NOT — that's gate 1.
 
-**The parked unknown is CLEARED.** The bundled Python pipeline was verified end-to-end against live
-DSC (3069826320) this session: gaql queries ran live (177 search terms → 16 winners, 27 negatives,
-138.5 acct conv), QS normalized (avg 6.5, keyword-grain, LP flag), `review_workbook` built a real
-workbook (account-level `wikipedia` fanned across 3 active campaigns, a net-new Bali RSA
-challenger), and `editor-csv-export` converted it to correct CSVs. The diagnostics→workbook→CSV
-chain works on a live account.
+**The DETERMINISTIC pipeline is verified on live DSC — the analytical layer is NOT (be precise
+here).** What ran this session: the gaql query strings executed live against DSC (3069826320) (177
+search terms, 138.5 acct conv), the QS normalizer produced correct keyword-grain output (avg 6.5,
+LP flag), `review_workbook` built a real workbook (account-level `wikipedia` fanned across 3 active
+campaigns, a net-new Bali RSA challenger), and `editor-csv-export` converted it to correct CSVs.
+**But the findings were HAND-ASSEMBLED in a throwaway probe** (winners = `≥2 conv`, negatives =
+`zero-conv >50 DKK`, Bali challenger hand-written) — standing in for the agent work. The skill's
+actual analytical layer — taxonomy classification (RELEVANT/VINDER/PLACEMENT_PROBLEM/IRRELEVANT/
+GRÆNSE) grounded in the scraped offering, significance selection, asset-hygiene challenger
+derivation from `rsa_count` — lives in SKILL.md prose and **has NOT been run.** So the original
+parked unknown (the orchestration runs end-to-end and produces a workbook) is **still open** — it's
+gate 1 below. What's proven is the plumbing the orchestration feeds, not the orchestration.
 
 ### Trust gates remaining (Python pipeline is proven; these are the surfaces it hasn't touched)
 
