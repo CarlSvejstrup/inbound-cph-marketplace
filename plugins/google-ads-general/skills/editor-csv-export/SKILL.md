@@ -1,6 +1,6 @@
 ---
 name: editor-csv-export
-description: Konvertér en klient-bekræftet campaign-build review-workbook (.xlsx fra assembler-skillen) til Google Ads Editor import-CSV'er. Anden halvdel af Excel-only-grænsen - assembler laver ÉN pæn Excel (klient-bekræftelses-artefaktet), denne skill dropper den bekræftede Excel ned til de flade per-entitet CSV'er Editor importerer (Editor importerer KUN CSV, ikke .xlsx). Ren transform - læser én lokal .xlsx, skriver op til 6 lokale .csv. Pusher ALDRIG til Google Ads API'et; mennesket importerer CSV'erne i Editor. Genkører de to hårde guards (ingen Broad/blank positiv keyword, LEN-tjek) fordi et menneske kan have redigeret Excel'en efter godkendelse. Den arvede 277-term delte negativliste kommer ALDRIG i en CSV - den tilknyttes by-reference i Editor. Brug når brugeren siger "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav import-filer", eller har en godkendt kampagne-workbook der skal importeres. Svarer på dansk.
+description: Konvertér en bekræftet Google Ads review-workbook (.xlsx) til Google Ads Editor import-CSV'er. Læser TO workbook-dialekter med samme kontrakt - (a) campaign-build assembler-workbooken (fuld ny kampagne) og (b) optimerings-loopets review-workbook (delmængde - negatives, vinder-keywords, RSA-challengers). Anden halvdel af Excel-only-grænsen - workbooken er bekræftelses-artefaktet, denne skill dropper den ned til de flade per-entitet CSV'er Editor importerer (Editor importerer KUN CSV, ikke .xlsx). Ren transform - læser én lokal .xlsx, skriver op til 6 lokale .csv. Pusher ALDRIG til Google Ads API'et; mennesket importerer CSV'erne i Editor. Genkører de to hårde guards (ingen Broad/blank positiv keyword, LEN-tjek) fordi et menneske kan have redigeret Excel'en efter godkendelse. Den arvede 277-term delte negativliste kommer ALDRIG i en CSV - den tilknyttes by-reference i Editor. Brug når brugeren siger "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav import-filer", eller har en godkendt kampagne- eller optimerings-workbook der skal importeres. Svarer på dansk.
 ---
 
 # editor-csv-export
@@ -21,6 +21,31 @@ til at dette trin findes.
 **Ren transform:** læser ÉN lokal `.xlsx`, skriver op til 6 lokale `.csv`. Ingen Google Ads
 API-kald, intet push, ingen ekstern read/write. Mennesket importerer CSV'erne i Editor
 (Account → Import → From file) efter review.
+
+## To workbook-dialekter, én kontrakt
+
+Skillen læser **to** slags workbooks med samme per-entitet CSV-mål (den er stadig en ren
+transform — den genkender bare begge):
+
+| Dialekt | Faner | Hvad den indeholder |
+|---|---|---|
+| **assembler** (campaign-build) | `01 Campaign settings`, `02 Ad groups`, `03 Keywords`, `04 Negative keywords`, `06 RSAs`, `07 Assets` | en fuld NY kampagne (alt net-new, Paused) |
+| **optimerings-loop** | `Negative keywords`, `Nye keywords (vindere)`, `RSA challengers` | en delmængde — kun negatives, promoverede vinder-keywords, RSA-challengers |
+
+`read_tab` matcher fanenavne på alias (tolerant for `NN `-præfiks), så begge dialekter rammer de
+samme writers. Mindst ÉN genkendt entitet-fane kræves (campaign-settings er IKKE længere påkrævet).
+
+**Loop-specifikke regler (gælder kun loop-workbooken):**
+- **Alle RSA-rækker er NET-NEW challengers** — aldrig in-place edits. At redigere en live RSA
+  nulstiller dens læring (RSA'er er reelt immutable), og Editors CSV kan ikke pålideligt matche en
+  eksisterende RSA. Loopet emitterer derfor en frisk challenger; mennesket sætter den gamle annonce
+  på pause når challengeren er bevist.
+- **Konto-niveau negatives udfoldes** til én `Campaign negative`-række per aktiv kampagne (Editor
+  CSV har ingen konto-niveau). Det sker i loopets builder (som har kampagnelisten), så CSV'en er
+  what-you-see-is-what-imports.
+- **`#Original`-passthrough:** skillen bevarer enhver `*#Original`-kolonne verbatim (korrekt for
+  reelt-redigerbare entiteter som en keywords bud/URL). Den er harmløs når ingen findes — og
+  loopet emitterer aldrig én for RSA'er.
 
 ## Hård regel — pusher ALDRIG, mennesket importerer
 

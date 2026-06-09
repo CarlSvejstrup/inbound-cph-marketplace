@@ -15,7 +15,7 @@
     {
       "name": "google-ads-general",
       "source": "./plugins/google-ads-general",
-      "description": "General Google Ads deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and editor-csv-export (confirmed campaign-build workbook -> Google Ads Editor import CSVs)."
+      "description": "General Google Ads deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and editor-csv-export (confirmed review workbook -> Google Ads Editor import CSVs; reads both the campaign-build assembler and optimization-loop workbooks)."
     }
   ]
 }

@@ -1,8 +1,9 @@
 # Editor-CSV-export contract
 
-Single source of truth for how `editor-csv-export` converts a **confirmed** campaign-build review
-workbook (the `.xlsx` from the `google-ads-setup` `assembler` skill) into Google Ads Editor import
-CSVs. If SKILL.md and this file disagree, this file wins.
+Single source of truth for how `editor-csv-export` converts a **confirmed** Google Ads review
+workbook into Google Ads Editor import CSVs. It reads **two dialects on one contract** (§Two
+dialects): the `google-ads-setup` `assembler` workbook (full new campaign) and the
+optimization-loop review workbook (a subset). If SKILL.md and this file disagree, this file wins.
 
 Pure transform: ONE local `.xlsx` in → up to 6 local `.csv` out. No Google Ads API call, no push,
 no external read/write.
@@ -90,9 +91,42 @@ converter hardcodes the three Google-fixed integers (not an Inbound choice).
 - **No live Editor import done yet** — the smoke test below tests the TRANSFORM (workbook → CSV
   shape), not that Editor accepts every header. That verification is the human's one real import.
 
+## Two dialects (the converter reads BOTH on this one contract)
+
+The converter is a pure transform that recognizes two workbook shapes. `read_tab` matches tab
+names by alias (tolerant of the `NN ` numeric prefix), so both hit the same writers. At least ONE
+recognized entity tab is required — campaign settings is NOT mandatory (the loop workbook has none).
+
+| Dialect | Source | Tabs | What converts |
+|---|---|---|---|
+| **assembler** | `google-ads-setup` assembler | `01 Campaign settings`, `02 Ad groups`, `03 Keywords`, `04 Negative keywords`, `06 RSAs`, `07 Assets` | all 6 CSVs (full new campaign, net-new) |
+| **optimization-loop** | `workflows/optimization-loop` review workbook | `Negative keywords`, `Nye keywords (vindere)`, `RSA challengers` | negatives + keywords + ads only |
+
+Tab-name aliases the converter accepts for the loop dialect: `Nye keywords (vindere)` → keywords,
+`RSA challengers` → ads, `Negative keywords` → negatives (matches both dialects already).
+
+**The loop dialect shares the §"6 CSVs" mapping unchanged** — its negatives tab was deliberately
+given the same `Campaign / Level / Ad group / Negative keyword / Match type` vocabulary as the
+assembler's tab 04, so the Type-derivation works identically. Loop-specific facts the converter
+must honor:
+
+- **`#Original` passthrough.** Any `<Column>#Original` column in the workbook is preserved
+  VERBATIM in the matching CSV (discovered from the actual rows, appended after the fixed fields).
+  Editor uses it to edit an existing entity in place instead of creating a duplicate (answer
+  57747). Correct for genuinely-editable entities (a keyword's bid/URL). **Harmless when absent.**
+- **RSAs are NET-NEW only (loop builder rule, not a converter rule).** The loop never emits an RSA
+  edit row — editing a live RSA resets its learning and Editor CSV can't reliably match an RSA. So
+  in practice the loop's ads.csv carries zero `#Original`. The converter's passthrough stays
+  general (it would carry `#Original` if a future editable-entity tab used it) but never fires for
+  the loop's RSAs.
+- **Account-level negatives are pre-fanned by the loop builder.** Editor CSV has no account level;
+  the loop builder fans an account-level finding out to one `Level=campaign` row per active
+  campaign BEFORE the workbook is written. The converter sees only campaign/ad-group rows and
+  needs no special logic — what-you-see-in-the-workbook-is-what-imports.
+
 ## Smoke-test invariants (run before declaring done)
 
-Run the assembler on a golden input set, then this converter on the output, verify:
+**Assembler dialect** — run the assembler on a golden input set, then this converter on the output:
 1. 6 CSVs written; UTF-8 BOM; æ/ø/å survive.
 2. negatives.csv contains ONLY client-specific rows — no `[SHARED LIST ...]` line, no monitor
    candidate, no enumeration of the 277.
@@ -102,3 +136,10 @@ Run the assembler on a golden input set, then this converter on the output, veri
    semicolon-joined.
 6. Feed an over-length headline → guard fires, NO CSV written, non-zero exit.
 7. Feed a Broad/blank positive keyword → guard fires, NO CSV written, non-zero exit.
+
+**Loop dialect** — run `review_workbook.py` on a synthetic findings set, then this converter:
+8. Only the 3 loop CSVs written (negatives, keywords, ads) — no campaigns/adgroups/assets.
+9. An account-level negative fans out to one `Campaign negative` row per active campaign.
+10. ads.csv carries NO `#Original` columns (loop RSAs are all net-new), even if the findings
+    carried legacy `is_edit`/`original` (the builder ignores them).
+11. The same two guards (§Two hard guards) fire on the loop workbook's keyword/RSA tabs too.
