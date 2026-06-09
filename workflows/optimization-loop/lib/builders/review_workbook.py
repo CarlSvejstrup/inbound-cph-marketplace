@@ -98,14 +98,18 @@ def _sheet(wb, title, editor_headers, meta_headers, rows, widths=None):
 
 # Editor-bound header sets per entity (the converter's KEEP list). Exact Editor spelling.
 KEYWORDS_EDITOR = ["Campaign", "Ad group", "Keyword", "Match type", "Status"]
-NEGATIVES_EDITOR = ["Campaign", "Ad group", "Keyword", "Match type"]   # Match type carries Negative/Campaign negative
+# Negatives speak the SAME vocabulary as the assembler's tab 04 so the converter's
+# build_negatives() works unchanged for both workbooks (one contract, no fork):
+# Campaign + Level + Ad group + Negative keyword + Match type. The converter derives
+# Editor's Type (Campaign negative vs Negative) from Level, never from Match type.
+NEGATIVES_EDITOR = ["Campaign", "Level", "Ad group", "Negative keyword", "Match type"]
 RSA_EDITOR = (["Campaign", "Ad group", "Ad type", "Final URL", "Path 1", "Path 2"]
               + [f"Headline {i}" for i in range(1, 16)]
               + [f"Description {i}" for i in range(1, 5)]
               + ["Status"])
 
 
-def _readme_sheet(wb, client, account_id, period, today):
+def _readme_sheet(wb, client, account_id, period, today, account_level_notes=None):
     ws = wb.create_sheet("Laes mig", 0)
     ws["A1"] = f"Optimerings-forslag — {client}"
     ws["A1"].font = TITLE_FONT
@@ -118,14 +122,29 @@ def _readme_sheet(wb, client, account_id, period, today):
         "   De LYSEBLAA kolonner er kontekst til dig (begrundelse, spild, konverteringer) —",
         "   de bliver IKKE importeret.",
         "2. Ret frit: slet raekker du er uenig i, juster tekst, tilpas bud.",
-        "3. Raekker der RETTER en eksisterende annonce/keyword har en '#Original'-kolonne",
-        "   med den nuvaerende vaerdi — lad den staa, saa Editor retter i stedet for at",
-        "   oprette en dublet.",
+        "3. Alle RSA-forslag er NYE challengers (status Paused) — ikke rettelser af eksisterende",
+        "   annoncer. Saet den gamle annonce paa pause/fjern den FOERST naar challengeren har",
+        "   vist sig bedre. (At redigere en live RSA nulstiller dens laering.)",
         "4. Naar du er faerdig: koer konverterings-skillet (workbook -> Editor-CSV), og",
         "   importer CSV'erne i Google Ads Editor. Gennemgaa groen/gul diff, tryk Send.",
         "",
         "Intet i denne fil er skrevet til kontoen. Du har fuld kontrol.",
     ]
+    # Account-level negatives can't be a CSV row (Editor only has campaign/ad-group level).
+    # They are fanned out to one Campaign-negative row per active campaign on the Negative
+    # keywords tab. Surface the cleaner alternative (a shared negative list) here so the
+    # expert can choose it instead of the fanned rows.
+    if account_level_notes:
+        lines += [
+            "",
+            "KONTO-NIVEAU NEGATIVE (vigtigt):",
+            "Editor kan ikke importere konto-niveau negative via CSV. Foelgende ord er derfor",
+            "udfoldet til en 'Campaign negative'-raekke PER aktiv kampagne paa fanen 'Negative",
+            "keywords'. Alternativt (renere): tilfoej dem i stedet til en delt negativliste i",
+            "Google Ads UI'en og tilknyt den til kontoens kampagner. Vaelg det ene ELLER det andet:",
+        ]
+        for n in account_level_notes:
+            lines.append(f"   - {n.get('keyword', '')}  ({n.get('reason', '')})")
     for i, ln in enumerate(lines, start=2):
         ws.cell(row=i, column=1, value=ln)
     ws.column_dimensions["A"].width = 90
@@ -138,14 +157,15 @@ def build(data, out_path):
     data schema:
     {
       "client", "account_id", "period", "today",
+      "active_campaigns": ["string"],   # active campaign names; account-level negatives fan out across these
       "negatives": [ {keyword, match_type (EXACT|PHRASE), level (ad_group|campaign|account),
                       campaign, ad_group, wasted_spend_dkk, reason} ],
       "winners":   [ {term, campaign, ad_group, conversions, cpa_dkk, reason} ],   # promote->Exact, Paused
       "rsa_rows":  [ {campaign, ad_group, headlines[], descriptions[], paths[2], final_url,
-                      status (Paused|Enabled), is_edit (bool), original (optional dict of
-                      {Headline 1: "...", ...} live values for #Original), reason} ]
+                      status (Paused), reason} ]
     }
-    Net-new RSA: is_edit=false, no original. Editing an existing RSA: is_edit=true + original.
+    Every RSA row is a NET-NEW challenger (Paused). The loop never edits a live RSA in place
+    (resets learning + Editor CSV can't reliably match an RSA) — see the RSA tab comment.
     """
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -155,25 +175,55 @@ def build(data, out_path):
     period = data.get("period", "")
     today = data.get("today", "")
 
-    _readme_sheet(wb, client, account_id, period, today)
-
     # --- Negative keywords tab ---
+    # Google Ads Editor's CSV import supports ONLY campaign- and ad-group-level negatives
+    # (Type = "Campaign negative" / "Negative", answer 57747). There is NO account-level
+    # negative row in the CSV namespace; account-wide blocking is a shared-negative-list
+    # (shared set) operation done in the UI. So an ACCOUNT-level finding is fanned out here
+    # into one "Campaign negative" row per active campaign (same account-wide blocking effect,
+    # fully importable) AND listed once on the Laes mig tab with the shared-list instruction.
+    # The fan-out lives in the builder (not the converter) because the builder has the active
+    # campaign list and because the workbook should be what-you-see-is-what-imports: the expert
+    # reviews the actual per-campaign rows that will be created, not a single row that secretly
+    # explodes at CSV time. Decision 2026-06-09.
+    active_campaigns = data.get("active_campaigns") or []
+    account_level_notes = []
     neg_rows = []
     for n in data.get("negatives", []):
-        level = n.get("level", "campaign")
+        level = (n.get("level") or "campaign").lower()
+        if level == "account":
+            account_level_notes.append(n)
+            targets = active_campaigns or [n.get("campaign", "")]
+            for camp in targets:
+                neg_rows.append({
+                    "Campaign": camp,
+                    "Level": "campaign",   # fanned to campaign-level rows
+                    "Ad group": "",
+                    "Negative keyword": n.get("keyword", ""),
+                    "Match type": _match(n.get("match_type", "")),
+                    "Niveau (oprindeligt)": "account -> fanned to campaign",
+                    "Spildt budget (DKK)": n.get("wasted_spend_dkk", ""),
+                    "Begrundelse": n.get("reason", ""),
+                })
+            continue
         neg_rows.append({
-            "Campaign": "" if level == "account" else n.get("campaign", ""),
+            "Campaign": n.get("campaign", ""),
+            "Level": level,
             "Ad group": n.get("ad_group", "") if level == "ad_group" else "",
-            "Keyword": n.get("keyword", ""),
+            "Negative keyword": n.get("keyword", ""),
             "Match type": _match(n.get("match_type", "")),
             # metadata (dropped by converter):
-            "Niveau": level,
+            "Niveau (oprindeligt)": level,
             "Spildt budget (DKK)": n.get("wasted_spend_dkk", ""),
             "Begrundelse": n.get("reason", ""),
         })
+    # Readme first (inserted at index 0). Built here so it can list the account-level notes
+    # computed in the negatives loop above.
+    _readme_sheet(wb, client, account_id, period, today, account_level_notes)
+
     _sheet(wb, "Negative keywords", NEGATIVES_EDITOR,
-           ["Niveau", "Spildt budget (DKK)", "Begrundelse"], neg_rows,
-           widths=[26, 22, 28, 12, 12, 18, 60])
+           ["Niveau (oprindeligt)", "Spildt budget (DKK)", "Begrundelse"], neg_rows,
+           widths=[26, 10, 22, 28, 12, 22, 18, 60])
 
     # --- Keyword expansion tab (promote winners to Exact, Paused) ---
     kw_rows = []
@@ -193,17 +243,18 @@ def build(data, out_path):
            ["Konverteringer", "CPA (DKK)", "Begrundelse"], kw_rows,
            widths=[26, 22, 28, 12, 10, 13, 11, 60])
 
-    # --- RSA challengers / rewrites tab ---
+    # --- RSA challengers tab ---
+    # EVERY RSA change is a NET-NEW challenger (Paused), never an in-place edit. Rationale
+    # (decision 2026-06-09): editing a live RSA's creative resets its learning — RSAs are
+    # effectively immutable in Google Ads, so "improving" one is a new-ad operation under the
+    # hood (SPEC §6.4 + the ASA/Inbound memory note). Google Ads Editor's docs do not even
+    # confirm RSA text-edit-in-place via CSV, and never enumerate which #Original fields would
+    # match an RSA — so an #Original RSA edit row risks BOTH a silent duplicate (no match) and
+    # clobbered headlines 2-15 (treated as full new content). The safe, idiomatic move is a
+    # fresh challenger: the human pauses/removes the old ad after the challenger proves out.
+    # (The converter still supports #Original passthrough for genuinely-editable entities like
+    # keyword bid/URL — it is just never emitted for RSAs.)
     rsa_editor_headers = list(RSA_EDITOR)
-    # If any row is an edit, add #Original columns for the headline/description fields it carries.
-    has_edit = any(r.get("is_edit") for r in data.get("rsa_rows", []))
-    orig_headers = []
-    if has_edit:
-        # Only add #Original for fields that actually appear in an original dict, to keep it tight.
-        present = set()
-        for r in data.get("rsa_rows", []):
-            present.update((r.get("original") or {}).keys())
-        orig_headers = [f"{h}#Original" for h in rsa_editor_headers if h in present]
     rsa_rows = []
     for r in data.get("rsa_rows", []):
         row = {
@@ -219,13 +270,9 @@ def build(data, out_path):
             row[f"Headline {i}"] = h
         for i, d in enumerate(r.get("descriptions", [])[:4], start=1):
             row[f"Description {i}"] = d
-        for k, v in (r.get("original") or {}).items():
-            row[f"{k}#Original"] = v
-        row["AEndringstype"] = "Ret eksisterende" if r.get("is_edit") else "Ny challenger"
         row["Begrundelse"] = r.get("reason", "")
         rsa_rows.append(row)
-    _sheet(wb, "RSA challengers", rsa_editor_headers + orig_headers,
-           ["AEndringstype", "Begrundelse"], rsa_rows)
+    _sheet(wb, "RSA challengers", rsa_editor_headers, ["Begrundelse"], rsa_rows)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)

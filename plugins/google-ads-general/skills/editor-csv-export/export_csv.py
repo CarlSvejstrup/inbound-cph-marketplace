@@ -237,6 +237,20 @@ def build_ads(rsa_rows):
     fields = (["Campaign", "Ad group", "Ad type", "Final URL", "Path 1", "Path 2"]
               + [f"Headline {i}" for i in range(1, 16)]
               + [f"Description {i}" for i in range(1, 5)])
+    # #Original passthrough (the optimization-loop's distinguishing need; answer 57747).
+    # The campaign-build assembler is all net-new and carries no #Original. The optimization
+    # loop EDITS live RSAs, so its workbook may carry `<Column>#Original` columns holding the
+    # current live value — Editor uses them to match the edit to the existing ad and edit it
+    # IN PLACE instead of creating a duplicate. Preserve any such column verbatim; dropping it
+    # would turn an edit into a duplicate. Discover them from the actual rows (present only
+    # when an edit row exists) and append after the fixed fields.
+    orig_fields = []
+    for r in rsa_rows:
+        for k in r:
+            ks = str(k)
+            if ks.endswith("#Original") and ks not in orig_fields:
+                orig_fields.append(ks)
+    fields = fields + orig_fields
     out = []
     for r in rsa_rows:
         row = {
@@ -251,6 +265,9 @@ def build_ads(rsa_rows):
             row[f"Headline {i}"] = _s(get(r, f"Headline {i}"))
         for i in range(1, 5):
             row[f"Description {i}"] = _s(get(r, f"Description {i}"))
+        # Preserve #Original cells verbatim (exact-key match, not the normalized get()).
+        for of in orig_fields:
+            row[of] = _s(r.get(of, ""))
         out.append(row)
     return fields, out
 
@@ -302,15 +319,27 @@ def main():
 
     wb = openpyxl.load_workbook(args.workbook, read_only=True, data_only=True)
 
+    # Two known workbook dialects feed this converter (it stays a pure transform, it just
+    # recognizes both): (a) the campaign-build ASSEMBLER workbook (tabs "01 Campaign settings",
+    # "02 Ad groups", "03 Keywords", "06 RSAs", ...) — a full net-new campaign; (b) the
+    # optimization-LOOP review workbook (tabs "Negative keywords", "Nye keywords (vindere)",
+    # "RSA challengers") — a subset: only negatives, promoted-winner keywords, and RSA
+    # challengers/edits, never campaign settings or ad groups. read_tab matches any alias.
     _, settings = read_tab(wb, "Campaign settings", "Campaign setting")
     _, agroups = read_tab(wb, "Ad groups", "Ad group")
-    _, keywords = read_tab(wb, "Keywords", "Keyword")
+    _, keywords = read_tab(wb, "Keywords", "Keyword", "Nye keywords (vindere)")
     _, negatives = read_tab(wb, "Negative keywords", "Negatives")
-    _, rsas = read_tab(wb, "RSAs", "RSA")
+    _, rsas = read_tab(wb, "RSAs", "RSA", "RSA challengers")
     _, assets = read_tab(wb, "Assets", "Asset")
 
-    if not settings:
-        raise SystemExit("STOP: workbook has no '01 Campaign settings' tab — is this the assembler output?")
+    # Require at least one recognized entity tab (works for both the full assembler workbook
+    # and the optimization-loop subset). Campaign settings is no longer mandatory.
+    if not any([settings, agroups, keywords, negatives, rsas, assets]):
+        raise SystemExit(
+            "STOP: workbook has no recognized entity tab (Campaign settings / Ad groups / "
+            "Keywords / Negative keywords / RSAs / Assets). Is this an assembler or "
+            "optimization-loop workbook?"
+        )
 
     # Re-run the two hard guards at this boundary (a human may have edited the Excel).
     guard_keywords(keywords)

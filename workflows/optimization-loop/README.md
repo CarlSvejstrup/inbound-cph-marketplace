@@ -23,8 +23,11 @@ agent → returns a CSV bundle + a Danish executive summary.
 - **Quality score**: keyword-grain (no fabricated ad-group QS); LP is a flag, not a score.
 - **Execute**: builds **ONE editable Excel workbook** (`Optimering - <client> - <date>.xlsx`)
   with tabs for negatives, winner-keywords, and RSA challengers. Each tab has Editor-header
-  columns (the converter keeps) + review-metadata columns (the converter drops); edit rows carry
-  `#Original` so Editor edits in place. Writes `recommendations.json` for the next run's measure.
+  columns (the converter keeps) + review-metadata columns (the converter drops). Every RSA is a
+  NET-NEW challenger (never an in-place edit — editing resets learning); account-level negatives
+  fan out to one campaign-level row per active campaign. Writes `recommendations.json` for the
+  next run's measure. The converter (`editor-csv-export`) reads this workbook AND the campaign
+  -build assembler's — one shared per-entity CSV target.
 
 **Recommend-only, Excel-first.** No Google Ads API writes, no Drive writes. The expert **edits
 the workbook** (and can send it to the client), then runs a separate converter skill (in

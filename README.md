@@ -2,9 +2,9 @@
 
 Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **three plugins**, installed per user and updated via `/plugin update`:
 
-- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → assembled review workbook + Editor CSVs).
+- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → a polished, client-shareable review workbook). Editor CSVs come from `google-ads-general`'s `editor-csv-export`.
 - **`google-ads-optimization`** — optimize a LIVE Google Ads account (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining).
-- **`google-ads-general`** — standalone reporting deliverables: full audit reports (slide deck + PDF) and change-log generation from Ads change-history.
+- **`google-ads-general`** — standalone deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and `editor-csv-export` (confirmed campaign-build workbook → Google Ads Editor import CSVs).
 
 All share one operating contract (`CLAUDE.md`) and company context (`context/`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account; humans import the artifacts after approval.
 
@@ -34,7 +34,7 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 | `structuring` | The Phase-2 gate: ad groups + keyword selection (Exact/Phrase) + client-specific negatives |
 | `rsa-copywriter` | Writes RSAs for every ad group by reusing `responsive-search-ads` per group |
 | `assets` | Sitelinks, callouts, structured snippets (lead forms are a manual UI step) |
-| `assembler` | Merges all the above into Ian's 10-tab review workbook + per-entity Editor CSVs (no API push) |
+| `assembler` | Merges all the above into Ian's polished 10-tab review workbook — Excel-only, the client-confirmation artifact (no CSV, no API push). Editor CSVs are produced later by `editor-csv-export` |
 | `responsive-search-ads` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards |
 
 ### google-ads-optimization (2 skills) — optimize a live account
@@ -44,12 +44,13 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 | `annonce-optimering` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief |
 | `search-terms` | Search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list |
 
-### google-ads-general (2 skills) — standalone reporting
+### google-ads-general (3 skills) — standalone deliverables
 
 | Skill | Purpose |
 |---|---|
 | `ads-audit-report` | Full paid-search audit → polished HTML slide deck + rendered PDF report |
 | `ads-changelog` | Build a changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
+| `editor-csv-export` | Convert a client-confirmed campaign-build review workbook (the `assembler` Excel) → the per-entity Google Ads Editor import CSVs. Pure transform, re-runs the no-Broad + length guards, never pushes to the account |
 
 ## Data integration
 

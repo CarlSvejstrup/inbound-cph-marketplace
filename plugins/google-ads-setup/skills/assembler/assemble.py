@@ -91,6 +91,7 @@ WRAP_COLS = {
     "Budget rationale", "Reason", "Test hypothesis", "Notes", "Supporting queries",
     "Primary angles", "Check", "Snippet values", "Workflow note", "Value",
     "Default action", "Description line 1", "Description line 2",
+    "Tracking prerequisite", "Primary conversion action", "Target CPA switch rule",
 }
 # Sensible per-column width caps (chars). Wrapped columns get a fixed comfortable width;
 # everything else autosizes within [min, max].
@@ -287,13 +288,12 @@ def tab_campaign_settings(wb, strategy):
     headers = [h for h, _ in pairs]
     _write_header(ws, headers)
     ws.append([str(v) for _, v in pairs])
-    # One wide data row: wrap every cell so long values (rationale, prerequisite) stay readable
-    # without a 90-char column. _style_body handles banding/borders/freeze/filter/widths.
+    # One wide data row. _style_body sizes each column to its own content and wraps only the
+    # genuinely-long prose columns (WRAP_COLS: Budget rationale, Tracking prerequisite, ...) —
+    # NOT all 20 equal-width, which reads as a wall. Short columns (Location, Languages, the
+    # budget number) stay compact. Give the single tall row room for the wrapped prose.
     _style_body(ws, headers)
-    for c in range(1, len(headers) + 1):
-        ws.cell(row=2, column=c).alignment = WRAP_ALIGN
-        ws.column_dimensions[get_column_letter(c)].width = 22
-    ws.row_dimensions[2].height = 60
+    ws.row_dimensions[2].height = 75
 
 
 def tab_ad_groups(wb, structuring):

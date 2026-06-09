@@ -351,24 +351,24 @@ STEP 1 - assemble the findings object for review_workbook.build():
        Apply headline-craft as VARIATION + tiebreakers (NOT hard <20-char ceilings); keep the
        validated "ignore Ad Strength" stance. RESPECT the hard Editor limits: headline <=30,
        description <=90, path <=15 chars. Drop/triM any over-length line before writing.
-     - status: "Paused" for a brand-new challenger.
-     - is_edit: false for a NEW challenger (ad group had <2 RSAs). If you are REWRITING an
-       existing RSA (e.g. a QS/intent fix on an ad group that already has 2+ RSAs), set
-       is_edit:true and original:{"Headline 1": "<current live H1>", "Final URL": "<current>"}
-       carrying the live values you saw in the diagnostics, so Editor edits in place via
-       #Original instead of creating a duplicate. Default to NEW challengers unless you have the
-       live current value to anchor an edit.
-     - reason: one Danish line (why this challenger / edit).
+     - status: "Paused" (ALWAYS — every RSA is a brand-new challenger).
+     - EVERY RSA is a NET-NEW challenger, never an in-place edit. Even when the trigger is a
+       QS/intent fix on an ad group that already has 2+ RSAs, emit a fresh challenger — do NOT
+       try to rewrite an existing RSA. Editing a live RSA resets its learning (RSAs are
+       effectively immutable) and Editor CSV cannot reliably match an existing RSA, so an edit
+       row risks a silent duplicate or clobbered headlines. The human pauses/removes the old
+       ad once the challenger proves out.
+     - reason: one Danish line (why this challenger).
 
 STEP 2 - build the workbook:
   python3 ${libDir}/builders/review_workbook.py --in <findings.json> --out "${runDir}/Optimering - ${clientName} - ${today}.xlsx"
   (or import review_workbook and call build(findings, out)). It writes tabs: Laes mig,
   Negative keywords, Nye keywords (vindere), RSA challengers. Dark headers = Editor columns the
-  converter keeps; light headers = metadata the converter drops. #Original columns appear only
-  for edit rows.
+  converter keeps; light headers = metadata the converter drops. Account-level negatives are
+  fanned out to one Campaign-negative row per active campaign (pass active_campaigns).
 
 STEP 3 - PERSIST THIS RUN -> ${runDir}/recommendations.json: a compact JSON of what you
-  recommended (negatives, winners, rsa ad groups + is_edit, qs flags) so the NEXT run's measure
+  recommended (negatives, winners, rsa ad groups, qs flags) so the NEXT run's measure
   stage can read it as "what we proposed last run". Set wrote_run_recommendations=true.
 
 STEP 4 - EXECUTIVE SUMMARY (Danish, markdown) - executive_summary_md:

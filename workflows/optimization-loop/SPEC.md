@@ -302,26 +302,34 @@ its columns into two bands:
 
 - **EDITOR-BOUND columns** — exact Google Ads Editor header spelling (Editor answer 57747:
   headers are English, case/space-insensitive). Dark-blue header. **The converter KEEPS these.**
-- **METADATA columns** — review context (Niveau, Spildt budget, Begrundelse, Konverteringer, CPA,
-  AEndringstype). Light-blue header. **The converter DROPS these.** Never go to Editor.
+- **METADATA columns** — review context (Niveau (oprindeligt), Spildt budget, Begrundelse,
+  Konverteringer, CPA). Light-blue header. **The converter DROPS these.** Never go to Editor.
 
-Editor-bound header sets (the converter's KEEP list, exact spelling):
-- **Negative keywords:** `Campaign`, `Ad group`, `Keyword`, `Match type` (Match type carries the
-  Negative / Campaign negative distinction; account-level → blank Campaign + Ad group).
+Editor-bound header sets (the converter's KEEP list, exact spelling). The negatives tab speaks
+the **same vocabulary as the assembler's tab 04** so ONE converter (`editor-csv-export` in
+`google-ads-general`) reads both workbooks unchanged:
+- **Negative keywords:** `Campaign`, `Level`, `Ad group`, `Negative keyword`, `Match type`. The
+  converter derives Editor's `Type` (`Campaign negative` vs `Negative`) from `Level`, never from
+  Match type. **Account-level negatives are NOT a CSV-importable level** (Editor CSV only has
+  campaign + ad-group); the builder fans an account-level finding out to one campaign-level row
+  per active campaign (pass `active_campaigns`) + a Laes-mig note offering the shared-list
+  alternative. Decision 2026-06-09.
 - **Nye keywords (vindere):** `Campaign`, `Ad group`, `Keyword`, `Match type` (always `Exact`),
   `Status` (`Paused`).
 - **RSA challengers:** `Campaign`, `Ad group`, `Ad type`, `Final URL`, `Path 1`, `Path 2`,
-  `Headline 1`…`Headline 15`, `Description 1`…`Description 4`, `Status`.
+  `Headline 1`…`Headline 15`, `Description 1`…`Description 4`, `Status`. **Every RSA row is a
+  NET-NEW challenger (`Paused`) — never an in-place edit** (see below).
 
-**`#Original` — editing EXISTING entities (the loop's distinguishing need vs the assembler):**
-The assembler builds NEW campaigns (all net-new, Paused, no `#Original`). The loop optimises a
-LIVE account, so some rows EDIT an existing entity. Editor's `<Column>#Original` convention
-(answer 57747) matches an edit to the existing entity and preserves its history instead of
-creating a duplicate. So a `Headline 1#Original` / `Final URL#Original` column carrying the
-current live value appears **only on edit rows**; net-new rows have none. **The converter MUST
-preserve any `*#Original` column verbatim** — it is the difference between "edit in place" and
-"create a duplicate". Verified: `#Original` columns appear iff an edit row is present, blank on
-net-new rows.
+**RSA changes are net-new challengers, NOT `#Original` edits (decision 2026-06-09):** editing a
+live RSA's creative resets its learning (RSAs are effectively immutable — SPEC §6.4), and Editor's
+CSV docs neither confirm RSA text-edit-in-place nor enumerate which `#Original` fields would match
+an RSA. An `#Original` RSA edit row therefore risks BOTH a silent duplicate (no match) and
+clobbered headlines 2-15 (row treated as full new content). So the loop emits a fresh challenger
+for every RSA change; the human pauses/removes the old ad once it proves out. **The converter
+keeps a general `#Original` passthrough** (preserves any `*#Original` column verbatim — correct
+for genuinely-editable entities like a keyword's bid/URL), but the loop never emits one for RSAs.
+Verified: with the converter's passthrough live, the RSA tab + ads.csv carry zero `#Original`
+columns; account-level negatives fan out correctly.
 
 ---
 
@@ -375,14 +383,15 @@ A single execute agent receives all Stage-A findings JSON, assembles the
 `review_workbook.build()` input, and builds **one editable `.xlsx`** (tabs: Laes mig, Negative
 keywords, Nye keywords (vindere), RSA challengers):
 - **Negatives** from `SearchTermFindings.negatives` (+ optional SEMrush waste) → Negative
-  keywords tab (Editor columns + Niveau/Spildt budget/Begrundelse metadata; account-level →
-  blank Campaign).
+  keywords tab (Editor columns: Campaign/Level/Ad group/Negative keyword/Match type + metadata;
+  account-level findings fan out to one campaign-level row per active campaign, §3.5b).
 - **Winners** from `SearchTermFindings.winners` (already_exact skipped) → Nye keywords tab,
   promoted to `Exact`, `Paused`. Conservative: never "aggressively scale" on 2-3 conversions.
 - **RSA challengers** for each ad group with `challenger_flag` or `missing_angles` → RSA tab,
   grounded in `assetHygiene.gap_brief` + `headline-craft.md` (variation + tiebreakers, hard
-  Editor length limits respected). New challengers `Paused`. A *rewrite* of an existing ad uses
-  `#Original` columns (§3.5b) so Editor edits in place; never a `Removed` row (§6).
+  Editor length limits respected). **Always a NET-NEW challenger, `Paused`** — never an in-place
+  edit of an existing RSA (editing resets learning; §3.5b / §6). The human pauses the old ad once
+  the challenger proves out.
 - Writes this run's recommendations to the run dir (cold-start source 1 for next run).
 - Returns `WorkbookBundle` (the `.xlsx` path + counts + the executive summary).
 
@@ -430,9 +439,10 @@ locked "workbook → expert edits → converter → Editor" decision:
 3. **No API writes, ever.** The loop never calls a Google Ads mutate. The repo `CLAUDE.md`
    human-in-the-loop rule holds unchanged.
 4. **The `Removed+Enabled` trap.** Never set an old ad to `Removed` + a new one to `Enabled` in
-   one import (resets the new ad's learning, drops the old ad's data). The loop emits new
-   challengers as `Paused`; for a *rewrite* of an existing ad it uses the `#Original` convention
-   (§3.5b) so Editor edits in place, never duplicating. The human decides pause-vs-remove.
+   one import (resets the new ad's learning, drops the old ad's data). The loop emits every RSA
+   as a NET-NEW challenger, `Paused`, and never edits an existing RSA in place (§3.5b) — so it
+   never duplicates and never resets learning. The human decides pause-vs-remove on the old ad
+   after the challenger proves out.
 
 ### v2 (not built this session): gated negative-keyword apply
 Negative keywords are the one maximally-reversible change. A future version may offer a single

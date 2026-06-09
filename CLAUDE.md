@@ -3,9 +3,9 @@
 Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against Inbound CPH's Google Ads work.
 
 This repo is a **marketplace with three plugins**:
-- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → assembled review workbook + Editor CSVs).
+- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → a polished, client-shareable review workbook; Excel-only).
 - **`google-ads-optimization`** — optimize a LIVE Google Ads account (RSA asset-hygiene, search-terms).
-- **`google-ads-general`** — standalone reporting deliverables (audit reports, change-logs).
+- **`google-ads-general`** — standalone deliverables (audit reports, change-logs, and `editor-csv-export`: confirmed campaign-build workbook → Editor import CSVs).
 
 Each plugin also carries its own `CLAUDE.md` (a copy of the same operating contract) loaded via `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` when a skill runs. This repo-root file is the canonical version; the plugin copies refine, never override. Skill-level `SKILL.md` files refine further, never override.
 
@@ -15,7 +15,7 @@ Each plugin also carries its own `CLAUDE.md` (a copy of the same operating contr
 
 **No external write happens without explicit user approval. No exceptions. This rule overrides skill convenience, demo polish, and "obvious next step" reasoning.**
 
-External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Google Ads is never written to — every skill is read-only / recommend-only against the account.** The campaign-build output is a workbook + Editor CSVs that a human imports into Google Ads Editor after approval; the optimization skills only diagnose and recommend.
+External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Google Ads is never written to — every skill is read-only / recommend-only against the account.** The campaign-build output is a review workbook (the `assembler`, Excel-only); after the client confirms it, `editor-csv-export` converts it to the Editor CSVs a human imports into Google Ads Editor; the optimization skills only diagnose and recommend.
 
 Read operations are not writes. Drafting in chat is not a write. Producing a proposed change is not a write. The boundary is the moment bytes leave the agent and land somewhere persistent or visible to anyone other than the operator.
 
@@ -70,7 +70,7 @@ But every skill that produces an artifact or recommendation stops at "here's the
 | `structuring` | Phase-2 gate: ad groups + keywords (Exact/Phrase) + client-specific negatives | No — emits an object |
 | `rsa-copywriter` | RSAs for every ad group, reusing `responsive-search-ads` per group | Gated — sheet save |
 | `assets` | Sitelinks, callouts, structured snippets (lead forms = manual UI) | No — emits an object |
-| `assembler` | Merges all four shapes → 10-tab workbook + Editor CSVs (NO API push) | Gated — file/Drive save |
+| `assembler` | Merges all four shapes → polished 10-tab review workbook (Excel-only, NO CSV, NO API push) | Gated — file/Drive save |
 | `responsive-search-ads` | RSA copy engine: one ad group → Editor-ready sheet with live `=LEN()` | Gated — sheet save |
 
 ### google-ads-optimization — optimize a live account
@@ -80,12 +80,13 @@ But every skill that produces an artifact or recommendation stops at "here's the
 | `annonce-optimering` | Post-launch RSA asset-hygiene → gap-brief | Gated — sheet save |
 | `search-terms` | Search-terms analysis → sheet + negative-keyword list | Gated — sheet save |
 
-### google-ads-general — standalone reporting
+### google-ads-general — standalone deliverables
 
 | Skill | Purpose | Writes? |
 |---|---|---|
 | `ads-audit-report` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
 | `ads-changelog` | Change-history → format-matched changelog draft | Gated — Drive paste |
+| `editor-csv-export` | Confirmed campaign-build review workbook → per-entity Editor import CSVs (pure transform, re-runs no-Broad + length guards) | Gated — file/Drive save |
 
 Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. They are reinforcing, not redundant. All Google Ads MCP use is read-only.
 
