@@ -1,74 +1,101 @@
-# Session handoff — 2026-06-05 (optimization-loop build)
+# Session handoff — 2026-06-09 (Excel→CSV converter shipped; loop made converter-ready)
 
-## Current state (2026-06-05, end of session)
+## Current state (2026-06-09, end of session)
 
-- **Branch:** `feat/optimization-loop` (NOT merged to main, NOT pushed). Commits `76eb7e3`,
-  `e5236c3`, `39b9aed`, `fe514cd`.
-- **Marketplace:** 3 plugins — `google-ads-setup` (9 skills), `google-ads-optimization`
-  (2 skills), `google-ads-general` (2 skills). Repo
+- **Branch:** `main` (commits `7b31bf1`, `6b0bc78`, `ceb59ca` — all on main, repo automation
+  fast-forwards feature branches to main; orphaned `feat/*` branches are harmless leftovers).
+  NOT manually pushed (`main == origin/main` was set by the automation; do not push by hand).
+- **Marketplace:** 3 plugins — `google-ads-setup` (9 skills, v1.2.0), `google-ads-optimization`
+  (2 skills), `google-ads-general` (**3 skills** now, v1.1.0). Repo
   https://github.com/CarlSvejstrup/inbound-cph-marketplace.
-- **Built this session — the optimization loop** (`workflows/optimization-loop/`): a *local*
-  Claude Code Workflow (NOT a Cowork plugin) that diagnoses a live account in parallel and
-  produces ONE editable Excel workbook. Recommend-only.
 
-### Optimization-loop build status
+### Shipped + verified this session — `editor-csv-export` (the Excel→CSV converter)
 
-- **DONE + verified (unit):** the shared lib —
-  - `lib/builders/load.py`: by-path loader of the skills' own `build()`, output cell-identical
-    to their CLIs; RSA length/quality gates fire through it. **Skills NOT modified.**
-  - `lib/gaql/*`: live-verified queries + the `LAST_90_DAYS`-isn't-a-literal guard.
-  - `lib/gaql/quality_score.py` + `change_events.py`: verified against live DSC. QS is
-    keyword-grain; change-history bulk-collapse + ≤29-day clamp verified.
-  - `lib/builders/review_workbook.py`: the ONE editable `.xlsx` (Editor-header columns +
-    metadata band + `#Original` for edit rows). Verified: account-level negative → blank
-    Campaign; winners → Exact/Paused; `#Original` only on edit rows.
-  - `SPEC.md` is the design contract; §3.5b is the column contract the converter is built on.
-- **DONE + PASSED (workflow):** `smoke.workflow.js` proved the agent→Bash/MCP→schema-JSON
-  pattern against live DSC (3069826320) — real analysis: 8 negatives (incl. a struktur
-  self-competition finding on `grupperejser`), 6 winners, significance gate fired (601 conv →
-  low_confidence=false). Saved as `fixtures/dsc-smoke-search-terms.json`.
-- **PARTIAL (full run `wf_b215523d-8ef`):** launched 4 parallel diagnostics; **2 of 4 journaled
-  a result before the session moved on** — QS (avg 6.4, 20 flagged keywords, matches the live
-  probe) and measure (correct `is_baseline_run: true`). search-terms + asset-hygiene + the
-  execute stage did NOT finish. **And that run used the OLD CSV execute stage** (pre-refactor),
-  so its execute output is superseded regardless. The QS + measure stages are now validated
-  through the real workflow, not just unit tests.
-- **ARCHITECTURE CHANGE late in session (commit `fe514cd`):** the loop returns ONE editable
-  Excel workbook, NOT CSVs (Carl's call: experts must edit + send to client before import). A
-  separate converter skill (to be built in `google-ads-general`) does workbook → Editor CSV.
-  The assembler was already Excel-only (`eb4ebd9`) and was NOT touched.
+A new **plugin skill** `plugins/google-ads-general/skills/editor-csv-export/` (this is the "build
+another skill that turns Excel into CSV for Editor" Carl asked for). Pure transform: ONE confirmed
+`.xlsx` in → up to 6 per-entity Editor import CSVs out. No API push, re-runs both hard guards.
 
-### The parked unknown
+- **Reads BOTH workbook dialects on one contract** (the key design win):
+  - **assembler** (campaign-build, full new campaign) → 6 CSVs.
+  - **optimization-loop** review workbook (subset) → 3 CSVs (negatives, keywords, ads).
+  - `read_tab` matches tab names by alias (tolerant of `NN ` prefix). ≥1 entity tab required;
+    campaign-settings no longer mandatory.
+- **Target schema = assembler-contract §5** (traces to Ian's real skeleton, NOT the lossy public
+  Editor docs). Negatives `Type` derived from `Level` (`Campaign negative` / `Negative`),
+  bracket/quote negative form, `<Account-level>` for assets, UTF-8 BOM (Danish æ/ø/å).
+- **Both §6 guards re-run at the converter boundary** (no Broad/blank positive keyword; recompute
+  RSA 30/90/15) — verified to fire (exit 1, zero CSVs) on BOTH dialects.
+- **Verified end-to-end** against a synthetic assembler workbook (6 CSVs, every §5 branch +
+  both guards) AND a synthetic loop workbook (3 CSVs, account-level fan-out, no RSA `#Original`),
+  with the assembler path unregressed. Contract + smoke invariants in
+  `references/editor-csv-contract.md`.
 
-A full `loop.workflow.js` run that reaches the **execute stage and writes the workbook** has not
-happened yet (the one full run predates the Excel refactor and didn't finish execute). That
-end-to-end run — diagnostics → workbook with the right tabs/columns/`#Original` — is THE thing to
-verify next. Re-run fresh (see `README.md`); the diagnostics are cheap to re-run.
+### Loop changes this session (made the loop workbook converter-ready)
 
-### Next session — TWO tracks (Carl, 2026-06-05)
+- `lib/builders/review_workbook.py`:
+  - Negatives tab now speaks the **same vocabulary as the assembler's tab 04**
+    (`Campaign / Level / Ad group / Negative keyword / Match type`) → one converter, no fork.
+  - **Account-level negatives fan out** to one `Campaign negative` row per active campaign (pass
+    `active_campaigns`) + a Laes-mig note offering the shared-list alternative (Editor CSV has no
+    account level). Decision 2026-06-09.
+  - **RSA-edit-in-place path REMOVED.** Every RSA is now a NET-NEW challenger (`Paused`).
+    Rationale: editing a live RSA resets its learning (RSAs effectively immutable, SPEC §6.4), and
+    Editor CSV can't reliably match an RSA → an `#Original` edit row risks a silent duplicate or
+    clobbered headlines. The converter keeps a general `#Original` passthrough (correct for
+    editable entities like a keyword's bid/URL) but the loop never emits one for RSAs.
+- `SPEC.md` §3.5b / §4 / §6.4, `README.md`, `loop.workflow.js` execute prompt all updated to the
+  net-new-RSA + fan-out reality.
 
-**Track 1 — SETUP (the one Carl most wants to nail).** The `google-ads-setup` campaign-build
-suite. Goals:
-- **Make it actually work end-to-end** — the live Cowork run is still the parked unknown for the
-  build suite too.
-- **Compare against what Ian built.** Ian sent a skill / something he created. Pull it, read it,
-  and benchmark our setup flow against his — what does he do better, what do we, what to merge.
-- **User-friendliness + UI.** Think about a UI layer (Ian made something here). Make the
-  build flow less raw-skill, more guided.
-- **The customer part.** Ian's thing includes a customer-facing piece. Figure out what the
-  customer side of setup looks like for us.
+### Still DONE from before (unchanged, still valid)
 
-**Track 2 — OPTIMIZATION (dial in + test).** The loop built this session. Goals:
-- **Run it end-to-end** and see the workbook output (the parked unknown above).
-- **Find what works / what doesn't** on a real account, and **where to optimize** the loop
-  itself.
-- Build the **workbook → Editor CSV converter skill** in `google-ads-general` (SPEC §3.5b is its
-  interface; preserve `*#Original` columns, drop the metadata band).
+- `lib/gaql/*` (+ QS keyword-grain + change_events ≤29-day clamp) verified against live DSC.
+- `smoke.workflow.js` PASSED against live DSC (3069826320).
+- `lib/builders/load.py` (by-path loader) exists but is **DEAD CODE** — the Excel-refactor execute
+  stage calls only `review_workbook.py`, never the loader. (This is what de-risked the loop→plugin
+  port: no cross-plugin imports remain.)
+
+### THE headline open item — the loop is still NOT a plugin
+
+Carl's top ask this session was **"I want it as a plugin!"** The *converter* shipped as a plugin
+skill ✅, but the **optimization loop itself is still `workflows/optimization-loop/`, a local Claude
+Code Workflow — NOT a Cowork plugin.** This was a deliberate sequencing call (ship + verify the
+converter first; port the loop after its end-to-end run clears), so it is **deferred, not done.**
+Good news: the Excel refactor already removed the original blocker (the dead `load.py` cross-plugin
+coupling), so the port is now realistic — a skill runs in the main loop and CAN spawn agents /
+invoke skills, unlike a Workflow agent. Porting plan: move the `lib/` (gaql + review_workbook) into
+a new `google-ads-optimization` skill, run the diagnostics sequentially or via sub-agents, bundle
+`headline-craft.md`. **Port VALIDATED logic** — clear the two gates below first.
+
+### Two trust gates before the loop runs on a live account
+
+1. **The parked unknown (still open):** a full `loop.workflow.js` run that reaches the **execute
+   stage and writes the workbook** has never completed. Drive `review_workbook.py` directly (pure
+   function, seconds) to eyeball workbooks — done this session — but the full diagnostics→execute
+   chain on a live account is unverified. Re-run fresh (see `README.md`); diagnostics are cheap.
+2. **The Editor edit-row round-trip (NEW gate):** no CSV has been imported into real Editor yet.
+   The honest acceptance test is one manual import. Because the converter's `#Original` passthrough
+   is the riskiest piece, the round-trip must **specifically import an edit row** (not just net-new
+   negatives/keywords) and confirm Editor matches + edits in place + does NOT clobber unspecified
+   headlines. (The loop sidesteps this for RSAs by going net-new; it still matters if any future
+   editable-entity tab uses `#Original`.) Also resolve the UNVERIFIED snippet-header CSV column
+   name on the same round-trip.
+
+### Next session — TWO tracks (Carl, 2026-06-05, still current)
+
+**Track 1 — SETUP (the one Carl most wants to nail).** The `google-ads-setup` campaign-build suite.
+- **Make it actually work end-to-end** — the live Cowork run is still the parked unknown here too.
+- **Compare against what Ian built.** Pull Ian's skill, benchmark our setup flow against it.
+- **User-friendliness + UI** (Ian made something here) + **the customer-facing part**.
+
+**Track 2 — OPTIMIZATION (dial in + test).** The loop.
+- **Port it to a plugin** (the headline item above) once validated.
+- **Run it end-to-end** (gate 1) and the **Editor edit-row round-trip** (gate 2).
+- **Find what works / what doesn't** on a real account; where to optimize the loop itself.
 - Then a **second run with `prior_run_dir`** set, to exercise the measure stage's
   proposed/applied/did-it-move comparison (not just baseline).
 
-**Plumbing:** decide merge of `feat/optimization-loop` → main once the workbook run is verified;
-refresh the stale M-series sections below + `docs/project-status.md` for the 3-plugin reality.
+**Plumbing:** refresh the stale M-series sections below + `docs/project-status.md` for the
+3-plugin / converter reality.
 
 ---
 
