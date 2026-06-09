@@ -51,7 +51,7 @@ def _load_rsa_layout():
 _layout = _load_rsa_layout()  # also pip-installs openpyxl on first run via its bootstrap
 import openpyxl  # noqa: E402
 from openpyxl.formatting.rule import CellIsRule  # noqa: E402
-from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
 
 # Hard limits derived from the RSA layout's FIELDS — never retyped. FIELDS entries are
@@ -65,9 +65,37 @@ SHARED_NEG_NAME = "Generelle negative søgeord"
 SHARED_NEG_ID = "6688642473"
 SHARED_NEG_MCC = "1138360630"
 
-HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-RED_FILL = PatternFill(start_color="F4C7C3", end_color="F4C7C3", fill_type="solid")
-HEADER_FONT = Font(bold=True)
+# --- Visual design system (client-facing: the workbook is often sent to the customer) -------
+# Inbound dark-navy header, white bold text, soft zebra banding, thin grid. Row 1 STAYS the
+# header row (the google-ads-general converter reads headers from row 1) — we style cells only,
+# never insert a banner row above the data. Styling must not move the header off row 1.
+NAVY = "1F2A44"          # Inbound dark navy
+NAVY_TEXT = "FFFFFF"
+BAND_FILL = "F4F6FA"     # very light blue-grey for odd data rows (zebra)
+RED_FILL_HEX = "F4C7C3"  # over-length flag (kept)
+GREEN_TEXT = "1E7A34"    # Pass=True
+RED_TEXT = "B00020"      # Pass=False
+
+HEADER_FILL = PatternFill(start_color=NAVY, end_color=NAVY, fill_type="solid")
+BAND_PATTERN = PatternFill(start_color=BAND_FILL, end_color=BAND_FILL, fill_type="solid")
+RED_FILL = PatternFill(start_color=RED_FILL_HEX, end_color=RED_FILL_HEX, fill_type="solid")
+HEADER_FONT = Font(bold=True, color=NAVY_TEXT, size=11)
+_THIN = Side(style="thin", color="D6DBE6")
+CELL_BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
+WRAP_ALIGN = Alignment(horizontal="left", vertical="top", wrap_text=True)
+TOP_ALIGN = Alignment(horizontal="left", vertical="top")
+
+# Columns whose prose is long enough to wrap instead of forcing a 60-char-wide column.
+WRAP_COLS = {
+    "Budget rationale", "Reason", "Test hypothesis", "Notes", "Supporting queries",
+    "Primary angles", "Check", "Snippet values", "Workflow note", "Value",
+    "Default action", "Description line 1", "Description line 2",
+}
+# Sensible per-column width caps (chars). Wrapped columns get a fixed comfortable width;
+# everything else autosizes within [min, max].
+WIDE_WIDTH = 48
+NARROW_MAX = 30
 
 
 # --------------------------------------------------------------------------- helpers
@@ -80,18 +108,43 @@ def _write_header(ws, headers):
         cell = ws.cell(row=1, column=c, value=h)
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = HEADER_ALIGN
+        cell.border = CELL_BORDER
+    ws.row_dimensions[1].height = 28
 
 
-def _autosize(ws, max_width=60):
-    for idx, col in enumerate(ws.iter_cols(min_row=1, max_row=ws.max_row), start=1):
-        widest = 0
-        for cell in col:
+def _style_body(ws, headers):
+    """Zebra-band data rows, wrap prose columns, thin grid, freeze header, autofilter, widths.
+    Call AFTER all data rows are appended. Row 1 must already be the header row."""
+    ncols = len(headers)
+    wrap_idx = {i for i, h in enumerate(headers, start=1) if h in WRAP_COLS}
+    # Body rows: banding + borders + alignment.
+    for r in range(2, ws.max_row + 1):
+        band = (r % 2 == 1)  # band odd data rows (row 3, 5, ...) for subtle contrast
+        for c in range(1, ncols + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.border = CELL_BORDER
+            cell.alignment = WRAP_ALIGN if c in wrap_idx else TOP_ALIGN
+            if band:
+                cell.fill = BAND_PATTERN
+    # Freeze the header row, add an autofilter over the full used range.
+    ws.freeze_panes = "A2"
+    if ws.max_row >= 1 and ncols >= 1:
+        ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}{max(ws.max_row, 1)}"
+    # Column widths.
+    for idx in range(1, ncols + 1):
+        letter = get_column_letter(idx)
+        header = headers[idx - 1] if idx - 1 < len(headers) else ""
+        if header in WRAP_COLS:
+            ws.column_dimensions[letter].width = WIDE_WIDTH
+            continue
+        widest = len(str(header))
+        for cell in ws[letter]:
             v = cell.value
             if v is None or str(v).startswith("="):
                 continue
             widest = max(widest, len(str(v)))
-        ws.column_dimensions[get_column_letter(idx)].width = max(8, min(max_width, widest + 2))
+        ws.column_dimensions[letter].width = max(10, min(NARROW_MAX, widest + 3))
 
 
 def _display_form(text, match_type):
@@ -174,7 +227,8 @@ def guard_positive_match_types(structuring):
 def tab_readme(wb, strategy, meta):
     ws = wb.active
     ws.title = "00 README"
-    _write_header(ws, ["Field", "Value"])
+    headers = ["Field", "Value"]
+    _write_header(ws, headers)
     rows = [
         ("Deliverable", meta.get("deliverable", "Google Ads campaign skeleton (campaign-build)")),
         ("Date", meta.get("date", "")),
@@ -187,7 +241,10 @@ def tab_readme(wb, strategy, meta):
     ]
     for r in rows:
         ws.append(list(r))
-    _autosize(ws)
+    # README has a wide free-text "Value" column — give it room and wrap.
+    _style_body(ws, headers)
+    ws.column_dimensions["A"].width = 24
+    ws.column_dimensions["B"].width = 80
 
 
 def tab_campaign_settings(wb, strategy):
@@ -195,7 +252,7 @@ def tab_campaign_settings(wb, strategy):
     into a numeric 'Daily budget (DKK)' cell + a 'Budget rationale' cell so the number the
     CSV converter needs is never lost behind the prose rationale."""
     ws = wb.create_sheet("01 Campaign settings")
-    nets = strategy.get("networks", {})
+    nets = strategy.get("networks") or {}
     budget = strategy.get("budget_recommendation") or {}
     net_str = "; ".join(
         n for n, on in [("Search", nets.get("search")),
@@ -218,7 +275,7 @@ def tab_campaign_settings(wb, strategy):
         ("Do not optimize toward", strategy.get("do_not_optimize_toward", "")),
         ("Location", strategy.get("location", "")),
         ("Location option", strategy.get("location_option", "")),
-        ("Languages", "; ".join(strategy.get("languages", []))),
+        ("Languages", "; ".join(strategy.get("languages") or [])),
         ("Networks", net_str),
         ("Ad rotation", strategy.get("ad_rotation", "")),
         ("Start match types", strategy.get("start_match_types", "")),
@@ -227,9 +284,16 @@ def tab_campaign_settings(wb, strategy):
         ("Ad schedule", strategy.get("ad_schedule", "")),
         ("Tracking prerequisite", strategy.get("tracking_prerequisite", "")),
     ]
-    _write_header(ws, [h for h, _ in pairs])
+    headers = [h for h, _ in pairs]
+    _write_header(ws, headers)
     ws.append([str(v) for _, v in pairs])
-    _autosize(ws, max_width=45)
+    # One wide data row: wrap every cell so long values (rationale, prerequisite) stay readable
+    # without a 90-char column. _style_body handles banding/borders/freeze/filter/widths.
+    _style_body(ws, headers)
+    for c in range(1, len(headers) + 1):
+        ws.cell(row=2, column=c).alignment = WRAP_ALIGN
+        ws.column_dimensions[get_column_letter(c)].width = 22
+    ws.row_dimensions[2].height = 60
 
 
 def tab_ad_groups(wb, structuring):
@@ -253,7 +317,7 @@ def tab_ad_groups(wb, structuring):
             ag.get("max_cpc", ""),
             "; ".join(ag.get("angles", [])),
         ])
-    _autosize(ws)
+    _style_body(ws, cols)
 
 
 def tab_keywords(wb, structuring):
@@ -272,7 +336,7 @@ def tab_keywords(wb, structuring):
                 "Enabled after launch QA",
                 structuring.get("keyword_volume_disclaimer", ""),
             ])
-    _autosize(ws)
+    _style_body(ws, cols)
 
 
 def tab_negatives(wb, structuring):
@@ -284,8 +348,8 @@ def tab_negatives(wb, structuring):
             "Category", "Reason"]
     _write_header(ws, cols)
     campaign = structuring.get("campaign", "")
-    negs = structuring.get("negatives", {})
-    shared = negs.get("inherited_shared_list", {})
+    negs = structuring.get("negatives") or {}
+    shared = negs.get("inherited_shared_list") or {}
     # Reference line ONLY — the 277 terms are applied by reference, never enumerated here.
     if shared.get("apply_by_reference"):
         ws.append([
@@ -303,15 +367,16 @@ def tab_negatives(wb, structuring):
             n.get("text", ""), n.get("match_type", "broad"),
             n.get("category", ""), n.get("why", ""),
         ])
-    _autosize(ws)
+    _style_body(ws, cols)
 
 
 def tab_monitor(wb, structuring):
     ws = wb.create_sheet("05 Monitor negatives")
-    _write_header(ws, ["Candidate negative", "Default action", "Reason"])
-    for m in structuring.get("negatives", {}).get("monitor_first_candidates", []):
+    cols = ["Candidate negative", "Default action", "Reason"]
+    _write_header(ws, cols)
+    for m in (structuring.get("negatives") or {}).get("monitor_first_candidates") or []:
         ws.append([m.get("text", ""), "Monitor first", m.get("why", "")])
-    _autosize(ws)
+    _style_body(ws, cols)
 
 
 def _rsa_rows(rsa_manifest):
@@ -365,7 +430,13 @@ def tab_rsas(wb, structuring, rsa_manifest):
         row += [(hls[i] if i < len(hls) else "") for i in range(15)]
         row += [(descs[i] if i < len(descs) else "") for i in range(4)]
         ws.append(row)
-    _autosize(ws, max_width=40)
+    _style_body(ws, cols)
+    # Headline/description columns hold copy that should wrap and be readable for the client.
+    for idx, h in enumerate(cols, start=1):
+        if h.startswith(("Headline", "Description")):
+            ws.column_dimensions[get_column_letter(idx)].width = 26
+            for cell in ws[get_column_letter(idx)]:
+                cell.alignment = WRAP_ALIGN
 
 
 def tab_assets(wb, assets):
@@ -393,14 +464,15 @@ def tab_assets(wb, assets):
     for sn in assets.get("structured_snippets", []):
         ws.append([campaign, level, "Structured snippet", "", "", "", "", "",
                    sn.get("header", ""), "; ".join(sn.get("values", []))])
-    _autosize(ws)
+    _style_body(ws, cols)
 
 
 def tab_launch_qa(wb, strategy, structuring, adless_ad_groups=None):
     ws = wb.create_sheet("08 Launch QA")
-    _write_header(ws, ["Priority", "Check", "Owner", "Launch gate"])
-    nets = strategy.get("networks", {})
-    shared = structuring.get("negatives", {}).get("inherited_shared_list", {})
+    qa_cols = ["Priority", "Check", "Owner", "Launch gate"]
+    _write_header(ws, qa_cols)
+    nets = strategy.get("networks") or {}
+    shared = (structuring.get("negatives") or {}).get("inherited_shared_list") or {}
     rows = [
         ("Critical", strategy.get("tracking_prerequisite",
          "HubSpot form conversion fires into Google Ads"), "Tracking/analytics", "Must pass"),
@@ -437,14 +509,17 @@ def tab_launch_qa(wb, strategy, structuring, adless_ad_groups=None):
         ))
     for r in rows:
         ws.append(list(r))
-    _autosize(ws)
+    _style_body(ws, qa_cols)
 
 
 def tab_validation(wb, rsa_manifest):
     """Guard 2: recompute LEN + Pass independently against the imported limits."""
     ws = wb.create_sheet("09 Validation")
-    _write_header(ws, ["Area", "Ad group", "Ad label", "Field", "Text", "Length", "Limit", "Pass"])
+    val_cols = ["Area", "Ad group", "Ad label", "Field", "Text", "Length", "Limit", "Pass"]
+    _write_header(ws, val_cols)
     failures = 0
+    fail_rows = []  # row numbers to flag red AFTER styling (banding would otherwise overwrite)
+    pass_rows = []
     for ag, label, _url, paths, _hyp, hls, descs in _rsa_rows(rsa_manifest):
         items = (
             [("RSA headline", f"Headline {i+1}", t, HEADLINE_LIMIT) for i, t in enumerate(hls)]
@@ -459,11 +534,20 @@ def tab_validation(wb, rsa_manifest):
             if not ok:
                 failures += 1
             cell_row = ws.max_row + 1
-            ws.append([area, ag, label, field, text, length, limit, ok])
-            if not ok:
-                ws.cell(row=cell_row, column=8).fill = RED_FILL
-                ws.cell(row=cell_row, column=6).fill = RED_FILL
-    _autosize(ws, max_width=50)
+            ws.append([area, ag, label, field, text, length, limit, "Pass" if ok else "FAIL"])
+            (pass_rows if ok else fail_rows).append(cell_row)
+    _style_body(ws, val_cols)
+    # Re-apply the over-length flags ON TOP of the zebra banding (styling runs first).
+    for cell_row in fail_rows:
+        ws.cell(row=cell_row, column=8).fill = RED_FILL
+        ws.cell(row=cell_row, column=8).font = Font(bold=True, color=RED_TEXT)
+        ws.cell(row=cell_row, column=6).fill = RED_FILL
+        ws.cell(row=cell_row, column=5).fill = RED_FILL
+    for cell_row in pass_rows:
+        ws.cell(row=cell_row, column=8).font = Font(color=GREEN_TEXT)
+    ws.column_dimensions["E"].width = 50
+    for cell in ws["E"]:
+        cell.alignment = WRAP_ALIGN
     return failures
 
 
@@ -473,8 +557,8 @@ def write_overview(path, strategy, structuring, rsa_manifest, assets, date, adle
     one-liners left as {{model: ...}} slots for the skill to complete (findings are
     semantic, not mechanical). Template + rules: references/kampagne-overblik-template.md.
     ONE lead doc — do not also emit a separate import README."""
-    negs = structuring.get("negatives", {})
-    shared = negs.get("inherited_shared_list", {})
+    negs = structuring.get("negatives") or {}
+    shared = negs.get("inherited_shared_list") or {}
     ags = structuring.get("ad_groups", [])
     n_kw = sum(len(a.get("keywords", [])) for a in ags)
     n_rsa = sum(1 for _ in _rsa_rows(rsa_manifest))
@@ -504,10 +588,10 @@ def write_overview(path, strategy, structuring, rsa_manifest, assets, date, adle
         "## Vigtigste fund / flag (læs før go-live)",
     ]
     if adless:
-        lines.append(f"- ⚠️ Ad group(s) UDEN RSA (ingen annonce serveres): {', '.join(adless)} — "
+        lines.append(f"- ADVARSEL: Ad group(s) UDEN RSA (ingen annonce serveres): {', '.join(adless)} — "
                      "tilføj RSA eller fjern før aktivering (tab 08).")
     if failures:
-        lines.append(f"- ⚠️ {failures} felt(er) over hård tegngrænse — se fane 09 Validering (rød). "
+        lines.append(f"- ADVARSEL: {failures} felt(er) over hård tegngrænse — se fane 09 Validering (rød). "
                      "Ret før import.")
     lines += [
         "{{model: 2-5 one-liner-fund fra fane 08 + 09 + input-objekterne — fx udeladte "

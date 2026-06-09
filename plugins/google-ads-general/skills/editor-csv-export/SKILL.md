@@ -1,0 +1,135 @@
+---
+name: editor-csv-export
+description: Konvertér en klient-bekræftet campaign-build review-workbook (.xlsx fra assembler-skillen) til Google Ads Editor import-CSV'er. Anden halvdel af Excel-only-grænsen - assembler laver ÉN pæn Excel (klient-bekræftelses-artefaktet), denne skill dropper den bekræftede Excel ned til de flade per-entitet CSV'er Editor importerer (Editor importerer KUN CSV, ikke .xlsx). Ren transform - læser én lokal .xlsx, skriver op til 6 lokale .csv. Pusher ALDRIG til Google Ads API'et; mennesket importerer CSV'erne i Editor. Genkører de to hårde guards (ingen Broad/blank positiv keyword, LEN-tjek) fordi et menneske kan have redigeret Excel'en efter godkendelse. Den arvede 277-term delte negativliste kommer ALDRIG i en CSV - den tilknyttes by-reference i Editor. Brug når brugeren siger "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav import-filer", eller har en godkendt kampagne-workbook der skal importeres. Svarer på dansk.
+---
+
+# editor-csv-export
+
+Anden halvdel af **Excel-only-grænsen** i campaign-build (beslutning 2026-06-05). Kæden er:
+
+```
+campaign-build (Phase 1-4)  →  assembler  →  ÉN pæn .xlsx  →  [klient godkender]  →  THIS skill  →  6 Editor-CSV'er  →  [mennesket importerer i Editor]
+```
+
+`assembler` (i `google-ads-setup`) laver **én pæn workbook** — klient-bekræftelses-artefaktet,
+ofte den Excel der sendes til kunden for godkendelse. Når kunden har godkendt, læser **denne
+skill** den bekræftede workbook og dropper den ned til de flade per-entitet CSV'er Google Ads
+Editor importerer. **Editor importerer KUN CSV, ikke .xlsx**
+([answer 30564](https://support.google.com/google-ads/editor/answer/30564)) — det er hele grunden
+til at dette trin findes.
+
+**Ren transform:** læser ÉN lokal `.xlsx`, skriver op til 6 lokale `.csv`. Ingen Google Ads
+API-kald, intet push, ingen ekstern read/write. Mennesket importerer CSV'erne i Editor
+(Account → Import → From file) efter review.
+
+## Hård regel — pusher ALDRIG, mennesket importerer
+
+Denne skill rører ALDRIG Google Ads-kontoen. Den laver CSV-filer; et menneske importerer dem i
+Editor og kører **Check Changes** før **Post Changes**. Human-in-the-loop på hver ekstern write
+er ikke til forhandling (repo-CLAUDE.md).
+
+## Hvornår
+
+Triggerfraser: "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav
+import-filer", "gør workbooken klar til Editor", eller når en godkendt kampagne-workbook skal
+importeres.
+
+## Trin 0 — Kontekst
+
+Læs `references/editor-csv-contract.md` — målskemaet (hvilke CSV-kolonner der kommer fra hvilke
+workbook-celler), de to genkørte guards, negatives-non-flatten-reglen og de UNVERIFIED
+kolonnenavne. **Den vinder ved konflikt.** Dansk medmindre brugeren skriver engelsk.
+
+## Trin 1 — Find den bekræftede workbook
+
+Du skal bruge **den godkendte** `.xlsx` fra assembler-kørslen (ikke et udkast). Spørg brugeren om
+stien hvis den ikke er givet. Ligger den på Drive, så download den lokalt først (read, ingen
+gate) — scriptet læser en lokal fil.
+
+## Trin 2 — Kør konverteren
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/export_csv.py \
+  --workbook "Campaign - <klient> - <YYYY-MM-DD>.xlsx" \
+  --outdir ./editor-csv
+```
+
+Output: op til 6 CSV'er i `--outdir` + en JSON-opsummering på stdout.
+
+- **Exit 0:** alle CSV'er skrevet.
+- **Exit ≠ 0 (en guard stoppede):** INGEN CSV skrevet. Enten (a) en positiv keyword er blank/Broad
+  i workbooken, eller (b) et RSA-felt er over hård grænse (et menneske redigerede Excel'en efter
+  godkendelse). Ret i workbooken (fane 03 hhv. fane 06) og kør igen — overstyr aldrig guarden.
+
+### Hvorfor guards genkøres her
+
+De samme to guards kører i `assembler`, MEN et menneske kan have redigeret den bekræftede Excel
+mellem godkendelse og konvertering. En Broad-keyword eller en for-lang headline indført dér ville
+ellers sejle direkte ind i en CSV. Konverteren tjekker derfor igen ved SIN egen grænse
+(contract §6).
+
+## Trin 3 — De 6 CSV'er (én per entitet)
+
+| CSV | Fra workbook-fane | Editor-entitet |
+|---|---|---|
+| `campaigns.csv` | 01 Campaign settings | kampagne (status altid `Paused`) |
+| `adgroups.csv` | 02 Ad groups | ad groups (+ Max CPC) |
+| `keywords.csv` | 03 Keywords | positive keywords (Exact/Phrase, `Paused`) |
+| `negatives.csv` | 04 Negative keywords | **kun klient-specifikke** negatives |
+| `ads.csv` | 06 RSAs | RSA'er (Headline 1-15, Description 1-4, Path 1-2) |
+| `assets.csv` | 07 Assets | sitelinks / callouts / structured snippets |
+
+Faner der ALDRIG bliver en CSV: 00 README, 05 Monitor negatives, 08 Launch QA, 09 Validation
+(review-only metadata). Snippet-/keyword-review-kolonner (`Notes`, `Keyword display`, `Test
+hypothesis`, `Reason`, `Category`, `vinkel`/`hypotese`) droppes — kun rene Editor-headers
+overlever.
+
+## Trin 4 — Negatives-non-flatten (vigtigste regel)
+
+`negatives.csv` læser **KUN** fane-04's klient-specifikke rækker. Den:
+- **SPRINGER** linjen `[SHARED LIST APPLIED BY REFERENCE ...]` over — den er en reference-markør,
+  ikke en Editor-række. De 277 delte negative ord kommer **ALDRIG** i en CSV; de tilknyttes
+  by-reference i Editor (vedhæft den delte liste "Generelle negative søgeord" id `6688642473` til
+  kampagnen manuelt).
+- **Læser ALDRIG fane 05** (monitor-first-kandidater) — at committe dem er over-blokerings-skaden
+  Phase 2 bevidst undgår.
+
+Ser du de 277 i en CSV: stop — reglen er brudt.
+
+## Trin 5 — Output + import-vejledning
+
+Lever:
+1. **Stierne** til de skrevne CSV'er (+ rækketal per fil).
+2. **Import-rækkefølgen** (afhængigheder): `campaigns → adgroups → keywords → ads → assets →
+   negatives`. Kør **Check Changes** efter hver. I Editor: Account → Import → From file → vælg
+   CSV'en → tjek kolonne-headers (Editor auto-mapper engelske headers; ret i dropdown hvis nødvendigt)
+   → Import → Review imported changes.
+3. **Den delte negativliste tilknyttes manuelt** by-reference (id `6688642473`) — IKKE i nogen CSV.
+4. **Manuelt efter import:** sprog = Dansk, Denmark = Presence (ikke Presence-or-Interest),
+   verificér leadgen-konverteringshandlingen, status = **Paused**, kør launch-QA (workbookens
+   fane 08), enable først når alle Must-pass-gates er grønne.
+5. **UNVERIFIED-flag:** structured-snippet-headerens CSV-kolonnenavn (`Header` — kan være `Subject`
+   eller andet). Verificér via ÉN Editor-round-trip (eksportér en konto med en snippet, se den
+   faktiske header) før du stoler på den. Indtil da: hvis snippet-importen fejler, ret kun den ene
+   header-celle i CSV'en.
+
+## Hård sandheds-grænse (skriv aldrig "verificeret mod Google docs")
+
+Målskemaet (`references/editor-csv-contract.md` §-mapping) stammer fra Ians faktiske skeleton +
+assembler-kontrakten, IKKE fra Googles offentlige docs (de udskyder bevidst den fulde kolonneliste
+til "den næste artikel"). Den ærlige accept-test er **én rigtig Editor-import** (eller en
+eksport-diff fra en lille rigtig kampagne), ikke doc-læsning. En forkert-men-plausibel header
+degraderer til Editors manuelle mapping-dropdown, ikke stille korruption — så det er ikke
+alt-eller-intet, men kald det aldrig "verificeret" uden den ene rigtige import.
+
+## Maintenance
+
+- Transform-logik i `export_csv.py`; målskema + regler i `references/editor-csv-contract.md`. Ret
+  kun de to.
+- CSV-kolonnerne SKAL spore til workbook-cellerne. Ændrer `assembler`-fanerne kolonner, eller
+  tilføjes et felt, opdatér begge skills + denne kontrakt (de er tæt koblede par).
+- Læs workbooken **by header-navn, ikke kolonneindeks** — Editor-headers er case-/space-ufølsomme,
+  og by-navn-læsning gør konverteren immun mod kolonne-omrokering fra assembler-stylingen.
+- 30/90/15-grænserne er de eneste duplikerede konstanter (Google-faste, ikke et Inbound-valg);
+  assembler importerer dem fra `sheet_layout.py`, men cross-plugin-import virker ikke i Cowork, så
+  de tre heltal er gentaget her med vilje.

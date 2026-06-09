@@ -1,7 +1,7 @@
 {
   "name": "google-ads-general",
-  "description": "Google Ads GENERAL reporting skills for Inbound CPH: standalone deliverables that aren't tied to building or tuning a single campaign. ads-audit-report (full paid-search audit → polished HTML slide deck + rendered PDF), ads-changelog (build a changelog/optimeringslog entry from Google Ads' own change-history — per client, or per specialist across their accounts — collapse bulk uploads, format-matched draft to paste into the client's Drive changelog). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns see google-ads-setup; for live-account tuning see google-ads-optimization. Danish-default.",
-  "version": "1.0.0",
+  "description": "Google Ads GENERAL deliverables for Inbound CPH: standalone outputs that aren't tied to building or tuning a single campaign. ads-audit-report (full paid-search audit to a polished HTML slide deck + rendered PDF), ads-changelog (build a changelog/optimeringslog entry from Google Ads' own change-history — per client, or per specialist across their accounts — collapse bulk uploads, format-matched draft to paste into the client's Drive changelog), editor-csv-export (convert a client-confirmed campaign-build review workbook from google-ads-setup's assembler into the per-entity Google Ads Editor import CSVs — Editor imports CSV only, not .xlsx; pure transform, re-runs the no-Broad + length guards, never pushes to the account). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns see google-ads-setup; for live-account tuning see google-ads-optimization. Danish-default.",
+  "version": "1.1.0",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

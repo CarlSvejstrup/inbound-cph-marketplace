@@ -5,7 +5,7 @@
     {
       "name": "google-ads-setup",
       "source": "./plugins/google-ads-setup",
-      "description": "Build a new Google Ads campaign end-to-end: research, structure, creative, assembled workbook + Editor CSVs (and the RSA copy engine)."
+      "description": "Build a new Google Ads campaign end-to-end: research, structure, creative, and a polished assembled review workbook (and the RSA copy engine). Editor CSVs are produced from the confirmed workbook by google-ads-general's editor-csv-export."
     },
     {
       "name": "google-ads-optimization",
@@ -15,7 +15,7 @@
     {
       "name": "google-ads-general",
       "source": "./plugins/google-ads-general",
-      "description": "General Google Ads reporting: full audit reports (slide deck + PDF) and change-log generation from Ads change-history."
+      "description": "General Google Ads deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and editor-csv-export (confirmed campaign-build workbook -> Google Ads Editor import CSVs)."
     }
   ]
 }

@@ -1,6 +1,6 @@
 ---
 name: assembler
-description: Phase-4-barrieren i campaign-build der fletter de fire upstream-outputs (campaign-strategy, structuring, rsa-manifest, assets) til Ians 10-fane review-workbook (Excel-only), kører QA/validering, og stopper ved review-artefaktet. Pusher ALDRIG til Google Ads API'et. Workbooken er klient-bekræftelses-artefaktet; Editor-CSV'er genereres SENERE fra den bekræftede Excel af google-ads-general-konverteringsskillen. Workbooken er et tabsfrit superset (Max CPC, numerisk budget, negativ-level, per-type asset-kolonner). Den arvede 277-term delte negativliste påføres by-reference, aldrig enumereret. Brug når brugeren siger "saml kampagnen", "assembler", "byg review-workbook", "flet alt sammen", eller afslutter en campaign-build-kørsel. Svarer på dansk.
+description: Phase-4-barrieren i campaign-build der fletter de fire upstream-outputs (campaign-strategy, structuring, rsa-manifest, assets) til Ians 10-fane review-workbook (Excel-only), kører QA/validering, og stopper ved review-artefaktet. Pusher ALDRIG til Google Ads API'et. Workbooken er klient-bekræftelses-artefaktet; Editor-CSV'er genereres SENERE fra den bekræftede Excel af google-ads-general-skillen `editor-csv-export`. Workbooken er et tabsfrit superset (Max CPC, numerisk budget, negativ-level, per-type asset-kolonner). Den arvede 277-term delte negativliste påføres by-reference, aldrig enumereret. Brug når brugeren siger "saml kampagnen", "assembler", "byg review-workbook", "flet alt sammen", eller afslutter en campaign-build-kørsel. Svarer på dansk.
 ---
 
 # assembler
@@ -17,8 +17,8 @@ Hele transform-logikken bor i `assemble.py`; alle fane-kontrakter + de hårde re
 
 Assembleren producerer KUN workbooken (beslutning 2026-06-05). Workbooken er
 klient-bekræftelses-artefaktet — det er ofte den Excel der sendes til kunden for godkendelse.
-**Editor-CSV'er genereres SENERE**, fra den bekræftede Excel, af konverteringsskillen i
-`google-ads-general` (Excel-upload → 6 Editor-CSV'er). Derfor er workbooken et **tabsfrit
+**Editor-CSV'er genereres SENERE**, fra den bekræftede Excel, af `editor-csv-export`-skillen i
+`google-ads-general` (Excel → op til 6 Editor-CSV'er). Derfor er workbooken et **tabsfrit
 superset**: hvert felt en CSV skal bruge har en dedikeret celle (Max CPC, numerisk dagsbudget,
 negativ-level/ad-group, asset-level, per-type asset-kolonner). `CSV = kun Editor-skema`-grænsen
 bor nu i konverteren, ikke her.
