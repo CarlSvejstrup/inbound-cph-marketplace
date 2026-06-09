@@ -1,7 +1,7 @@
 {
   "name": "google-ads-optimization",
-  "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), search-terms (search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list). All read-only against Google Ads (recommend-only, never writes to the account). For building NEW campaigns see google-ads-setup; for audit reports + change-logs see google-ads-general. Danish-default.",
-  "version": "2.0.0",
+  "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), search-terms (search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list), optimering-loop (runs the whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score in parallel → ONE editable Excel workbook the expert edits, then editor-csv-export makes the Editor CSVs; v1 is diagnose→workbook, the measure/closed-loop phase is v2). All read-only against Google Ads (recommend-only, never writes to the account; every RSA suggestion is a NEW challenger, never an in-place edit). For building NEW campaigns see google-ads-setup; for audit reports + change-logs + the workbook→CSV converter see google-ads-general. Danish-default.",
+  "version": "2.1.0",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

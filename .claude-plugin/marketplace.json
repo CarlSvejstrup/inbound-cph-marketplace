@@ -10,7 +10,7 @@
     {
       "name": "google-ads-optimization",
       "source": "./plugins/google-ads-optimization",
-      "description": "Optimize live Google Ads accounts: post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining."
+      "description": "Optimize live Google Ads accounts: post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining, plus optimering-loop (the whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score → one editable Excel workbook)."
     },
     {
       "name": "google-ads-general",

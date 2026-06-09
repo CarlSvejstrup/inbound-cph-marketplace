@@ -1,11 +1,19 @@
 # optimization-loop
 
-A **local Claude Code Workflow** that diagnoses a live Google Ads account across parallel
-dimensions, then chains the findings into Google Ads Editor import CSVs for human review.
+> **SUPERSEDED (2026-06-09) — this is the kept-for-history dev prototype, not the canonical
+> path.** The loop now ships as a Cowork plugin skill:
+> `plugins/google-ads-optimization/skills/optimering-loop/`. That skill is canonical and bundles
+> its own copies of `lib/` (gaql + review_workbook + taxonomy); its Python pipeline was verified
+> end-to-end against live DSC (diagnostics → workbook → CSV). **Do not maintain both** — make
+> changes in the skill. This Workflow remains only as the throwaway harness that proved the
+> agent→MCP→schema→workbook pattern; `lib/builders/load.py` here is dead code (the Excel-refactor
+> execute stage never calls it). v1 of the skill is diagnose→workbook; the measure/closed-loop
+> phase is v2 (needs a run-persistence design).
 
-This is a Carl-local dev/ops harness, **not** a Cowork product. It reuses the shipped skills'
-logic (`search-terms`, `annonce-optimering`, `responsive-search-ads`) as a single source of
-truth without modifying them; the skills ship to Cowork independently. Full design rationale:
+A **local Claude Code Workflow** that diagnoses a live Google Ads account across parallel
+dimensions, then chains the findings into ONE editable Excel workbook for human review.
+
+This was a Carl-local dev/ops harness, **not** a Cowork product. Full design rationale:
 [`SPEC.md`](./SPEC.md).
 
 ## What it does
