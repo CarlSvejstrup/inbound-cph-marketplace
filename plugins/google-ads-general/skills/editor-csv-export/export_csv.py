@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Convert a confirmed campaign-build review workbook into Google Ads Editor import CSVs.
+"""Convert a confirmed Google Ads review workbook into Google Ads Editor import CSVs.
 
-This is the SECOND half of the Excel-only boundary (decision 2026-06-05): the campaign-build
-`assembler` (in google-ads-setup) emits ONE styled .xlsx — the client-confirmation artifact.
-After the client signs off, THIS converter reads that confirmed workbook and drops it to the
-flat per-entity CSVs Google Ads Editor imports. Editor imports CSV only, never .xlsx
-(support.google.com/google-ads/editor/answer/30564), which is the whole reason this step exists.
+The SHARED workbook->CSV converter for BOTH workflows. Editor imports CSV only, never .xlsx
+(support.google.com/google-ads/editor/answer/30564), so each workflow ships a human-editable
+Excel for review and THIS converter drops the confirmed Excel to the flat per-entity CSVs
+Editor imports. It reads two workbook dialects on one contract (it just recognizes both):
+  - SETUP    (google-ads-setup):     campaign-build assembler workbook — a full new campaign
+             (Campaign settings, Ad groups, Keywords, Negatives, RSAs, Assets).
+  - OPTIMIZE (optimization-loop):    review_workbook — a subset (Negative keywords, promoted
+             winner Keywords, RSA challengers); no campaign settings / ad groups / assets.
+Both workbooks speak the SAME per-entity Editor vocabulary (harmonized 2026-06-09), so the same
+builders run on either — one converter, no fork. It lives in google-ads-general precisely because
+it serves both setup and optimization (Cowork can't share the .py cross-plugin, so a per-plugin
+copy would guarantee drift).
 
 Pure transform: reads ONE local .xlsx, writes up to 6 local .csv files. No Google Ads API call,
 no push, no external read/write. The human imports the CSVs in Editor (Account > Import > From
@@ -308,8 +315,10 @@ def build_assets(asset_rows):
 
 # --------------------------------------------------------------------------- main
 def main():
-    ap = argparse.ArgumentParser(description="Confirmed campaign-build workbook -> Editor CSVs.")
-    ap.add_argument("--workbook", required=True, help="the confirmed .xlsx from the assembler")
+    ap = argparse.ArgumentParser(
+        description="Confirmed review workbook -> Editor CSVs (setup assembler OR optimization-loop).")
+    ap.add_argument("--workbook", required=True,
+                    help="the confirmed .xlsx (campaign-build assembler or optimization-loop review_workbook)")
     ap.add_argument("--outdir", required=True, help="directory to write the CSVs into")
     args = ap.parse_args()
 

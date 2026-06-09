@@ -4,7 +4,7 @@ Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships
 
 - **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → a polished, client-shareable review workbook). Editor CSVs come from `google-ads-general`'s `editor-csv-export`.
 - **`google-ads-optimization`** — optimize a LIVE Google Ads account (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining).
-- **`google-ads-general`** — standalone deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and `editor-csv-export` (confirmed campaign-build workbook → Google Ads Editor import CSVs).
+- **`google-ads-general`** — standalone deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and `editor-csv-export` (the shared converter: a confirmed review workbook from EITHER setup's `assembler` OR the optimization-loop → Google Ads Editor import CSVs).
 
 All share one operating contract (`CLAUDE.md`) and company context (`context/`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account; humans import the artifacts after approval.
 
@@ -50,7 +50,7 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 |---|---|
 | `ads-audit-report` | Full paid-search audit → polished HTML slide deck + rendered PDF report |
 | `ads-changelog` | Build a changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
-| `editor-csv-export` | Convert a client-confirmed campaign-build review workbook (the `assembler` Excel) → the per-entity Google Ads Editor import CSVs. Pure transform, re-runs the no-Broad + length guards, never pushes to the account |
+| `editor-csv-export` | The **shared** converter for both workflows: a confirmed review workbook — from setup's `assembler` (full new campaign) OR the optimization-loop `review_workbook` (subset) → the per-entity Google Ads Editor import CSVs. Reads both dialects on one contract. Pure transform, re-runs the no-Broad + length guards, never pushes to the account |
 
 ## Data integration
 

@@ -5,22 +5,29 @@ description: Konvertér en bekræftet Google Ads review-workbook (.xlsx) til Goo
 
 # editor-csv-export
 
-Anden halvdel af **Excel-only-grænsen** i campaign-build (beslutning 2026-06-05). Kæden er:
+Den **delte workbook→CSV-konverter** for begge Google Ads-workflows. Editor importerer KUN CSV,
+ikke .xlsx ([answer 30564](https://support.google.com/google-ads/editor/answer/30564)) — så begge
+workflows leverer en pæn, menneske-redigerbar Excel til review, og DENNE skill dropper den
+bekræftede Excel ned til de flade per-entitet CSV'er Editor faktisk importerer.
 
 ```
-campaign-build (Phase 1-4)  →  assembler  →  ÉN pæn .xlsx  →  [klient godkender]  →  THIS skill  →  6 Editor-CSV'er  →  [mennesket importerer i Editor]
+SETUP (google-ads-setup):     campaign-build → assembler       → fuld .xlsx        ─┐
+OPTIMIZE (optimization-loop):  live-analyse   → review_workbook  → delmængde .xlsx   ─┤
+                                                                  [mennesket bekræfter/redigerer]
+                                              editor-csv-export → op til 6 Editor-CSV'er → [import i Editor]
 ```
 
-`assembler` (i `google-ads-setup`) laver **én pæn workbook** — klient-bekræftelses-artefaktet,
-ofte den Excel der sendes til kunden for godkendelse. Når kunden har godkendt, læser **denne
-skill** den bekræftede workbook og dropper den ned til de flade per-entitet CSV'er Google Ads
-Editor importerer. **Editor importerer KUN CSV, ikke .xlsx**
-([answer 30564](https://support.google.com/google-ads/editor/answer/30564)) — det er hele grunden
-til at dette trin findes.
+**Hvorfor ÉN delt skill (ikke én per workflow):** begge workbooks taler bevidst SAMME
+Editor-vokabular per entitet (Campaign / Level / Ad group / Negative keyword / Match type;
+Headline 1-15; osv. — harmoniseret 2026-06-09). Konverteren udleder hvilke CSV'er den skriver fra
+hvilke faner der findes — ingen fork, ingen duplikeret builder-logik, ingen drift. Den bor i
+`google-ads-general` netop fordi den tjener både setup OG optimization. (Cowork kan ikke dele
+`.py` på tværs af plugins, så en kopi i hvert plugin ville garantere drift — derfor én delt skill,
+ikke en setup-specifik.)
 
 **Ren transform:** læser ÉN lokal `.xlsx`, skriver op til 6 lokale `.csv`. Ingen Google Ads
 API-kald, intet push, ingen ekstern read/write. Mennesket importerer CSV'erne i Editor
-(Account → Import → From file) efter review.
+(Account → Import → From file) efter review. Dialekt-detaljen står lige nedenfor.
 
 ## To workbook-dialekter, én kontrakt
 
