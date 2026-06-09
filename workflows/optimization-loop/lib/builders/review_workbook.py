@@ -51,16 +51,37 @@ def _ensure_openpyxl():
 
 _ensure_openpyxl()
 import openpyxl  # noqa: E402
-from openpyxl.styles import Alignment, Font, PatternFill  # noqa: E402
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
 
-# --- styling (matches the review-sheet house look: blue header, wrap) ---
-HEADER_BG = "1F4E78"
-META_BG = "D9E1F2"          # metadata columns get a lighter header so the expert sees the divide
-HEADER_FONT = Font(bold=True, color="FFFFFF")
-META_FONT = Font(bold=True, color="1F4E78")
-TITLE_FONT = Font(bold=True, size=14)
-WRAP = Alignment(wrap_text=True, vertical="top")
+# --- Visual design system: SAME house look as the setup assembler workbook (assemble.py) ---
+# Inbound dark-navy header, white bold text, soft zebra banding, thin grid, freeze + autofilter.
+# The ONE optimizer-specific addition kept from before: a two-band header — Editor-bound columns
+# get the full navy header (the converter KEEPS them), metadata columns get a lighter navy-tinted
+# header (the converter DROPS them), so the expert can see at a glance which columns import.
+NAVY = "1F2A44"          # Inbound dark navy (Editor-bound header)
+NAVY_TEXT = "FFFFFF"
+META_BG = "DCE3F0"       # lighter navy-tint header for metadata (converter-dropped) columns
+META_TEXT = "1F2A44"
+BAND_FILL = "F4F6FA"     # very light blue-grey zebra band for odd data rows
+TITLE_FONT = Font(bold=True, size=14, color=NAVY)
+
+HEADER_FILL = PatternFill(start_color=NAVY, end_color=NAVY, fill_type="solid")
+META_FILL = PatternFill(start_color=META_BG, end_color=META_BG, fill_type="solid")
+BAND_PATTERN = PatternFill(start_color=BAND_FILL, end_color=BAND_FILL, fill_type="solid")
+HEADER_FONT = Font(bold=True, color=NAVY_TEXT, size=11)
+META_FONT = Font(bold=True, color=META_TEXT, size=11)
+_THIN = Side(style="thin", color="D6DBE6")
+CELL_BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
+WRAP_ALIGN = Alignment(horizontal="left", vertical="top", wrap_text=True)
+TOP_ALIGN = Alignment(horizontal="left", vertical="top")
+
+# Metadata columns that hold prose and should wrap at a comfortable width (not autosize wide).
+WRAP_COLS = {"Begrundelse", "Reason", "Niveau (oprindeligt)"}
+WIDE_WIDTH = 48
+NARROW_MAX = 30
+
 _MATCH = {"EXACT": "Exact", "PHRASE": "Phrase", "BROAD": "Broad"}
 
 
@@ -73,26 +94,56 @@ def _fill(hexv):
 
 
 def _sheet(wb, title, editor_headers, meta_headers, rows, widths=None):
-    """Write one entity tab. editor_headers get the dark header (converter KEEPS);
-    meta_headers get the light header (converter DROPS). rows are dicts keyed by header."""
+    """Write one entity tab in the shared house style. editor_headers get the navy header
+    (converter KEEPS); meta_headers get the lighter navy-tint header (converter DROPS). Zebra
+    banding, thin grid, freeze header (A2), autofilter. Row 1 stays the header row (the converter
+    reads headers from row 1 — never insert a banner row above the data)."""
     ws = wb.create_sheet(title)
     headers = editor_headers + meta_headers
+    editor_set = set(editor_headers)
+    # Header row (row 1).
     for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=c, value=h)
-        cell.alignment = WRAP
-        if h in editor_headers:
-            cell.fill = _fill(HEADER_BG)
+        cell.alignment = HEADER_ALIGN
+        cell.border = CELL_BORDER
+        if h in editor_set:
+            cell.fill = HEADER_FILL
             cell.font = HEADER_FONT
         else:
-            cell.fill = _fill(META_BG)
+            cell.fill = META_FILL
             cell.font = META_FONT
+    ws.row_dimensions[1].height = 28
+    # Body rows + zebra banding + borders + alignment.
+    wrap_idx = {i for i, h in enumerate(headers, start=1) if h in WRAP_COLS}
     for r, row in enumerate(rows, start=2):
+        band = (r % 2 == 1)  # band odd data rows for subtle contrast
         for c, h in enumerate(headers, start=1):
-            ws.cell(row=r, column=c, value=row.get(h, "")).alignment = WRAP
-    if widths:
-        for i, w in enumerate(widths, start=1):
-            ws.column_dimensions[get_column_letter(i)].width = w
+            cell = ws.cell(row=r, column=c, value=row.get(h, ""))
+            cell.border = CELL_BORDER
+            cell.alignment = WRAP_ALIGN if c in wrap_idx else TOP_ALIGN
+            if band:
+                cell.fill = BAND_PATTERN
+    # Freeze header + autofilter over the used range.
+    ncols = len(headers)
     ws.freeze_panes = "A2"
+    if ncols >= 1:
+        ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}{max(ws.max_row, 1)}"
+    # Column widths: explicit widths win; else wrap prose at WIDE_WIDTH, autosize the rest.
+    for i, h in enumerate(headers, start=1):
+        letter = get_column_letter(i)
+        if widths and i - 1 < len(widths):
+            ws.column_dimensions[letter].width = widths[i - 1]
+            continue
+        if h in WRAP_COLS:
+            ws.column_dimensions[letter].width = WIDE_WIDTH
+            continue
+        widest = len(str(h))
+        for cell in ws[letter]:
+            v = cell.value
+            if v is None or str(v).startswith("="):
+                continue
+            widest = max(widest, len(str(v)))
+        ws.column_dimensions[letter].width = max(10, min(NARROW_MAX, widest + 3))
     return ws
 
 
@@ -111,8 +162,13 @@ RSA_EDITOR = (["Campaign", "Ad group", "Ad type", "Final URL", "Path 1", "Path 2
 
 def _readme_sheet(wb, client, account_id, period, today, account_level_notes=None):
     ws = wb.create_sheet("Laes mig", 0)
+    # Navy title banner to match the house look (this tab is never read by the converter, so
+    # a styled single-cell banner is safe). Title text white-on-navy, taller row.
     ws["A1"] = f"Optimerings-forslag — {client}"
-    ws["A1"].font = TITLE_FONT
+    ws["A1"].fill = HEADER_FILL
+    ws["A1"].font = Font(bold=True, size=14, color=NAVY_TEXT)
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 32
     lines = [
         "",
         f"Konto: {account_id}    Periode: {period}    Genereret: {today}",
@@ -221,9 +277,10 @@ def build(data, out_path):
     # computed in the negatives loop above.
     _readme_sheet(wb, client, account_id, period, today, account_level_notes)
 
+    # No explicit widths: the shared style system autosizes short columns and wraps the prose
+    # column (Begrundelse) at a comfortable width, exactly like the setup assembler workbook.
     _sheet(wb, "Negative keywords", NEGATIVES_EDITOR,
-           ["Niveau (oprindeligt)", "Spildt budget (DKK)", "Begrundelse"], neg_rows,
-           widths=[26, 10, 22, 28, 12, 22, 18, 60])
+           ["Niveau (oprindeligt)", "Spildt budget (DKK)", "Begrundelse"], neg_rows)
 
     # --- Keyword expansion tab (promote winners to Exact, Paused) ---
     kw_rows = []
@@ -240,8 +297,7 @@ def build(data, out_path):
             "Begrundelse": w.get("reason", ""),
         })
     _sheet(wb, "Nye keywords (vindere)", KEYWORDS_EDITOR,
-           ["Konverteringer", "CPA (DKK)", "Begrundelse"], kw_rows,
-           widths=[26, 22, 28, 12, 10, 13, 11, 60])
+           ["Konverteringer", "CPA (DKK)", "Begrundelse"], kw_rows)
 
     # --- RSA challengers tab ---
     # EVERY RSA change is a NET-NEW challenger (Paused), never an in-place edit. Rationale
