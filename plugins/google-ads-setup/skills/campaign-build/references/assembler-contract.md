@@ -24,7 +24,7 @@ kept here so the workbook columns and the CSV columns stay traceable to each oth
 |---|---|---|
 | `campaign-strategy.json` | Phase 1 campaign-strategy | campaign, type, goal, budget, bidding, geo, languages, networks, conversion action, tracking_prerequisite, match-type policy |
 | `structuring.json` | Phase 2 structuring | ad_groups[] (name, temperature, landing_page_url, theme, keywords[{text,match_type}], angles[], keyword_seeds_for_rsa[]), negatives{inherited_shared_list, client_specific_additions, monitor_first_candidates}, keyword_volume_disclaimer, structure_rationale |
-| rsa manifest (`rsa_artifacts`) | Phase 3 rsa-copywriter | per ad group: ad_group, ads_json path, xlsx, n_rsas, final_url; each ads.json has headlines[15]/descriptions[4]/paths[2]/vinkel/hypotese per RSA |
+| rsa manifest (`rsa_artifacts`) | Phase 3 `05-rsa-copy` | per ad group: ad_group, ads_json path, n_rsas, final_url; each ads.json has headlines[15]/descriptions[4]/paths[2]/vinkel/hypotese per RSA |
 | `assets.json` | Phase 3 assets | campaign, attachment_level, sitelinks[], callouts[], structured_snippets[], lead_form{csv_importable:false} |
 
 **Reconcile FIRST.** All four share `campaign` — assert it matches across all four before
@@ -135,13 +135,16 @@ a straight copy.
    or `Phrase`. If any row's match type is blank/missing/Broad, the assembler REFUSES to build
    and reports which rows. The silent-Broad trap caught at the boundary.
 2. **Recompute tab 09 independently.** Do NOT trust fill-sheet's earlier gate. Recompute
-   LEN + Pass for every headline (30) / description (90) / path (15) against the limits
-   imported from `sheet_layout.py`. Catches any human edit between Phase 3 and assembly. Any
+   LEN + Pass for every headline (30) / description (90) / path (15) against the limit
+   constants in `assemble.py`. Catches any human edit between Phase 3 and assembly. Any
    `Pass=False` row → flag prominently; the workbook still builds but the failure is loud.
 
-Limits (30/90/15) and the LEN+red-CF technique are IMPORTED from
-`responsive-search-ads/sheet_layout.py` (FIELDS owns them) — never retype them here. Reuse the
-limits + CF pattern, not `build_sheet` itself (it's RSA-specific).
+Limits (30/90/15) are Google's externally-fixed RSA caps, declared as named constants
+(`HEADLINE_LIMIT`/`DESCRIPTION_LIMIT`/`PATH_LIMIT`) in `assemble.py`. The script is
+self-contained — it does NOT import `responsive-search-ads/sheet_layout.py` (decoupled: a
+cross-skill dynamic import just to read three never-changing integers was needless coupling).
+The same three values are mirrored in `sheet_layout.py` FIELDS; if Google ever changes a cap,
+update both. The LEN+red-CF technique is reimplemented locally with openpyxl, not imported.
 
 **Both guards MUST re-run in the converter.** A human can edit the confirmed Excel between
 assembly and conversion — a Broad keyword or over-length headline introduced there would
@@ -160,9 +163,10 @@ converter's inputs; the converter re-checks at its own boundary.
   breakdown). Tab 08 already carries Ian's "Final URLs and UTM convention approved" Should-pass
   gate, so the gap is covered AS A GATE even though the assembler doesn't emit UTMs. Source the
   template from Nur/Social later. Does NOT block Phase 4.
-- **No live-Cowork end-to-end run** + **rsa-copywriter intake-injection assumption** — both
-  remain known unknowns (parked by Carl). The assembler smoke-test (below) tests the TRANSFORM,
-  not the full live chain.
+- **No live-Cowork end-to-end run** + **`05-rsa-copy` intake-injection assumption** (the
+  reference injects per-ad-group intake into the `responsive-search-ads` skill) — both remain
+  known unknowns (parked by Carl). The assembler smoke-test (below) tests the TRANSFORM, not the
+  full live chain.
 
 ---
 

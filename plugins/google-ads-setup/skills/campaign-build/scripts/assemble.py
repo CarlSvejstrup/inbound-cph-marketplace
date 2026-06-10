@@ -12,9 +12,12 @@ field a CSV needs has a dedicated workbook cell (Max CPC, numeric daily budget, 
 level/ad-group, per-type asset columns). The CSV = Editor-schema-only boundary now lives in
 the converter, not here.
 
-Reuses the hard field limits (headline 30 / description 90 / path 15) and the LEN+red
-conditional-formatting technique from responsive-search-ads/sheet_layout.py — there is one
-source of truth for those, not a retyped copy here.
+The hard field limits (headline 30 / description 90 / path 15) are Google's externally-fixed
+RSA caps, declared here as named constants. This script is self-contained: it does NOT import
+responsive-search-ads/sheet_layout.py (that kept the assembler coupled to another skill for the
+sake of three never-changing integers). The same three values are mirrored in
+responsive-search-ads/sheet_layout.py FIELDS; if Google ever changes a cap, update both. Guard 2
+(tab 09) re-checks every field against these limits at emit time as defense-in-depth.
 
 Two hard emit-time guards (defense-in-depth, see references/assembler-contract.md):
   1. Every positive keyword row must have an explicit Exact or Phrase match type. A blank /
@@ -29,37 +32,47 @@ reference (a tab-08 launch-gate line + a single reference line in tab 04). Only 
 additions become negative rows. Monitor-first candidates go to tab 05 only.
 """
 import argparse
-import importlib.util
 import json
 import os
+import subprocess
 import sys
 
-# --- import the RSA layout module for the limits + CF technique (single source of truth) ---
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_RSA_LAYOUT = os.path.normpath(
-    os.path.join(_HERE, "..", "responsive-search-ads", "sheet_layout.py")
-)
+
+# --- openpyxl bootstrap (self-contained) -----------------------------------------------------
+# campaign-build/scripts/ owns its dependency outright: the assembler no longer imports
+# responsive-search-ads/sheet_layout.py, so it can no longer rely on that module's bootstrap to
+# pip-install openpyxl as a side effect. A requirements.txt alone is not reliably honoured in the
+# Cowork runtime (that is exactly why sheet_layout.py carries this same install-on-first-run
+# pattern) — so we replicate it here. requirements.txt sits beside this file as the declarative
+# record; this function is what actually guarantees openpyxl is importable on any Python 3 + pip
+# machine without a manual setup step.
+def _ensure_openpyxl():
+    try:
+        import openpyxl  # noqa: F401
+        return
+    except ImportError:
+        pass
+    print("openpyxl not found - installing...", file=sys.stderr)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--quiet", "openpyxl>=3.1"],
+        check=True,
+    )
 
 
-def _load_rsa_layout():
-    spec = importlib.util.spec_from_file_location("rsa_sheet_layout", _RSA_LAYOUT)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_layout = _load_rsa_layout()  # also pip-installs openpyxl on first run via its bootstrap
+_ensure_openpyxl()
 import openpyxl  # noqa: E402
 from openpyxl.formatting.rule import CellIsRule  # noqa: E402
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
 
-# Hard limits derived from the RSA layout's FIELDS — never retyped. FIELDS entries are
-# (header, limit-or-None); the limit on "Headline 1"/"Description 1"/"Path 1" is the cap.
-_LIMITS = {h.split()[0]: lim for h, lim in _layout.FIELDS if lim is not None}
-HEADLINE_LIMIT = _LIMITS["Headline"]      # 30
-DESCRIPTION_LIMIT = _LIMITS["Description"]  # 90
-PATH_LIMIT = _LIMITS["Path"]               # 15
+# Hard RSA field limits. These are Google's externally-fixed Responsive Search Ad caps, not
+# layout logic — so they live here as named constants rather than being imported from another
+# skill. Canonical mirror of the same three values: responsive-search-ads/sheet_layout.py FIELDS.
+# If Google ever changes a cap, update both. Guard 2 (tab 09) re-checks every field against these
+# at emit time, so a stale constant cannot ship an over-length field silently.
+HEADLINE_LIMIT = 30
+DESCRIPTION_LIMIT = 90
+PATH_LIMIT = 15
 
 SHARED_NEG_NAME = "Generelle negative søgeord"
 SHARED_NEG_ID = "6688642473"

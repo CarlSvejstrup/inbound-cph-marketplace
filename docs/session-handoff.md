@@ -1,3 +1,64 @@
+# Session handoff — 2026-06-10 (campaign-build consolidation: google-ads-setup 9→5 skills)
+
+## Current state (2026-06-10, end of session)
+
+- **Branch:** `feat/campaign-build-consolidation` (branched off `main`). NOT pushed, NOT merged —
+  Carl asked to keep it on the branch until he reviews. **Caveat:** the repo automation
+  fast-forwards feature branches to main (see the 2026-06-09 note below); confirm with Carl before
+  relying on this branch as a long-lived holding pen, or it may get auto-merged.
+- **Marketplace:** 3 plugins — `google-ads-setup` (**5 skills now, v2.0.0** — was 9 at v1.2.0),
+  `google-ads-optimization` (2 skills), `google-ads-general` (3 skills, v1.1.0).
+
+### What changed this session — campaign-build consolidation
+
+`google-ads-setup` went from **9 flat skills → 5**, on the per-step axis "is this ever invoked
+solo, or only as pipeline plumbing?" (Carl drove the design over several turns).
+
+- **NEW `campaign-build/`** — the orchestrator. Owns the broad "byg en hel kampagne" entry point.
+  Runs Phase 1→4 by dispatching a **subagent per phase reference** (pipeline-mode → JSON between
+  phases), with the one human-gate at Phase 2. The full pipeline logic lives here as granular
+  references + scripts, NOT as separate skills:
+  - `references/` — `pipeline-flow.md` (the dispatch + data contract) + 7 granular phase refs
+    (`01-landing-page`, `02-competitor`, `03-campaign-strategy`, `04-structuring`, `05-rsa-copy`,
+    `06-assets`, `07-assembler`) + the 8 migrated deep contracts (page-extraction, structuring-rules,
+    asset-rules, assembler-contract, campaign-settings-defaults, generelle-negative-eksempel,
+    kampagne-overblik-template, page-extraction-schema.json).
+  - `scripts/` — `assemble.py` (moved from the old `assembler/` skill) + `requirements.txt`.
+- **`research/` (NEW, merged)** — thin-shell standalone skill = `01`+`02`+`03` (landing-page +
+  competitor + campaign-strategy). Solo-mode emits a `.docx`. Semrush research was **cut** (no plan).
+- **`structuring/` + `assets/`** — rewritten as thin-shell standalone skills that read their
+  granular reference from `../campaign-build/references/` and emit an `.xlsx` in solo-mode.
+- **`responsive-search-ads/`** — UNTOUCHED (script-heavy + cross-plugin dep of optimization-loop).
+  `05-rsa-copy` invokes it per ad group (replacing the dropped `rsa-copywriter`).
+- **Removed:** `landing-page-analyzer`, `competitor-research`, `campaign-strategy`, `semrush-research`
+  (cut), `rsa-copywriter` (dropped — campaign-build calls responsive-search-ads directly), standalone
+  `assembler` skill (now a campaign-build reference + script). All recoverable from git history.
+
+**Key engineering decision — `assemble.py` decoupled.** It no longer dynamically imports
+`responsive-search-ads/sheet_layout.py`. The three RSA limits (30/90/15) are Google's externally-fixed
+caps → now named constants (`HEADLINE_LIMIT`/`DESCRIPTION_LIMIT`/`PATH_LIMIT`) with `sheet_layout.py`
+FIELDS as the cited canonical mirror. The old code got openpyxl as a *side effect* of that import's
+bootstrap, so the decoupled script carries its own `_ensure_openpyxl()` install-on-first-run pattern
+(a requirements.txt alone isn't reliably honoured in the Cowork runtime).
+
+**Verification done:** `assemble.py` smoke-tested from its new path — exit 0 + workbook + overview
+produced; Guard 1 (Broad keyword → stop, no file) and Guard 2 (40-char headline > 30 → exit 3 + red)
+both fire. Full dangling-reference sweep across all skill files: no path or prose references to deleted
+skills remain (the `competitor-research.json` hits are the artifact filename, kept).
+
+**Parked / not done (needs a real Cowork run, not local testing):** the live end-to-end campaign-build
+run with real subagent dispatch; the `05-rsa-copy` intake-injection-into-`responsive-search-ads`
+assumption; whether subagent-invokes-skill resolves cleanly in Cowork (the design rests on it, backed
+by the precedent that `/overview` etc. spawn subagents and the old `rsa-copywriter` reused
+`responsive-search-ads`).
+
+**Resume:** `git checkout feat/campaign-build-consolidation`; tree is at
+`plugins/google-ads-setup/skills/` (5 dirs). To smoke-test the assembler again, build 4 minimal JSON
+fixtures (strategy/structuring/rsa-manifest/assets + a referenced ads.json) and run
+`scripts/assemble.py`. Next real step is a live Cowork install + a full campaign-build run on a test client.
+
+---
+
 # Session handoff — 2026-06-09 (Excel→CSV converter shipped; loop made converter-ready)
 
 ## Current state (2026-06-09, end of session)

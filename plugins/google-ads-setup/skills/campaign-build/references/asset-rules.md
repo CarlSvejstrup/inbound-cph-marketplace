@@ -16,7 +16,7 @@ ships false claims into ad infrastructure.
 
 **Firewall A — never fabricate asset content.** Callouts ("20 års SEO-erfaring"), sitelink
 descriptions, and structured-snippet values are FACTUAL CLAIMS. Generate them ONLY from the
-landing-page-analyzer output (its actual fields: `usp_candidates`, `trust_signals` verbatim
+`01-landing-page` output (its actual fields: `usp_candidates`, `trust_signals` verbatim
 with `has_numbers`, `product_service`, `on_page_ctas`, `active_offer`, `tone`) + explicit
 intake. NEVER synthesize a plausible-sounding
 callout ("Markedsledende", "Bedste pris") that isn't grounded. Trust numbers are verbatim from
@@ -110,7 +110,7 @@ lead form, say it's created in the Google Ads UI, not via this CSV.
       "grounded_in": "product_service + operator-supplied service list (analyzer has no list field)" }
   ],
   "lead_form": { "csv_importable": false, "note": "Manual UI step — Editor does not import lead forms via CSV." },
-  "content_firewall": "All text grounded in landing-page-analyzer output / intake; nothing fabricated. Trust numbers verbatim.",
+  "content_firewall": "All text grounded in the landing-page analysis / intake; nothing fabricated. Trust numbers verbatim.",
   "snippet_header_note": "Header column name UNVERIFIED — build-time Editor round-trip needed."
 }
 ```

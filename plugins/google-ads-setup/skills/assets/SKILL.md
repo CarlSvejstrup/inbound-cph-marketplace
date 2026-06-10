@@ -1,126 +1,49 @@
 ---
 name: assets
-description: Generér Google Ads kampagne-assets (sitelinks, callouts, structured snippets) fra Phase-1 landing-page-analyzer-output + intake, som struktureret objekt til kampagne-byggeren. Phase-3-creative-trin i campaign-build. To hårde firewalls: opfind ALDRIG asset-tekst (kun grounded i analyzer/intake), og sitelink-URL'er er IKKE udledelige fra den skrabne side (operator-leveret eller Firecrawl-map). Lead forms er et manuelt UI-trin (ikke CSV-importerbart). Brug når brugeren siger "lav assets", "sitelinks + callouts", "extensions til kampagnen", eller fortsætter campaign-build efter structuring. Svarer på dansk.
+description: Generér Google Ads kampagne-assets (sitelinks, callouts, structured snippets) som selvstændigt trin og aflever dem som regneark (.xlsx), grounded i en klients landingsside + intake. Tynd indgang til assets-referencen i campaign-build, kørt i solo-mode. To hårde firewalls: opfind ALDRIG asset-tekst (kun grounded i analyse/intake), og sitelink-URL'er er IKKE udledelige fra den skrabne side (operator-leveret eller Firecrawl-map). Pusher ALDRIG til kontoen. Brug når brugeren siger "lav assets", "sitelinks + callouts", "extensions til kampagnen", "structured snippets", eller vil have assets som et selvstændigt stykke (ikke en fuld build). Svarer på dansk.
 ---
 
 # assets
 
-Phase-3-creative-trinnet i **campaign-build** (parallelt med rsa-copywriter). Genererer
-kampagne-assets — **sitelinks, callouts, structured snippets** — fra Phase-1
-landing-page-analyzer-output + intake, og emitterer dem som ét struktureret objekt der spejler
-Ians skeleton tab 07. Output forbruges af **assembler** (Phase 4, fylder tab 07 + Editor
-asset-CSV).
+Selvstændig indgang til **Phase 3 — assets** i kampagne-builden. Genererer sitelinks, callouts og
+structured snippets og afleverer dem som et **`.xlsx`-regneark** (tabulært per asset-type). Al logikken
+bor i campaign-build's reference — dette skill er en tynd shell der kører den i **solo-mode** (producerer
+en regnearks-rapport i stedet for kun JSON til en pipeline).
 
-## Designprincip — to korrekthed-firewalls, ikke pynt
-
-Carl: "just make" — så hold det enkelt. MEN to ting er korrekthed, ikke polish (begge i
-`references/asset-rules.md`, læs den, den vinder ved konflikt):
-
-1. **Opfind ALDRIG asset-tekst.** Callouts, sitelink-beskrivelser og snippet-værdier er
-   FAKTUELLE claims. Generér KUN fra landing-page-analyzer-output (dens faktiske felter:
-   `usp_candidates`, `trust_signals` verbatim, `product_service`, `on_page_ctas`,
-   `active_offer`, `tone`) + intake. Aldrig en plausibel men
-   ugrounded callout ("Markedsledende", "Bedste pris"). Trust-tal verbatim fra siden/intake —
-   aldrig opfundet (samme regel som RSA). Hver callout + snippet SKAL have et `grounded_in`-felt
-   der navngiver analyzer-feltet claimet kom fra; ingen grounding → emit ikke.
-
-2. **Sitelink-URL'er er IKKE udledelige fra den skrabne side.** Tab 07's sitelinks peger på
-   ANDRE sider (`/ai-seo-audit/`, `/kontakt/`) end den ene landingsside Phase 1 skrabede. At
-   opfinde stier er samme fejlklasse som at opfinde keyword-volumen. Kilde dem bevidst:
-   operator-leveret (default). Valgfrit, hvis firecrawl-CLI'en er tilgængelig: `firecrawl map <domæne>` for at finde rigtige URL'er operatøren vælger fra. Kan en URL
-   ikke bekræftes: UDELAD sitelinket — ship aldrig en gættet URL.
-
-## Hård regel — INGEN API-push, gated writes
-
-Som hele campaign-build: ingen Google Ads API-push, ingen eksterne writes fra dette skill (det
-emitterer et objekt; assembler renderer CSV/workbook). En valgfri `firecrawl map` (URL-discovery, kun hvis CLI'en findes) er en
-read, ikke en write — men oplys hvilket domæne der mappes.
-
-## When to use
-
-Trigger-fraser: "lav assets", "sitelinks + callouts", "extensions til kampagnen", "structured
-snippets", eller automatisk som Phase-3-trin (parallelt med rsa-copywriter) efter structuring.
-
-## Trin 0 — Kontekst
-
-Læs `references/asset-rules.md` — de verificerede Editor-CSV-
-fakta, de to firewalls og output-formen. Dansk medmindre brugeren skriver engelsk.
+Kilden til sandhed: `${CLAUDE_SKILL_DIR}/../campaign-build/references/06-assets.md` (+ dens kontrakt
+`asset-rules.md` i samme references-mappe).
 
 ## Trin 1 — Indlæs input
 
-Forbrug landing-page-analyzer-JSON (dens faktiske felter: `product_service`, `usp_candidates`,
-`trust_signals`, `active_offer`, `on_page_ctas`, `tone`) + campaign-strategy `campaign`
-(kampagnenavn). Bemærk: analyzeren har INTET `services`-listefelt — snippet-værdier kræver
-operator-input (se Trin 4). Kædet
-fra campaign-build: læs fra kørslens artefakt-mappe. Standalone: saml minimal intake (URL +
-klient) og kør landing-page-analyzer-mønstret.
+Som selvstændigt skill: saml minimal intake (landingsside-URL + klient) og kør `01-landing-page`-mønstret
+for at få analyse-felterne (`product_service`, `usp_candidates`, `trust_signals`, `active_offer`,
+`on_page_ctas`, `tone`). Har brugeren allerede en `landing-page-analysis.json` fra `research`-skillet, så
+læs den fra arbejdsmappen i stedet. Default attachment level = campaign.
 
-Default **attachment level = campaign** (tab 07 er alt campaign-niveau).
+## Trin 2 — Kør referencen
 
-## Trin 2 — Sitelinks (Firewall B gælder)
+Følg `06-assets.md` præcist — den vinder ved konflikt. De to firewalls er korrekthed, ikke pynt:
+1. **Opfind ALDRIG asset-tekst** — hver callout/snippet-værdi grounded i et analyzer-felt (`grounded_in`).
+   Ingen grounding → emit ikke.
+2. **Sitelink-URL'er er ikke udledelige fra den skrabne side** — operator-leveret (default) eller
+   `firecrawl map` hvis CLI'en findes. Kan en URL ikke bekræftes: udelad sitelinket.
 
-Sitelinks skal pege på rigtige sider. Spørg operatøren om sitelink-targets (tekst + URL), ELLER
-tilbyd — hvis firecrawl-CLI'en er tilgængelig — `firecrawl map <domæne>` for at finde rigtige URL'er operatøren kan vælge fra (ellers ren operator-input). Til hver
-sitelink: kort tekst (~25 tegn praktisk), Final URL (bekræftet), og valgfrit 2 beskrivelses-
-linjer (par — begge eller ingen) grounded i sidens budskab. Kan en URL ikke bekræftes: udelad.
-Sæt `url_source` per sitelink (operator-supplied / firecrawl-map / omitted-unconfirmed).
+Referencen skriver `assets.json` til arbejdsmappen.
 
-## Trin 3 — Callouts (Firewall A gælder)
+## Trin 3 — Aflever regnearket (.xlsx)
 
-Korte fordel-/trust-fraser (~25 tegn praktisk), HVER grounded i analyzer-output. Eksempler fra tab 07:
-"20 års SEO-erfaring" (← trust_signal), "HubSpot-partner" (← USP), "Ingen binding" (← offer/USP).
-Map hver callout til sit analyzer-felt i `grounded_in`. Opfind ikke en callout der lyder godt
-men ikke står på siden. 4-10 callouts typisk.
+Pak resultatet i én `.xlsx` (brug `xlsx`-skillet) med en fane per asset-type:
+- **Sitelinks:** tekst | Final URL | url_source (kun bekræftede URL'er).
+- **Callouts:** tekst | grounded_in.
+- **Structured snippets:** header | værdier | grounded_in.
 
-## Trin 4 — Structured snippets (header UNVERIFIED — flag)
+Bekræft firewall'en i en note ("Alle assets grounded i landingssiden/intake; intet opfundet"), og flag den
+UNVERIFIED snippet-header-kolonne. At gemme til Drive er en gated write (bekræft før upload). Lokalt er fint.
 
-Header SKAL være en af Googles foruddefinerede headers (fx Services, Platforms, Brands), første
-bogstav stort — opfind ikke en header. Værdier: korte navneord-fraser. **Værdierne er en LISTE
-som den enkelt-side-analyzer IKKE kan levere** (`product_service` er én linje, intet
-`services`-felt findes) — så ground listen i `product_service`-dekomponering operatøren
-bekræfter, ELLER en operator-leveret service-liste. Opfind aldrig en 5-punkts liste fra én linje.
-- **Editor-kolonnen til selve headeren er UNVERIFIED** (sandsynligvis `Subject`, muligvis
-  `Header`) OG værdi-delimiteren for `Snippet Values` er UNVERIFIED (semikolon er den generelle
-  regel, men ikke bekræftet for netop denne kolonne). Begge læses i ÉT build-time Editor-round-
-  trip (opret manuelt → Export CSV → læs kolonnenavn + delimiter). Sæt `header_column_unverified:
-  true`. Værdi-KOLONNEN `Snippet Values` ER verificeret (kun delimiteren er ukendt).
+## Safety
 
-## Trin 5 — Lead forms (manuelt UI-trin)
-
-Lead forms er IKKE CSV-importerbare i Editor (verificeret negativ). Emit INGEN række. Hvis
-operatøren vil have en lead form: sig at den oprettes i Google Ads UI'et, ikke via denne CSV.
-Sæt `lead_form.csv_importable: false` i objektet med noten.
-
-## Trin 6 — Emit objektet
-
-Skriv det strukturerede objekt (formen i §3 af reference-filen) til kørslens artefakt-mappe
-(fx `assets.json`). Indeholder `campaign`, `attachment_level`, `sitelinks[]`, `callouts[]`,
-`structured_snippets[]`, `lead_form` (csv_importable false), `content_firewall`-bekræftelse, og
-`snippet_header_note`. Hver callout + snippet har `grounded_in`.
-
-## Trin 7 — Output
-
-Lever en kort tabel per asset-type: sitelinks (tekst | URL | url_source), callouts (tekst |
-grounded_in), structured snippets (header | værdier | grounded_in). Plus:
-- Bekræft firewall'en: "Alle assets grounded i landingssiden/intake; intet opfundet."
-- Flag UNVERIFIED snippet-header-kolonnen + build-time-round-trip.
-- Nævn lead forms som manuelt UI-trin hvis relevant.
-- Liste eventuelle udeladte sitelinks (URL kunne ikke bekræftes).
-
-## Risici / noter
-
-- **Firewall A er den hyppigste drift:** en asset-generator vil gerne fylde med plausible
-  callouts. Hver eneste skal have `grounded_in`. Tom grounding = drop.
-- **Firewall B:** gæt ALDRIG en sitelink-sti fra én skrabet side. Operator eller firecrawl map.
-- **Snippet-header-kolonnen** er det ene reelle Editor-ukendte — flag det, hardcode det ikke.
-- **Lead forms** = manuelt. Prøv aldrig en CSV-række.
-- Assets er campaign-niveau by default (tab 07). Ad-group-niveau kun hvis operatøren beder
-  (begge Campaign + Ad group udfyldt); account-niveau via literal `<Account-level>` i Campaign.
-
-## Maintenance
-
-- Alle Editor-CSV-fakta + firewalls + output-form bor i `references/asset-rules.md`. Ret kun den.
-- Snippet-header-kolonnenavnet skal verificeres via Editor-round-trip og opdateres fra UNVERIFIED
-  til verificeret når det er gjort (hold i sync med assembler Phase 4).
-- v1 dækker sitelinks/callouts/structured snippets. Andre asset-typer (price, promotion, image,
-  call) branches senere — verificér hver enkelts Editor-kolonner først.
+- **Firewall A (grounding)** er den hyppigste drift — hver asset SKAL have `grounded_in`; tom = drop.
+- **Firewall B (sitelink-URL'er)** — gæt aldrig en sti fra én skrabet side. Operator eller firecrawl map.
+- **Lead forms er manuelle** — ikke CSV-importerbare; emit ingen række, henvis til Google Ads UI'et.
+- **Read-only; gem til Drive = gated write.** **Logikken bor i referencen, ikke her** — ret `06-assets.md`
+  hvis reglerne ændrer sig.

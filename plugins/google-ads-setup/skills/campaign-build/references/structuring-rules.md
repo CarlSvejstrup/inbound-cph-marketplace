@@ -67,14 +67,14 @@ source in this stack.
 - Google Ads MCP exposes only existing-campaign keyword data (`keyword_view` GAQL,
   `get_keyword_performance`, search-terms report). There is **no Keyword Planner
   ideas/volume surface** (KeywordPlanIdeaService is not a GAQL resource).
-- Semrush MCP `keyword_research` is plan-gated (no data) — verified Phase 1. **If Semrush
-  access is later granted**, the `semrush-research` skill emits volume/difficulty/CPC per
-  keyword; consume its `keyword_data[]` (rows with `source: semrush`) to ground the selection.
-  Until then it returns all-`UNAVAILABLE` and this theme-derived path stands. Never a dependency.
+- Semrush MCP `keyword_research` is plan-gated (no data) — verified Phase 1. The Semrush
+  research step was **cut from this suite** (no connected plan), so there is no volume-grounding
+  source at all; the theme-derived path below is the only path. If Inbound later connects a
+  Semrush plan, volume data could be reintroduced as an optional grounding input — never a
+  dependency.
 
-So generate keyword candidates from the **landing-page-analyzer + competitor-research
-output + theme** (+ `semrush-research` volume data when available). Group them by intent into
-the ad groups from §1.
+So generate keyword candidates from the **`01-landing-page` + `02-competitor` output + theme**.
+Group them by intent into the ad groups from §1.
 
 **Honesty rule (load-bearing):** generated keywords are **theme-derived, NOT
 volume-ranked**. The skill MUST say so and route volume validation to the human (Keyword
@@ -173,7 +173,7 @@ structuring must tag each row with the fields the assembler needs, so the rules 
 
 ---
 
-## 5. Output object shape (consumed by rsa-copywriter + assembler)
+## 5. Output object shape (consumed by 05-rsa-copy + 07-assembler)
 
 ```json
 {
@@ -214,7 +214,7 @@ structuring must tag each row with the fields the assembler needs, so the rules 
 }
 ```
 
-`angles` + `keyword_seeds_for_rsa` are the semantic content Phase-3 rsa-copywriter
+`angles` + `keyword_seeds_for_rsa` are the semantic content Phase-3 `05-rsa-copy`
 consumes — this is why creative is downstream of the gate, not a peer.
 
 `paths` (the two Editor display-path segments, ≤15 chars each, derived from the ad-group
