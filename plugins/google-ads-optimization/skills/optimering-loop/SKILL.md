@@ -32,7 +32,7 @@ alt i den ene workbook — så eksperten ikke skal stykke tre regneark sammen i 
 
 3. **Konto-niveau negatives udfoldes.** Editor CSV har kun kampagne- og ad-group-niveau. Et fund
    på konto-niveau udfoldes til én `Campaign negative`-række per aktiv kampagne (samme blokerings-
-   effekt, fuldt importérbart) + en note på "Laes mig"-fanen om delt-liste-alternativet.
+   effekt, fuldt importérbart) + en note på "Læs mig"-fanen om delt-liste-alternativet.
 
 4. **Læse-only, recommend-only.** Skillet rører ALDRIG kontoen — ingen mutate, intet API-push,
    ingen pause/rediger. Det afleverer en workbook. Mennesket importerer via Editor efter review.
@@ -182,23 +182,28 @@ Findings-objektet (se docstring i `review_workbook.py` for det fulde skema):
   + asset-hygiejnens gap-brief. RESPEKTÉR Editor-grænserne (headline ≤30, description ≤90, path
   ≤15) — drop/trim for-lange linjer. Status altid `Paused`. ALDRIG en in-place edit.
 
-Workbooken har **6 faner:** **Laes mig**, **Negative keywords** (Konfidens-farvet 🟢/🟡/🔴 +
+Workbooken har **6 faner:** **Læs mig**, **Negative keywords** (Konfidens-farvet 🟢/🟡/🔴 +
 `Tynd data`-flag), **Nye keywords (vindere)**, **RSA challengers**, **Sprunget over** (de dækkede
 ≥2-konv-termer + det dækkende keyword), **Alle søgetermer** (FULDT overblik over alle ≥5 DKK,
 farvet efter `Gruppe`/bucket). To farve-akser, bevidst forskellige: overview farver efter
 KLASSIFIKATION (bucket), negatives-fanen efter KONFIDENS (hvor trygt at blokere).
 
+Hver fane bærer den SAMME metrik-blok (ens for eksperten): `Budget brugt (DKK)` / `Impressions` /
+`Klik` / `CTR (%)` / `Konverteringer` / `CPA (DKK)` — negatives-fanen kalder cost-kolonnen `Spildt
+budget (DKK)`. CTR og CPA beregnes i builderen (`_metric_block`), så de er ens på tværs uden at
+skulle vedligeholdes per fane. Farve-koderne (begge akser) forklares med farve-blokke på `Læs mig`.
+
 **To faner bliver ALDRIG til CSV:** `Alle søgetermer` + `Sprunget over` matcher ingen
 `editor-csv-export`-alias → konverteren læser dem aldrig. Det er garantien for "kun overblik".
-Mørkeblå kolonner på de andre faner = Editor-felter (konverteren beholder); lyseblå = metadata
-(droppes, inkl. Konfidens/Klik/Tynd data).
+Mørkeblå kolonner (yderst til venstre) på de andre faner = Editor-felter (konverteren beholder);
+lyseblå = metadata (droppes, inkl. hele metrik-blokken + Konfidens/Tynd data).
 
 ## Trin 4 — Aflever + næste skridt
 
 1. **Gem** workbooken (Drive = ekstern write → bekræft først; lokalt = ingen gate).
 2. **Kort dansk opsummering:** N negatives (X DKK spild), M vindere at promovere, K ad groups uden
    challenger, QS-flag. Ærlige forbehold: `low_confidence` hvis sat; QS-LP = flag, ikke score;
-   konto-niveau negatives er udfoldet (se Laes mig).
+   konto-niveau negatives er udfoldet (se Læs mig).
 3. **Sådan bruger eksperten filen:** ret frit i workbooken → kør `editor-csv-export` (workbook →
    Editor-CSV) → importér CSV'erne i Editor (Account → Import → From file) → gennemgå grøn/gul diff
    → Send. Intet er skrevet til kontoen af dette skill.
