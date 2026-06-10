@@ -32,20 +32,45 @@ A search term becomes a **new-keyword candidate** iff BOTH hold (pure script, no
    uncovered terms. Matching uses `keyword_map_query` rows; normalise both sides (lowercase,
    collapse whitespace, strip surrounding brackets/quotes) and compare on text equality.
 
-→ Every term passing 1 + 2 is **guaranteed** on the "Nye keywords (vindere)" tab as
-`Match type = Exact`, `Status = Paused`. Low-risk (a new keyword is reversible), so no
-confidence banding — they all ship as suggestions.
+**Then an OFFERING check splits the candidates (added 2026-06-10 — this was a real design hole).**
+The whole Phase 0 premise is "classification is meaningless without knowing what the client sells",
+yet winner selection used to skip the offering entirely — so an off-offering destination like
+`zanzibar rejse` got recommended as a new keyword to a destination the client doesn't sell. The
+root cause: **a conversion on a lead-gen account is a LEAD, not proof the search intent matched the
+offering** (someone can land and sign up for something else). Significance discipline covers
+volume; it does NOT cover attribution validity. So each candidate is checked against the offering
+vocabulary (`offering_overlap`, the same `offering.md` tokens the negative bands use):
+
+- **on-offering** (partial or full overlap, OR no offering context at all) → **"Nye keywords
+  (vindere)"** tab, `Match type = Exact`, `Status = Paused`. Promotable.
+- **off-offering** (has content words, none of which are offering vocabulary) → **"Vindere til
+  gennemgang"** tab. Surfaced + flagged, **never auto-promoted**. The expert moves a confirmed one
+  to the Nye keywords tab by hand.
+
+**Flag, NOT gate.** A hard out-of-scope gate in the script would re-break the very guarantee this
+sweep exists to give (nothing qualifying silently dropped) — and the offering-token signal is
+heuristic, so gating on it would kill real winners. Flagging fails safe: a skipped agent review
+leaves the term *visible but not promoted*, and it structurally cannot reach a CSV. With no offering
+context (empty tokens, scrape failed) the check is a no-op and everything stays promotable.
+
+**Token-overlap quality (2026-06-10):** `offering_overlap` matches multi-word offering tokens via
+n-grams (so `new zealand` / `costa rica` / `sri lanka` match as a UNIT, not as stray words) and
+strips a generic stoplist (`rejse`, `unge`, `billig`, `dansk`, …) before judging overlap — without
+both, single-word tokenisation + generic words made the proposed bands and the offering check noisy.
+`degree` is computed over CONTENT tokens only, so `grupperejser bali` (bali on-offering) reads as a
+full match, not "partial because of rejser".
 
 **The agent may still** add a one-line Danish `Begrundelse` per row, and MAY flag a row it thinks
-is wrong (e.g. "reelt jeres brand") in a `Agent-note` metadata column — but the row STAYS on the
+is wrong (e.g. "reelt jeres brand") in a `Agent-note` metadata column — but the row STAYS on its
 tab. The expert deletes it if they agree; the script never withholds it.
 
-**What the script records for transparency** — terms that hit `≥2 conv` but were filtered, go to a
-small `Sprunget over (vindere)` note with the deterministic reason:
-- `already_covered: "<matched keyword>" (<match type>)` — the legitimate, common case.
+**What the script records for transparency** — terms that hit `≥2 conv` but did not land on Nye
+keywords go to one of two reference tabs with the deterministic reason:
+- `already_covered: "<matched keyword>" (<match type>)` → **Sprunget over** — the legitimate, common case.
+- `off_offering` → **Vindere til gennemgang** — converts, but looks outside the offering.
 
-So a `≥2 conv` term is either on the tab, or named in that note with the exact keyword that
-already covers it. No more guessing why one fell off.
+So a `≥2 conv` term is always on exactly one of three tabs (Nye keywords / Vindere til gennemgang /
+Sprunget over), each with a script-provable reason. No more guessing why one fell off.
 
 ---
 
@@ -123,8 +148,9 @@ subsets of it. Decided 2026-06-09.
 - **NEVER becomes a CSV.** The tab is named `Alle søgetermer` — which matches NO `editor-csv-export`
   alias (the converter reads keywords from `Keywords`/`Keyword`/`Nye keywords (vindere)`, negatives
   from `Negative keywords`/`Negatives`). So it is structurally invisible to the converter. This is
-  the same isolation guarantee as the `Sprunget over` tab. The round-trip test must confirm no
-  overview row reaches `keywords.csv` or `negatives.csv`.
+  the same isolation guarantee as the `Sprunget over`, `Vindere til gennemgang`, and `Quality Score`
+  tabs — **all four** reference tabs are alias-invisible. The round-trip test must confirm no row
+  from any of them reaches `keywords.csv` or `negatives.csv`.
 
 **Æ/Ø/Å is load-bearing here** — the `Gruppe` column + Danish campaign/term text (`Søgeterm`,
 `Højskole`, `Grupperejser`) must survive. `review_workbook` writes the .xlsx with correct encoding

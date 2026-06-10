@@ -129,21 +129,36 @@ JSON.
   (`search_terms_query`, `keyword_map_query`, `ad_group_ads_query`, `account_search_cost_query`).
   **Kør FØRST det deterministiske sweep — agenten må aldrig selv finde/tabe kandidater** (det er
   rygraden, se `references/selection-spec.md`):
+  **VIGTIGT om de tunge pulls (token-loft):** `search_terms_query`, `keyword_map_query` og
+  ad-dumpet returnerer for meget til at læse ind i konteksten (keyword-map'en alene var 1,7 MB /
+  ~2500 rækker på DSC). Skriv hvert svar til en FIL og processér fil-side (python/jq) — læs aldrig
+  rå-rækkerne ind i agentens kontekst. `sweep` kører på de fil-indlæste rækker. (Keyword-map'en
+  kan ikke snævres på rækker — `sweep` skal bruge HELE det aktive keyword-sæt til
+  set-membership-tjekket — men den læses fil-side, ikke i konteksten.)
   ```python
   import sweep   # lib/sweep.py — IKKE 'select' (det skygger Pythons stdlib)
   offering_tokens = sweep.parse_offering_tokens(open("offering.md").read())  # fra Phase 0
-  w   = sweep.sweep_winners(search_term_rows, keyword_map_rows)   # {winners, skipped}
+  w   = sweep.sweep_winners(search_term_rows, keyword_map_rows, offering_tokens)  # {winners, review_winners, skipped}
   neg = sweep.sweep_negatives(search_term_rows, offering_tokens)  # [{band, thin_data, ...}]
   ov  = sweep.all_terms_overview(search_term_rows)                # alle >=5 DKK termer
   ```
-  `offering_tokens` kommer fra Phase 0's `offering.md` (ikke håndholdt) — det gør de foreslåede
-  negative-bånd forankret i det FAKTISKE tilbud. Tom liste (scrape fejlede) → alle foreslås GUL.
-  - `w["winners"]` (≥2 konv + matcher INTET eksisterende keyword på nogen match type) er
-    **garanteret** på "Nye keywords"-fanen. `w["skipped"]` (≥2 konv men allerede dækket) går på
-    "Sprunget over"-fanen MED det dækkende keyword — så intet forsvinder usynligt.
+  `offering_tokens` kommer fra Phase 0's `offering.md` (ikke håndholdt) — det forankrer BÅDE
+  negative-bånd OG vinder-udvælgelsen i det FAKTISKE tilbud. Tom liste (scrape fejlede) → alle
+  negative foreslås GUL, og ALLE vindere bliver promoverbare (kan ikke hævde off-offering uden tilbud).
+  - **Vindere er offering-grounded (vigtigt — det var et reelt hul).** En konvertering på en
+    lead-gen-konto er et LEAD, ikke bevis for at søge-intentionen matchede tilbuddet (folk lander og
+    tilmelder sig noget andet). Derfor tjekker `sweep_winners` hver ≥2-konv-kandidat mod
+    offering-vokabularet:
+    - `w["winners"]` (on-offering) → **garanteret** på "Nye keywords"-fanen (promoverbar).
+    - `w["review_winners"]` (off-offering: har content-ord, ingen rammer tilbuddet) → fanen
+      **"Vindere til gennemgang"** — synliggjort + flagget, men ALDRIG auto-promoveret. Sådan kan en
+      off-offering-destination (fx `zanzibar rejse`) aldrig usynligt blive et nyt keyword. Eksperten
+      flytter en bekræftet over i hånden. **Det FLAGGER, gater ikke** — intet kvalificerende tabes.
+    - `w["skipped"]` (≥2 konv men allerede dækket) → "Sprunget over"-fanen MED det dækkende keyword.
   - `neg` er ALLE 0-konv ≥50 DKK-termer; scriptet foreslår en `band` (GROEN/GUL/ROED) ud fra
-    offering-token-overlap. **Agentens rolle:** op/nedgradér `band` med den rigere sprog-vurdering
-    (`wikipedia` = info-søgning → GROEN; et reelt produkt → ROED) og LOG ændringen i
+    offering-token-overlap (nu med fler-ords-match + stopords-filter, så `new zealand` matcher som
+    enhed og `rejse`/`unge` ikke støjer). **Agentens rolle:** op/nedgradér `band` med den rigere
+    sprog-vurdering (`wikipedia` = info-søgning → GROEN; et reelt produkt → ROED) og LOG ændringen i
     `band_adjustment` (`script: GUL -> agent: GROEN (grund: ...)`). Tilføj `level` + en dansk
     `reason` per negativ. Tilføj aldrig/fjern aldrig en kandidat — kun juster band + begrundelse.
   - **Agentens øvrige rolle:** tildel hver overview-term en `bucket` (VINDER / RELEVANT /
@@ -151,14 +166,23 @@ JSON.
     `offering.md`** (Phase 0) — det er nu den eksplicitte grundsandhed for "passer dette tilbuddet?",
     inkl. out-of-scope-listen (en term der rammer den → konfident IRRELEVANT/GROEN). Sæt
     `low_confidence=true` hvis konto-konverteringer < 10.
-  Returnér `winners`, `negatives`, `all_terms` (m. bucket), `skipped_winners`, `active_campaigns`,
-  `low_confidence` — præcis de felter `review_workbook.build()` læser.
+  Returnér `winners`, `review_winners`, `negatives`, `all_terms` (m. bucket), `skipped_winners`,
+  `active_campaigns`, `low_confidence` — præcis de felter `review_workbook.build()` læser.
 - **Asset-hygiejne-agent** → `AssetHygieneFindings`. GAQL: `lib/gaql/asset_view.py`
-  (`asset_view_query`, `rsa_count_query`). Kun struktur: RSA-count per ad group (<2 →
-  challenger-flag), dødvægt, vinkel-gap-brief. ALDRIG CVR-dom.
+  (`asset_view_query`, `rsa_count_query`, `search_ad_groups_query`). Kun struktur: RSA-count per ad
+  group (<2 → challenger-flag), dødvægt, vinkel-gap-brief. ALDRIG CVR-dom.
+  **<2-RSA-flaget er KUN for SEARCH.** `rsa_count_query` + `search_ad_groups_query` er begge
+  scopet til `advertising_channel_type = 'SEARCH'`. Beregn manglende-RSA =
+  `search_ad_groups_query`-sættet MINUS de ad groups `rsa_count_query` dækker med ≥2 RSA'er.
+  Display/Video-målgruppe-ad-groups ("Combined segment", "Alle målgrupper") har 0 RSA som normal-
+  tilstand — uden SEARCH-scopet ville de fejlagtigt se ud som challenger-kandidater (live-fund på
+  DSC), og loopet ville generere RSA'er til ad groups hvor RSA ikke giver mening.
 - **QS-agent** → `QualityScoreFindings`. Kald `get_quality_score_audit(date_range=...)` (brug
   `lib/gaql/quality_score.date_range_arg()` — `LAST_90_DAYS` virker IKKE her), normalisér via
-  `normalise_findings()`. Keyword-grain; LP = flag, ikke score.
+  `normalise_findings()`. Keyword-grain; LP = flag, ikke score. Returnér `quality_score` =
+  `{average, total_keywords, worst:[...]}` (den verificerede `worst_keywords`-form) → bygger
+  **"Quality Score"-fanen** (QS-cellen + komponent-labels farves, så en klynge af QS 1-2 + 
+  BELOW_AVERAGE-landingsside springer i øjnene — det var det mest handlingsbare signal på DSC).
 
 ## Trin 3 — Saml + byg workbooken
 
@@ -174,33 +198,45 @@ Findings-objektet (se docstring i `review_workbook.py` for det fulde skema):
 - `negatives`: fra `sweep.sweep_negatives` (m. agent-justeret `band`, `band_adjustment`, `level`,
   `reason`). Niveau pr. term; konto-niveau udfoldes af builderen til per-kampagne-rækker — derfor
   SKAL `active_campaigns` med.
-- `winners`: `sweep.sweep_winners(...)["winners"]` (builderen promoverer til `Exact`, `Paused`).
+- `winners`: `sweep.sweep_winners(...)["winners"]` — on-offering vindere (builderen promoverer til
+  `Exact`, `Paused`).
+- `review_winners`: `...["review_winners"]` — off-offering ≥2-konv-termer (→ "Vindere til
+  gennemgang"-fanen; aldrig auto-promoveret, eksperten flytter en bekræftet over).
 - `skipped_winners`: `...["skipped"]` — ≥2-konv-termer der allerede er dækket (→ "Sprunget over").
 - `all_terms`: `sweep.all_terms_overview(...)` m. agent-tildelt `bucket` per term (→ overview-fanen).
-- `rsa_rows`: for hver ad group med `challenger_flag` eller vinkel-hul, ÉN **ny** challenger
+- `quality_score`: `{average, total_keywords, worst:[...]}` fra QS-agenten (→ "Quality Score"-fanen).
+- `rsa_rows`: for hver SEARCH-ad-group med `challenger_flag` eller vinkel-hul, ÉN **ny** challenger
   (headlines ≤15, descriptions ≤4, paths[2], final_url), forankret i `references/headline-craft.md`
   + asset-hygiejnens gap-brief. RESPEKTÉR Editor-grænserne (headline ≤30, description ≤90, path
   ≤15) — drop/trim for-lange linjer. Status altid `Paused`. ALDRIG en in-place edit.
 
-Workbooken har **6 faner:** **Læs mig**, **Negative keywords** (Konfidens-farvet 🟢/🟡/🔴 +
-`Tynd data`-flag), **Nye keywords (vindere)**, **RSA challengers**, **Sprunget over** (de dækkede
+Workbooken har **op til 8 faner:** **Læs mig**, **Negative keywords** (Konfidens-farvet 🟢/🟡/🔴 +
+`Tynd data`-flag), **Nye keywords (vindere)**, **Vindere til gennemgang** (off-offering konverterende
+termer — flagget, ikke auto-promoveret), **RSA challengers**, **Sprunget over** (de dækkede
 ≥2-konv-termer + det dækkende keyword), **Alle søgetermer** (FULDT overblik over alle ≥5 DKK,
-farvet efter `Gruppe`/bucket). To farve-akser, bevidst forskellige: overview farver efter
-KLASSIFIKATION (bucket), negatives-fanen efter KONFIDENS (hvor trygt at blokere).
+farvet efter `Gruppe`/bucket), **Quality Score** (flaggede keywords, QS + komponent-labels farvet).
+To farve-akser, bevidst forskellige: overview farver efter KLASSIFIKATION (bucket), negatives-fanen
+efter KONFIDENS (hvor trygt at blokere). ("Vindere til gennemgang" + "Quality Score" vises kun når
+der er noget at vise.)
 
 Hver fane bærer den SAMME metrik-blok (ens for eksperten): `Budget brugt (DKK)` / `Impressions` /
 `Klik` / `CTR (%)` / `Konverteringer` / `CPA (DKK)` — negatives-fanen kalder cost-kolonnen `Spildt
 budget (DKK)`. CTR og CPA beregnes i builderen (`_metric_block`), så de er ens på tværs uden at
 skulle vedligeholdes per fane. Farve-koderne (begge akser) forklares med farve-blokke på `Læs mig`.
 
-**To faner bliver ALDRIG til CSV:** `Alle søgetermer` + `Sprunget over` matcher ingen
-`editor-csv-export`-alias → konverteren læser dem aldrig. Det er garantien for "kun overblik".
-Mørkeblå kolonner (yderst til venstre) på de andre faner = Editor-felter (konverteren beholder);
-lyseblå = metadata (droppes, inkl. hele metrik-blokken + Konfidens/Tynd data).
+**Fire faner bliver ALDRIG til CSV:** `Alle søgetermer`, `Sprunget over`, `Vindere til gennemgang`
+og `Quality Score` matcher ingen `editor-csv-export`-alias → konverteren læser dem aldrig. Det er
+garantien for "kun overblik / kun gennemgang". Mørkeblå kolonner (yderst til venstre) på de andre
+faner = Editor-felter (konverteren beholder); lyseblå = metadata (droppes, inkl. hele metrik-blokken
++ Konfidens/Tynd data).
 
 ## Trin 4 — Aflever + næste skridt
 
-1. **Gem** workbooken (Drive = ekstern write → bekræft først; lokalt = ingen gate).
+1. **Gem** workbooken. **Lokalt-først er default** (ingen gate): skriv `.xlsx` til disk. **Drive er
+   best-effort:** workbooken KAN uploades via Drive-connectorens `create_file` med `base64Content`
+   (samme bevist-virkende sti som `responsive-search-ads`) — men en stor multi-fane-workbook (~50 KB
+   → ~65 KB base64) kan være for tung at relæe inline, så tilbyd Drive, og hvis upload fejler/er for
+   stor, fald tilbage til den lokale fil med en besked. Drive = ekstern write → bekræft FØRST.
 2. **Kort dansk opsummering:** N negatives (X DKK spild), M vindere at promovere, K ad groups uden
    challenger, QS-flag. Ærlige forbehold: `low_confidence` hvis sat; QS-LP = flag, ikke score;
    konto-niveau negatives er udfoldet (se Læs mig).
@@ -216,6 +252,14 @@ lyseblå = metadata (droppes, inkl. hele metrik-blokken + Konfidens/Tynd data).
   sidst") er v2 og kræver en run-persistens-beslutning. Sig "diagnose-loop", ikke "fuldt loop".
 - **Significance-floors er ikke til forhandling** — ≥2 konv. for en vinder, `low_confidence` under
   10, ingen per-asset CVR-dom.
+- **En konvertering er et LEAD, ikke intentions-bevis.** På en lead-gen-konto validerer en
+  konvertering volumen/signifikans, men IKKE at søge-intentionen matchede tilbuddet (folk lander og
+  tilmelder sig noget andet). Derfor er vinder-udvælgelsen offering-grounded: ≥2 konv. + off-offering
+  → "Vindere til gennemgang", ikke auto-promoveret. Significance-disciplinen dækker volumen;
+  offering-grounding dækker attributions-validitet — to forskellige ting.
+- **Tidszone-OBS:** kontoens tidszone styrer dato-vinduet, og en dansk konto kan stå i fx
+  America/Los_Angeles. Et 90-dages-vindue er derfor en anelse tidszone-følsomt i kanterne — nævn det
+  hvis et tal ser ud til at ligge lige på en dag-grænse; jagt ikke en perfekt match.
 
 ## Maintenance
 

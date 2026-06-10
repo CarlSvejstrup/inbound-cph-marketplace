@@ -86,7 +86,7 @@ WRAP_ALIGN = Alignment(horizontal="left", vertical="top", wrap_text=True)
 TOP_ALIGN = Alignment(horizontal="left", vertical="top")
 
 # Metadata columns that hold prose and should wrap at a comfortable width (not autosize wide).
-WRAP_COLS = {"Begrundelse", "Reason", "Niveau (oprindeligt)", "Konfidens-justering"}
+WRAP_COLS = {"Begrundelse", "Reason", "Niveau (oprindeligt)", "Konfidens-justering", "Flag"}
 WIDE_WIDTH = 48
 NARROW_MAX = 30
 
@@ -105,6 +105,20 @@ BAND_FILLS = {
     "GROEN": "D6EFD6",   # clearly off-offering -> safe to block
     "GUL":   "FBEFC8",   # loosely related -> check
     "ROED":  "F6D6D6",   # looks relevant -> probably should NOT be a negative
+}
+# Quality Score cell colour (1-10). Low = red (urgent), mid = orange, healthy = green. Keys are
+# the string forms of the integer score (the colour helper compares str(value).upper()).
+QS_FILLS = {
+    "1": "F6D6D6", "2": "F6D6D6", "3": "FCE4C8", "4": "FCE4C8",
+    "5": "FBEFC8", "6": "FBEFC8", "7": "EAF3E0", "8": "D6EFD6",
+    "9": "D6EFD6", "10": "D6EFD6",
+}
+# QS component labels (creative / landing page / expected CTR). BELOW_AVERAGE = red so a cluster
+# of below-average landing pages is visible at a glance; ABOVE = green; AVERAGE neutral.
+QS_COMPONENT_FILLS = {
+    "BELOW_AVERAGE": "F6D6D6",
+    "AVERAGE":       "F4F6FA",
+    "ABOVE_AVERAGE": "D6EFD6",
 }
 
 _MATCH = {"EXACT": "Exact", "PHRASE": "Phrase", "BROAD": "Broad"}
@@ -417,6 +431,24 @@ def _readme_sheet(wb, client, account_id, period, today, account_level_notes=Non
          "trygt at blokere OG have tyndt datagrundlag på samme tid.", height=32, subtle=True)
     spacer()
 
+    # Guide to the gennemgang / diagnose tabs.
+    section("Faner til gennemgang (bliver aldrig til CSV)")
+    para("Disse faner er KUN til overblik og gennemgang — de eksporteres aldrig til Editor:",
+         height=18)
+    para("•  'Vindere til gennemgang' — søgetermer der KONVERTERER, men ser ud til at ligge uden "
+         "for jeres tilbud. En konvertering er et lead, ikke bevis for at søgningen passede "
+         "tilbuddet, så de bliver IKKE automatisk foreslået som nye keywords. Flyt en over til "
+         "'Nye keywords' hvis du er enig i at den hører til.", height=46)
+    para("•  'Quality Score' — de svageste keywords med deres tre QS-komponenter "
+         "(annoncerelevans, landingsside, forventet CTR). Lave QS (1-2) og BELOW_AVERAGE-celler "
+         "er røde, så en klynge med samme svaghed (fx samme landingsside) er let at se.",
+         height=46)
+    para("•  'Sprunget over' — ≥2-konv-termer der allerede er dækket af et eksisterende keyword "
+         "(med angivelse af hvilket), så intet forsvinder usynligt.", height=32)
+    para("•  'Alle søgetermer' — det fulde overblik over alle termer ≥5 DKK, farvet efter gruppe.",
+         height=18)
+    spacer()
+
     # Account-level negatives (only when present).
     if account_level_notes:
         section("Konto-niveau negative (vigtigt)")
@@ -455,12 +487,19 @@ def build(data, out_path):
                       band (GROEN|GUL|ROED), clicks, impressions, thin_data (bool),
                       band_adjustment ("script: X -> agent: Y (grund: ...)")} ],
       "winners":   [ {term, campaign, ad_group, conversions, cpa_dkk, reason, agent_note} ],  # promote->Exact, Paused
+      "review_winners": [ {term, campaign, ad_group, conversions, cost_dkk, clicks, impressions,
+                            flag (off_offering), reason, agent_note} ],  # 'Vindere til gennemgang', never CSV
       "rsa_rows":  [ {campaign, ad_group, headlines[], descriptions[], paths[2], final_url,
                       status (Paused), reason} ],
       "all_terms": [ {term, campaign, ad_group, cost_dkk, clicks, conversions, cpa_dkk,
                       bucket (VINDER|RELEVANT|PLACEMENT_PROBLEM|IRRELEVANT|GRAENSE)} ],  # overview, never CSV
       "skipped_winners": [ {term, campaign, ad_group, conversions, cost_dkk,
-                            covered_by:{keyword, match_type}} ]                         # 'Sprunget over', never CSV
+                            covered_by:{keyword, match_type}} ],                        # 'Sprunget over', never CSV
+      "quality_score": {                                                                # 'Quality Score', never CSV
+        "average": float, "total_keywords": int,
+        "worst": [ {campaign, ad_group, keyword, match_type, quality_score (1-10),
+                    creative_quality, landing_page_quality, expected_ctr,
+                    impressions, cost_dkk} ] }
     }
     Every RSA row is a NET-NEW challenger (Paused). The loop never edits a live RSA in place
     (resets learning + Editor CSV can't reliably match an RSA) — see the RSA tab comment.
@@ -575,6 +614,29 @@ def build(data, out_path):
     _sheet(wb, "Nye keywords (vindere)", KEYWORDS_EDITOR,
            METRIC_BLOCK + ["Begrundelse", "Agent-note"], kw_rows)
 
+    # --- Vindere til gennemgang — converting terms that look OFF-OFFERING (reference only) ---
+    # The offering-grounded winner sweep (sweep.sweep_winners) splits >=2-conv novel terms by the
+    # offering check: on-offering -> Nye keywords (promotable), off-offering -> HERE. A conversion
+    # on a lead-gen account is a LEAD, not proof the search intent matched the offering (someone can
+    # land and sign up for something else), so an off-offering destination like 'zanzibar højskole'
+    # is SURFACED + flagged for the expert, never auto-promoted into a keyword. Named so it matches
+    # NO editor-csv-export alias -> never becomes a CSV. The expert moves a confirmed one to the Nye
+    # keywords tab by hand. See references/selection-spec.md (decision: flag, don't gate).
+    review_winners = data.get("review_winners", [])
+    if review_winners:
+        rw_rows = [{
+            "Søgeterm": w.get("term", ""),
+            "Kampagne": w.get("campaign", ""),
+            "Ad group": w.get("ad_group", ""),
+            **_metric_block(w),
+            "Flag": "Ser ud til at være uden for tilbuddet (off-offering)",
+            "Begrundelse": w.get("reason", ""),
+            "Agent-note": w.get("agent_note", ""),
+        } for w in review_winners]
+        _reference_sheet(wb, "Vindere til gennemgang",
+                         ["Søgeterm", "Kampagne", "Ad group"] + METRIC_BLOCK
+                         + ["Flag", "Begrundelse", "Agent-note"], rw_rows)
+
     # --- RSA challengers tab ---
     # EVERY RSA change is a NET-NEW challenger (Paused), never an in-place edit. Rationale
     # (decision 2026-06-09): editing a live RSA's creative resets its learning — RSAs are
@@ -642,6 +704,36 @@ def build(data, out_path):
         _reference_sheet(wb, "Alle søgetermer",
                          ["Søgeterm", "Kampagne", "Ad group"] + METRIC_BLOCK + ["Gruppe"], ov_rows,
                          row_fill_key="Gruppe", fill_map=BUCKET_FILLS)
+
+    # --- Quality Score — flagged KEYWORDS (reference only, never a CSV) ---
+    # QS is a first-class diagnosis but NOT a Google Ads Editor entity, so it gets a reference tab
+    # named to match NO editor-csv-export alias. Grain is KEYWORD (there is no native ad-group QS —
+    # see lib/gaql/quality_score.py). The QS cell is coloured by score so the actionable cluster
+    # (QS 1-2 keywords, usually with a BELOW_AVERAGE landing page) is visible at a glance. Landing
+    # page is shown as the API's component LABEL, never converted into a fabricated score.
+    qs = data.get("quality_score") or {}
+    qs_worst = qs.get("worst") or []
+    if qs_worst:
+        qs_rows = [{
+            "Søgeterm (keyword)": k.get("keyword", ""),
+            "Kampagne": k.get("campaign", ""),
+            "Ad group": k.get("ad_group", ""),
+            "Match type": _match(k.get("match_type", "")),
+            "Quality Score": k.get("quality_score", ""),
+            "Annoncerelevans": k.get("creative_quality", ""),
+            "Landingsside": k.get("landing_page_quality", ""),
+            "Forventet CTR": k.get("expected_ctr", ""),
+            "Impressions": k.get("impressions", ""),
+            "Budget brugt (DKK)": k.get("cost_dkk", k.get("cost", "")),
+        } for k in qs_worst]
+        qs_ws = _reference_sheet(wb, "Quality Score",
+                                 ["Søgeterm (keyword)", "Kampagne", "Ad group", "Match type",
+                                  "Quality Score", "Annoncerelevans", "Landingsside",
+                                  "Forventet CTR", "Impressions", "Budget brugt (DKK)"], qs_rows)
+        _color_column_by_value(qs_ws, "Quality Score", QS_FILLS)
+        # Component-label columns coloured by BELOW/AVERAGE/ABOVE so a red landing-page cluster pops.
+        for comp in ("Annoncerelevans", "Landingsside", "Forventet CTR"):
+            _color_column_by_value(qs_ws, comp, QS_COMPONENT_FILLS)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)

@@ -56,9 +56,64 @@ def normalise_term(text) -> str:
     return s
 
 
+# Generic words that carry no offering signal — they appear in almost every travel/education
+# search and would otherwise force spurious overlap (e.g. "rejse"/"unge" matching everything).
+# Kept lowercase; extend as new noise surfaces. This is why offering overlap was noisy before.
+GENERIC_STOPWORDS = {
+    "rejse", "rejser", "rejsen", "tur", "ture", "unge", "ung", "for", "med", "til", "den",
+    "det", "pris", "priser", "billig", "billige", "bedste", "gratis", "tilbud", "online",
+    "danmark", "dansk", "danske", "info", "information",
+}
+
+
 def _tokens(text) -> set:
-    """Word tokens of a string, for the offering-overlap hint. Danish letters kept."""
-    return {t for t in re.split(r"[^0-9a-zæøåA-ZÆØÅ]+", str(text or "").lower()) if len(t) > 2}
+    """Word tokens of a string, for the offering-overlap hint. Danish letters kept, >2 chars,
+    generic stopwords dropped (so 'rejse'/'unge' don't force overlap on everything)."""
+    raw = {t for t in re.split(r"[^0-9a-zæøåA-ZÆØÅ]+", str(text or "").lower()) if len(t) > 2}
+    return raw - GENERIC_STOPWORDS
+
+
+def _ngrams(text, n_max=3) -> set:
+    """All 1..n_max-word contiguous phrases of a string, lowercased and whitespace-collapsed.
+    Lets a multi-word offering token like 'new zealand' / 'costa rica' / 'sri lanka' match a
+    search term as a UNIT — single-word tokenisation alone never matched those (Carl's note)."""
+    words = [w for w in re.split(r"\s+", normalise_term(text)) if w]
+    grams = set()
+    for size in range(1, min(n_max, len(words)) + 1):
+        for i in range(len(words) - size + 1):
+            grams.add(" ".join(words[i:i + size]))
+    return grams
+
+
+def offering_overlap(term: str, offering_tokens: set) -> dict:
+    """Overlap between a search term and the offering vocabulary, used by BOTH the negative-band
+    proposal and the winner offering-check (one shared notion of 'does this match the offering').
+
+    Matches on two levels: (1) multi-word offering tokens (e.g. 'new zealand') matched as phrases
+    via n-grams; (2) single content words (generic stopwords already stripped). Returns:
+        {"matched": set(...), "content_tokens": set(...), "degree": "full"|"partial"|"none"}
+    degree is over CONTENT tokens (stopwords ignored), so 'grupperejser bali' with bali on-offering
+    reads as full, not partial-because-of-'rejser'.
+    """
+    ot = offering_tokens or set()
+    content = _tokens(term)                      # single content words, stopwords removed
+    if not ot or not content:
+        return {"matched": set(), "content_tokens": content, "degree": "none" if ot else "unknown"}
+    grams = _ngrams(term)                         # for multi-word offering tokens
+    matched = set()
+    for tok in ot:
+        if " " in tok:                            # multi-word offering token -> phrase match
+            if tok in grams:
+                matched |= set(w for w in tok.split() if w not in GENERIC_STOPWORDS)
+        elif tok in content:                      # single-word offering token
+            matched.add(tok)
+    if not matched:
+        degree = "none"
+    elif matched >= content:                      # every content word is offering vocab
+        degree = "full"
+    else:
+        degree = "partial"
+    return {"matched": matched, "content_tokens": content, "degree": degree}
 
 
 def parse_offering_tokens(offering_md: str) -> set:
@@ -127,50 +182,74 @@ def find_matching_keyword(term: str, keyword_map_rows: list):
 
 
 # --------------------------------------------------------------------------- winners sweep
-def sweep_winners(search_term_rows: list, keyword_map_rows: list) -> dict:
-    """Deterministic new-keyword sweep.
+def sweep_winners(search_term_rows: list, keyword_map_rows: list,
+                  offering_tokens: set | None = None) -> dict:
+    """Deterministic new-keyword sweep, OFFERING-GROUNDED.
 
-    A term qualifies iff conversions >= WINNER_MIN_CONV AND it matches NO existing keyword on
-    ANY match type. Returns {"winners": [...], "skipped": [...]} — skipped names the covering
-    keyword so the 'Sprunget over' tab can explain exactly why a >=N-conv term fell off.
+    A term is a candidate iff conversions >= WINNER_MIN_CONV AND it matches NO existing keyword on
+    ANY match type (the significance + novelty floor). But a conversion on a lead-gen account is a
+    LEAD, not proof the search intent matched the offering — someone can land and sign up for
+    something else (see references/selection-spec.md). So a candidate is THEN checked against the
+    offering vocabulary (the same offering.md tokens the negative bands use):
+
+      - on-offering (offering overlap none-but-has-no-content is treated on-offering; partial/full
+        overlap) -> "winners": promotable on the Nye keywords tab.
+      - off-offering (clear 'none' overlap WITH content tokens, and offering context exists)
+        -> "review_winners": a converter-invisible review tab. Surfaced + flagged, NOT auto-
+        promoted, so an off-offering destination like 'zanzibar højskole' can never silently
+        become a new keyword. The agent confirms (move to keywords) or leaves it.
+
+    This FLAGS, never GATES: nothing qualifying is dropped — every >=N-conv novel term lands on
+    exactly one of three tabs (Nye keywords / review / Sprunget over) with a script-provable reason.
+    With no offering context (empty tokens) everything stays a plain winner (can't claim off-offering).
+
+    Returns {"winners": [...], "review_winners": [...], "skipped": [...]}.
     """
     existing = build_keyword_set(keyword_map_rows)
-    winners, skipped = [], []
+    ot = offering_tokens or set()
+    winners, review, skipped = [], [], []
     for row in search_term_rows or []:
         mx = _row_metrics(row)
         if mx["conversions"] < WINNER_MIN_CONV:
             continue
         match = find_matching_keyword(mx["term"], keyword_map_rows) if existing else None
         if match is not None:
-            skipped.append({
-                **mx,
-                "skip_reason": "already_covered",
-                "covered_by": match,
-            })
+            skipped.append({**mx, "skip_reason": "already_covered", "covered_by": match})
             continue
-        winners.append(mx)   # guaranteed on the Nye keywords tab
+        # Offering check (only meaningful when we actually have offering tokens).
+        if ot:
+            ov = offering_overlap(mx["term"], ot)
+            # off-offering = has content words, none of which are offering vocab.
+            if ov["degree"] == "none" and ov["content_tokens"]:
+                review.append({
+                    **mx,
+                    "flag": "off_offering",
+                    "offering_overlap": "",   # nothing matched
+                })
+                continue
+        winners.append(mx)   # on-offering (or no offering context) -> promotable
     winners.sort(key=lambda x: -x["conversions"])
+    review.sort(key=lambda x: -x["conversions"])
     skipped.sort(key=lambda x: -x["conversions"])
-    return {"winners": winners, "skipped": skipped}
+    return {"winners": winners, "review_winners": review, "skipped": skipped}
 
 
 # --------------------------------------------------------------------------- negatives sweep
 def propose_band(term: str, offering_tokens: set) -> str:
-    """Script's PROPOSED relevance band from literal offering-token overlap (a hint, never a
-    gate — the agent up/downgrades with the richer language read). Precedence (evaluate in this
-    order): strong overlap -> ROED; partial -> GUL; none -> GROEN."""
+    """Script's PROPOSED relevance band from offering overlap (a hint, never a gate — the agent
+    up/downgrades with the richer language read). Uses the shared offering_overlap() so the band
+    benefits from n-gram + stopword handling. full overlap -> ROED; partial -> GUL; none -> GROEN;
+    no offering context -> GUL (can't claim 'clearly off-offering')."""
     ot = offering_tokens or set()
     if not ot:
-        return BAND_YELLOW   # no offering context -> can't claim 'clearly off-offering'
-    tt = _tokens(term)
-    if not tt:
         return BAND_YELLOW
-    overlap = tt & ot
-    if not overlap:
-        return BAND_GREEN                       # shares no word with the offering -> safe-looking
-    if overlap == tt:
-        return BAND_RED                         # every token is offering vocab -> looks relevant
-    return BAND_YELLOW                           # partial overlap -> check
+    ov = offering_overlap(term, ot)
+    degree = ov["degree"]
+    if degree == "none":
+        return BAND_GREEN                       # shares no offering word -> safe-looking
+    if degree == "full":
+        return BAND_RED                         # every content word is offering vocab -> looks relevant
+    return BAND_YELLOW                           # partial / unknown -> check
 
 
 def sweep_negatives(search_term_rows: list, offering_tokens: set | None = None) -> list:
