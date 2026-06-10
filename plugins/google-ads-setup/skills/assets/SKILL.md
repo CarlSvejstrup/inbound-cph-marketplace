@@ -1,6 +1,6 @@
 ---
 name: assets
-description: Generér Google Ads kampagne-assets (sitelinks, callouts, structured snippets) som selvstændigt trin og aflever dem som regneark (.xlsx), grounded i en klients landingsside + intake. Tynd indgang til assets-referencen i campaign-build, kørt i solo-mode. To hårde firewalls: opfind ALDRIG asset-tekst (kun grounded i analyse/intake), og sitelink-URL'er er IKKE udledelige fra den skrabne side (operator-leveret eller Firecrawl-map). Pusher ALDRIG til kontoen. Brug når brugeren siger "lav assets", "sitelinks + callouts", "extensions til kampagnen", "structured snippets", eller vil have assets som et selvstændigt stykke (ikke en fuld build). Svarer på dansk.
+description: Generér Google Ads kampagne-assets (sitelinks, callouts, structured snippets) som selvstændigt trin og aflever dem som regneark (.xlsx), grounded i en klients landingsside + intake. Tynd indgang til assets-referencen i campaign-build, kørt i solo-mode. To hårde firewalls, hvor den første er at opfinde ALDRIG asset-tekst (kun grounded i analyse/intake), og den anden at sitelink-URL'er IKKE er udledelige fra den skrabne side (operator-leveret eller Firecrawl-map). Pusher ALDRIG til kontoen. Brug når brugeren siger "lav assets", "sitelinks + callouts", "extensions til kampagnen", "structured snippets", eller vil have assets som et selvstændigt stykke (ikke en fuld build). Svarer på dansk.
 ---
 
 # assets
