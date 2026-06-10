@@ -57,6 +57,31 @@ by the precedent that `/overview` etc. spawn subagents and the old `rsa-copywrit
 fixtures (strategy/structuring/rsa-manifest/assets + a referenced ads.json) and run
 `scripts/assemble.py`. Next real step is a live Cowork install + a full campaign-build run on a test client.
 
+### Also this session (same branch) — optimering-loop review-workbook polish v2.4.0
+
+Independent of the consolidation above; commit `c965332` (pushed). Carl's feedback on the DSC
+`Search_Terms_Analyse` sample, all in `plugins/google-ads-optimization/skills/optimering-loop/`:
+
+- **One shared metric block on every tab** (`_metric_block()` in `lib/review_workbook.py`): Budget
+  brugt / Spildt budget (negatives), Impressions, Klik, CTR (%), Konverteringer, CPA (DKK). CTR + CPA
+  are COMPUTED in the builder (guarded ÷0) so the block stays "ens" with no per-tab maintenance.
+  Negatives gained Konverteringer (0 by construction) + CTR; overview gained Impressions + CTR.
+- **"Læs mig" rebuilt** as a styled one-page document: navy section bars, spacer rows, fit-to-width
+  print, and a real **two-axis colour legend with filled swatches** — BUCKET (klassifikation,
+  overview) vs KONFIDENS/bånd (negatives), named distinctly so the two colour systems don't blur.
+- **Editor/CSV columns now tinted full-height** (faint navy wash on every data row, not just the
+  header) so the expert sees which columns import while scanning any row.
+- **Real Æ Ø Å everywhere** (was ASCII translit — `SAADAN`/`MOERK`/`groen`); tab renamed `Laes mig`
+  → `Læs mig` (no converter alias keys off it). New standing rule in memory.
+- **Account-level negatives** show spend once on the first fanned campaign row; remaining rows blank +
+  "samme spild" note, so the fan-out doesn't N-count the same wasted budget.
+
+**Verified:** build + `editor-csv-export` round-trip — metric/confidence columns stay in the metadata
+band and do NOT leak into keywords/negatives/ads CSVs (Editor headers byte-identical); ÆØÅ survives the
+openpyxl round-trip; clean-room isolated build; PDF render of `Læs mig` confirms the document layout +
+both swatch legends. The standing gate is unchanged: a live Cowork run of the SKILL.md orchestration
+(the Python plumbing is verified, the agent's classification/orchestration layer hasn't run end-to-end).
+
 ---
 
 # Session handoff — 2026-06-09 (Excel→CSV converter shipped; loop made converter-ready)
