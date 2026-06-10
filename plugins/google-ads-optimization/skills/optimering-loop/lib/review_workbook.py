@@ -624,13 +624,21 @@ def build(data, out_path):
     # keywords tab by hand. See references/selection-spec.md (decision: flag, don't gate).
     review_winners = data.get("review_winners", [])
     if review_winners:
+        # A review-winner arrives either from the script token-split (flag "off_offering") or from
+        # the agent-bucket reconcile (flag "irrelevant"/"placement_problem" + a demoted_reason).
+        # Show a human flag string + whatever reason we have.
+        _FLAG_LABEL = {
+            "off_offering": "Ser ud til at være uden for tilbuddet (off-offering)",
+            "irrelevant": "Agent: uden for tilbuddet (IRRELEVANT)",
+            "placement_problem": "Agent: forkert ad group (skal omplaceres)",
+        }
         rw_rows = [{
             "Søgeterm": w.get("term", ""),
             "Kampagne": w.get("campaign", ""),
             "Ad group": w.get("ad_group", ""),
             **_metric_block(w),
-            "Flag": "Ser ud til at være uden for tilbuddet (off-offering)",
-            "Begrundelse": w.get("reason", ""),
+            "Flag": _FLAG_LABEL.get(w.get("flag", ""), "Til gennemgang"),
+            "Begrundelse": w.get("demoted_reason") or w.get("reason", ""),
             "Agent-note": w.get("agent_note", ""),
         } for w in review_winners]
         _reference_sheet(wb, "Vindere til gennemgang",

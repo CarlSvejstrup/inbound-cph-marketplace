@@ -166,8 +166,19 @@ JSON.
     `offering.md`** (Phase 0) — det er nu den eksplicitte grundsandhed for "passer dette tilbuddet?",
     inkl. out-of-scope-listen (en term der rammer den → konfident IRRELEVANT/GROEN). Sæt
     `low_confidence=true` hvis konto-konverteringer < 10.
-  Returnér `winners`, `review_winners`, `negatives`, `all_terms` (m. bucket), `skipped_winners`,
-  `active_campaigns`, `low_confidence` — præcis de felter `review_workbook.build()` læser.
+  - **AFSTEM vindere med buckets (OBLIGATORISK — det er det der fanger `zanzibar højskole`):** scriptets
+    token-split er grov. En term der deler ÉT offering-ord (`zanzibar højskole` deler `højskole`) scorer
+    PARTIAL og bliver en promoverbar vinder — scriptet kan ikke se at destinationen er off-offering. Det
+    er DIN bucket-vurdering der fanger det. Efter du har tildelt buckets, kør:
+    ```python
+    bucket_by_term = { t["term"]: t["bucket"] for t in all_terms }   # din klassifikation
+    w = sweep.reconcile_winners_with_buckets(w, bucket_by_term)       # demoterer IRRELEVANT/PLACEMENT-vindere
+    ```
+    Det flytter enhver vinder du buckede IRRELEVANT (off-offering) eller PLACEMENT_PROBLEM (forkert ad
+    group) fra `winners` til `review_winners` MED begrundelse. Resultat: ingen term kan stå som *promovér*
+    på "Nye keywords" OG som IRRELEVANT på "Alle søgetermer" i samme workbook. Kør ALTID dette før Trin 3.
+  Returnér `w["winners"]`, `w["review_winners"]` (EFTER reconcile), `negatives`, `all_terms` (m. bucket),
+  `skipped_winners`, `active_campaigns`, `low_confidence` — præcis de felter `review_workbook.build()` læser.
 - **Asset-hygiejne-agent** → `AssetHygieneFindings`. GAQL: `lib/gaql/asset_view.py`
   (`asset_view_query`, `rsa_count_query`, `search_ad_groups_query`). Kun struktur: RSA-count per ad
   group (<2 → challenger-flag), dødvægt, vinkel-gap-brief. ALDRIG CVR-dom.

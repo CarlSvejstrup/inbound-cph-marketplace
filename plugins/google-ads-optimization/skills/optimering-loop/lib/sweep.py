@@ -192,12 +192,17 @@ def sweep_winners(search_term_rows: list, keyword_map_rows: list,
     something else (see references/selection-spec.md). So a candidate is THEN checked against the
     offering vocabulary (the same offering.md tokens the negative bands use):
 
-      - on-offering (offering overlap none-but-has-no-content is treated on-offering; partial/full
-        overlap) -> "winners": promotable on the Nye keywords tab.
+      - on-offering (partial/full overlap, or no content tokens) -> "winners": promotable.
       - off-offering (clear 'none' overlap WITH content tokens, and offering context exists)
-        -> "review_winners": a converter-invisible review tab. Surfaced + flagged, NOT auto-
-        promoted, so an off-offering destination like 'zanzibar højskole' can never silently
-        become a new keyword. The agent confirms (move to keywords) or leaves it.
+        -> "review_winners": a converter-invisible review tab, surfaced + flagged, NOT auto-promoted.
+
+    IMPORTANT — the token check is COARSE and catches only the easy case. A term like
+    'zanzibar højskole' shares an offering word ('højskole') so it scores PARTIAL and stays a
+    promotable winner here — the script cannot tell that the destination is off-offering. That is
+    why reconcile_winners_with_buckets() (below) exists: the AGENT's offering-grounded bucket
+    (IRRELEVANT / PLACEMENT_PROBLEM) is the real catch, and it DEMOTES such a winner into
+    review_winners. Always run that reconcile after the agent assigns buckets — the script's token
+    split alone does NOT fix 'zanzibar højskole'.
 
     This FLAGS, never GATES: nothing qualifying is dropped — every >=N-conv novel term lands on
     exactly one of three tabs (Nye keywords / review / Sprunget over) with a script-provable reason.
@@ -232,6 +237,52 @@ def sweep_winners(search_term_rows: list, keyword_map_rows: list,
     review.sort(key=lambda x: -x["conversions"])
     skipped.sort(key=lambda x: -x["conversions"])
     return {"winners": winners, "review_winners": review, "skipped": skipped}
+
+
+# Buckets that mean "this winner should NOT be promoted as-is" — the agent's offering-grounded
+# read demotes a token-passed winner. IRRELEVANT = off-offering (the zanzibar højskole case);
+# PLACEMENT_PROBLEM = relevant but wrong ad group (promoting it to the current ad group as-is is
+# wrong — it needs re-placing first, so it goes to review, not straight to Nye keywords).
+DEMOTING_BUCKETS = {BUCKET_IRRELEVANT, BUCKET_PLACEMENT}
+
+
+def reconcile_winners_with_buckets(winner_result: dict, bucket_by_term: dict) -> dict:
+    """Reconcile the script's token-based winner split with the AGENT's offering-grounded buckets.
+
+    THE FIX for 'zanzibar højskole' (and the winner<->bucket incoherence generally). The token
+    split in sweep_winners is coarse: a term sharing one offering word ('højskole') scores PARTIAL
+    and stays a promotable winner, even when the agent — reading the full offering — buckets it
+    IRRELEVANT. Without this step the SAME term could sit on 'Nye keywords' as promote AND on 'Alle
+    søgetermer' coloured IRRELEVANT in one workbook. Routing all PARTIALs to review in the script
+    would over-flag legitimate partials ('københavn højskole', 'weekend højskole'), so the agent's
+    judgment — not a coarser script rule — is the right catch.
+
+    Any winner whose agent bucket is in DEMOTING_BUCKETS (IRRELEVANT / PLACEMENT_PROBLEM) moves from
+    `winners` to `review_winners`, carrying the bucket as its flag + a script reason. Idempotent;
+    terms not in bucket_by_term are left as-is. Run this AFTER the agent assigns buckets and BEFORE
+    building the workbook.
+
+    winner_result: the dict from sweep_winners (mutated copy returned, original untouched).
+    bucket_by_term: {normalised-or-raw term -> bucket string}. Lookup is normalised both ways.
+    """
+    bmap = {normalise_term(k): (v or "").strip().upper() for k, v in (bucket_by_term or {}).items()}
+    keep, demoted = [], list(winner_result.get("review_winners", []))
+    for w in winner_result.get("winners", []):
+        bucket = bmap.get(normalise_term(w.get("term", "")))
+        if bucket in DEMOTING_BUCKETS:
+            reason = ("Agenten klassificerede den som uden for tilbuddet (IRRELEVANT)"
+                      if bucket == BUCKET_IRRELEVANT
+                      else "Relevant, men i den forkerte ad group (skal omplaceres før promovering)")
+            demoted.append({**w, "flag": bucket.lower(), "demoted_reason": reason})
+        else:
+            keep.append(w)
+    keep.sort(key=lambda x: -x["conversions"])
+    demoted.sort(key=lambda x: -x.get("conversions", 0))
+    return {
+        "winners": keep,
+        "review_winners": demoted,
+        "skipped": winner_result.get("skipped", []),
+    }
 
 
 # --------------------------------------------------------------------------- negatives sweep

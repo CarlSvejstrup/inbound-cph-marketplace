@@ -53,6 +53,18 @@ heuristic, so gating on it would kill real winners. Flagging fails safe: a skipp
 leaves the term *visible but not promoted*, and it structurally cannot reach a CSV. With no offering
 context (empty tokens, scrape failed) the check is a no-op and everything stays promotable.
 
+**The token split is COARSE — the agent's bucket is the real catch (the `zanzibar højskole` case).**
+The script's overlap test only catches a term with ZERO offering words. `zanzibar højskole` shares
+`højskole`, so it scores *partial* and the script keeps it a promotable winner — the script cannot
+know the *destination* is off-offering. Routing all partials to review would over-flag legitimate
+ones (`københavn højskole`, `weekend højskole`). So the fix is `reconcile_winners_with_buckets()`:
+after the agent assigns offering-grounded buckets, any winner the agent bucketed **IRRELEVANT**
+(off-offering) or **PLACEMENT_PROBLEM** (relevant, wrong ad group) is **demoted** from `winners` to
+`review_winners`. This also closes a coherence hole — without it the same term could be *promote* on
+"Nye keywords" AND *IRRELEVANT* on "Alle søgetermer" in one workbook. The reconcile is OBLIGATORY in
+the SKILL.md flow (Trin 2, after bucketing, before build). The script owns the easy token split; the
+agent's richer offering read owns the hard cases like `zanzibar højskole`.
+
 **Token-overlap quality (2026-06-10):** `offering_overlap` matches multi-word offering tokens via
 n-grams (so `new zealand` / `costa rica` / `sri lanka` match as a UNIT, not as stray words) and
 strips a generic stoplist (`rejse`, `unge`, `billig`, `dansk`, …) before judging overlap — without
