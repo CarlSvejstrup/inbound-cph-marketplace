@@ -82,10 +82,12 @@ Udled så meget som muligt fra samtalen først. Saml i ét kald:
 
 1. **Klient + `customer_id`** — bekræft hvis nævnt; ellers `list_accessible_accounts` → find id'et
    → bekræft. (Klientnoter ligger i vault `clients/*.md`, men spørg hvis i tvivl.)
-2. **Analysevindue** — default sidste 30 dage. Vis `Sidste 30 dage (Anbefalet)`, `Sidste 90 dage`,
-   `Andet`. **VIGTIGT:** `LAST_90_DAYS` er IKKE et gyldigt GAQL-literal — for >30 dage beregn
-   `BETWEEN '<YYYY-MM-DD>' AND '<YYYY-MM-DD>'`. `lib/gaql/window_clause()` håndterer dette; brug
-   det, gæt aldrig literalet.
+2. **Analysevindue** — default **sidste 90 dage** (mere data → færre under-signifikans-tilfælde;
+   bedre signal for optimering på Inbounds små konti). Vis `Sidste 90 dage (Anbefalet)`,
+   `Sidste 30 dage`, `Andet`. **VIGTIGT:** `LAST_90_DAYS` er IKKE et gyldigt GAQL-literal — for
+   90 dage / >30 dage beregn `BETWEEN '<YYYY-MM-DD>' AND '<YYYY-MM-DD>'`. `lib/gaql/window_clause()`
+   (søgetermer/asset) og `lib/gaql/quality_score.date_range_arg()` (QS) håndterer begge dette; brug
+   dem, gæt aldrig literalet.
 3. **Gem-destination** — `Drive (klientens mappe)`, `Lokalt (.xlsx)`, eller begge. Drive = ekstern
    write → bekræft én gang før gem.
 
@@ -100,9 +102,27 @@ kampagner — pausede ekskluderes), (c) post-processe via modulets normaliser, (
 
 - **Søgeterm-agent** → `SearchTermFindings`. GAQL: `lib/gaql/search_terms.py`
   (`search_terms_query`, `keyword_map_query`, `ad_group_ads_query`, `account_search_cost_query`).
-  Klassificér hver term mod `lib/classify/taxonomy.md` (RELEVANT / VINDER / PLACEMENT_PROBLEM /
-  IRRELEVANT / GRÆNSE), forankret i klientens scrapede tilbud. Vinder = ≥2 konv. Sæt
-  `low_confidence=true` hvis konto-konverteringer < 10.
+  **Kør FØRST det deterministiske sweep — agenten må aldrig selv finde/tabe kandidater** (det er
+  rygraden, se `references/selection-spec.md`):
+  ```python
+  import sweep   # lib/sweep.py — IKKE 'select' (det skygger Pythons stdlib)
+  w   = sweep.sweep_winners(search_term_rows, keyword_map_rows)   # {winners, skipped}
+  neg = sweep.sweep_negatives(search_term_rows, offering_tokens)  # [{band, thin_data, ...}]
+  ov  = sweep.all_terms_overview(search_term_rows)                # alle >=5 DKK termer
+  ```
+  - `w["winners"]` (≥2 konv + matcher INTET eksisterende keyword på nogen match type) er
+    **garanteret** på "Nye keywords"-fanen. `w["skipped"]` (≥2 konv men allerede dækket) går på
+    "Sprunget over"-fanen MED det dækkende keyword — så intet forsvinder usynligt.
+  - `neg` er ALLE 0-konv ≥50 DKK-termer; scriptet foreslår en `band` (GROEN/GUL/ROED) ud fra
+    offering-token-overlap. **Agentens rolle:** op/nedgradér `band` med den rigere sprog-vurdering
+    (`wikipedia` = info-søgning → GROEN; et reelt produkt → ROED) og LOG ændringen i
+    `band_adjustment` (`script: GUL -> agent: GROEN (grund: ...)`). Tilføj `level` + en dansk
+    `reason` per negativ. Tilføj aldrig/fjern aldrig en kandidat — kun juster band + begrundelse.
+  - **Agentens øvrige rolle:** tildel hver overview-term en `bucket` (VINDER / RELEVANT /
+    PLACEMENT_PROBLEM / IRRELEVANT / GRÆNSE) mod `lib/classify/taxonomy.md`, forankret i det
+    scrapede tilbud (offering). Sæt `low_confidence=true` hvis konto-konverteringer < 10.
+  Returnér `winners`, `negatives`, `all_terms` (m. bucket), `skipped_winners`, `active_campaigns`,
+  `low_confidence` — præcis de felter `review_workbook.build()` læser.
 - **Asset-hygiejne-agent** → `AssetHygieneFindings`. GAQL: `lib/gaql/asset_view.py`
   (`asset_view_query`, `rsa_count_query`). Kun struktur: RSA-count per ad group (<2 →
   challenger-flag), dødvægt, vinkel-gap-brief. ALDRIG CVR-dom.
@@ -120,18 +140,28 @@ python3 ${CLAUDE_SKILL_DIR}/lib/review_workbook.py --in <findings.json> \
   --out "Optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Findings-objektet (se docstring i `review_workbook.py`):
-- `negatives`: fra søgeterm-fundene (+ evt. SEMrush-spild hvis tilgængeligt). Niveau pr. term;
-  konto-niveau udfoldes af builderen til per-kampagne-rækker — derfor SKAL `active_campaigns` med.
-- `winners`: søgeterm-vindere med ≥2 konv. (builderen promoverer til `Exact`, `Paused`).
+Findings-objektet (se docstring i `review_workbook.py` for det fulde skema):
+- `negatives`: fra `sweep.sweep_negatives` (m. agent-justeret `band`, `band_adjustment`, `level`,
+  `reason`). Niveau pr. term; konto-niveau udfoldes af builderen til per-kampagne-rækker — derfor
+  SKAL `active_campaigns` med.
+- `winners`: `sweep.sweep_winners(...)["winners"]` (builderen promoverer til `Exact`, `Paused`).
+- `skipped_winners`: `...["skipped"]` — ≥2-konv-termer der allerede er dækket (→ "Sprunget over").
+- `all_terms`: `sweep.all_terms_overview(...)` m. agent-tildelt `bucket` per term (→ overview-fanen).
 - `rsa_rows`: for hver ad group med `challenger_flag` eller vinkel-hul, ÉN **ny** challenger
   (headlines ≤15, descriptions ≤4, paths[2], final_url), forankret i `references/headline-craft.md`
   + asset-hygiejnens gap-brief. RESPEKTÉR Editor-grænserne (headline ≤30, description ≤90, path
   ≤15) — drop/trim for-lange linjer. Status altid `Paused`. ALDRIG en in-place edit.
 
-Workbooken har faner: **Laes mig**, **Negative keywords**, **Nye keywords (vindere)**,
-**RSA challengers**. Mørkeblå kolonner = Editor-felter (konverteren beholder); lyseblå = metadata
-(konverteren dropper).
+Workbooken har **6 faner:** **Laes mig**, **Negative keywords** (Konfidens-farvet 🟢/🟡/🔴 +
+`Tynd data`-flag), **Nye keywords (vindere)**, **RSA challengers**, **Sprunget over** (de dækkede
+≥2-konv-termer + det dækkende keyword), **Alle søgetermer** (FULDT overblik over alle ≥5 DKK,
+farvet efter `Gruppe`/bucket). To farve-akser, bevidst forskellige: overview farver efter
+KLASSIFIKATION (bucket), negatives-fanen efter KONFIDENS (hvor trygt at blokere).
+
+**To faner bliver ALDRIG til CSV:** `Alle søgetermer` + `Sprunget over` matcher ingen
+`editor-csv-export`-alias → konverteren læser dem aldrig. Det er garantien for "kun overblik".
+Mørkeblå kolonner på de andre faner = Editor-felter (konverteren beholder); lyseblå = metadata
+(droppes, inkl. Konfidens/Klik/Tynd data).
 
 ## Trin 4 — Aflever + næste skridt
 
@@ -154,9 +184,17 @@ Workbooken har faner: **Laes mig**, **Negative keywords**, **Nye keywords (vinde
 
 ## Maintenance
 
-- De deterministiske dele bor i `lib/` (medfølger skillet — Cowork-plugins er self-contained).
-  `lib/gaql/*` + `lib/review_workbook.py` + `lib/classify/taxonomy.md` er **kopier** harmoniseret
-  med `editor-csv-export`-kontrakten (negatives taler samme tab-04-vokabular). Retter du
+- De deterministiske dele bor i `lib/` (medfølger skillet — Cowork-plugins er self-contained):
+  `lib/gaql/*` (query-strenge + normalisering), `lib/sweep.py` (den deterministiske kandidat-sweep
+  — vinder/negative/overview), `lib/review_workbook.py` (bygger .xlsx), `lib/classify/taxonomy.md`.
+  Selektions-designet (hvorfor scriptet ejer "intet glemmes", konfidens-banderne, de to farve-akser,
+  CSV-isoleringen) står i `references/selection-spec.md` — læs den før du ændrer sweep- eller
+  workbook-logik.
+- **Navne-gotcha:** modulet hedder `sweep.py`, IKKE `select.py` — `select` skygger Pythons stdlib
+  `select` som `subprocess` (i review_workbook) afhænger af → import-crash hvis de deler proces.
+- `lib/*` er **kopier** harmoniseret med `editor-csv-export`-kontrakten (negatives taler samme
+  tab-04-vokabular; de nye kolonner — Konfidens/Klik/Tynd data/Agent-note — er alle metadata som
+  konverteren dropper; `Alle søgetermer` + `Sprunget over` er alias-usynlige). Retter du
   workbook-kolonnerne, så opdatér også `editor-csv-export`-kontrakten — de er tæt koblede.
 - Den lokale dev-harness (`workflows/optimization-loop/`, en Claude Code Workflow) var prototypen;
   DETTE skill er nu den kanoniske vej. Vedligehold ikke begge — workflow'en er kasserbar.

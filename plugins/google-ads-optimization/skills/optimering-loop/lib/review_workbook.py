@@ -78,9 +78,26 @@ WRAP_ALIGN = Alignment(horizontal="left", vertical="top", wrap_text=True)
 TOP_ALIGN = Alignment(horizontal="left", vertical="top")
 
 # Metadata columns that hold prose and should wrap at a comfortable width (not autosize wide).
-WRAP_COLS = {"Begrundelse", "Reason", "Niveau (oprindeligt)"}
+WRAP_COLS = {"Begrundelse", "Reason", "Niveau (oprindeligt)", "Konfidens-justering"}
 WIDE_WIDTH = 48
 NARROW_MAX = 30
+
+# --- Two colour axes (deliberately distinct; see references/selection-spec.md) ---
+# BUCKET = classification (the "Alle søgetermer" overview tab colours by which group a term is in).
+# BAND   = confidence/relevance (the Negative keywords tab colours by how safe a term is to block).
+# Soft fills (pastel) so coloured rows stay readable under the house style.
+BUCKET_FILLS = {
+    "VINDER":            "D6EFD6",   # green   — winner, not yet a keyword
+    "RELEVANT":          "D6E4F5",   # blue    — already covered / well-placed
+    "PLACEMENT_PROBLEM": "FCE4C8",   # orange  — relevant, wrong ad group
+    "IRRELEVANT":        "F6D6D6",   # red     — negative candidate
+    "GRAENSE":           "E6E6E6",   # grey    — borderline
+}
+BAND_FILLS = {
+    "GROEN": "D6EFD6",   # clearly off-offering -> safe to block
+    "GUL":   "FBEFC8",   # loosely related -> check
+    "ROED":  "F6D6D6",   # looks relevant -> probably should NOT be a negative
+}
 
 _MATCH = {"EXACT": "Exact", "PHRASE": "Phrase", "BROAD": "Broad"}
 
@@ -145,6 +162,73 @@ def _sheet(wb, title, editor_headers, meta_headers, rows, widths=None):
             widest = max(widest, len(str(v)))
         ws.column_dimensions[letter].width = max(10, min(NARROW_MAX, widest + 3))
     return ws
+
+
+def _reference_sheet(wb, title, headers, rows, row_fill_key=None, fill_map=None,
+                     fill_column=None):
+    """Write a REFERENCE tab (overview / sprunget-over) — never read by the converter, so it
+    uses a single navy header (no editor/metadata split) and colours rows by a classification.
+
+    title MUST NOT match any editor-csv-export tab alias (the converter reads keywords from
+    'Keywords'/'Nye keywords (vindere)', negatives from 'Negative keywords'/'Negatives') — these
+    reference tabs are named so they are structurally invisible to it (e.g. 'Alle søgetermer',
+    'Sprunget over').
+
+    row_fill_key: a key in each row dict whose value selects a colour from fill_map (e.g. the
+        'bucket' or 'band'). When set, the WHOLE data row is filled with that colour.
+    fill_column: if given, ONLY that column's cell is filled (used when colour belongs to one
+        cell, e.g. a 'Konfidens' column), not the whole row.
+    """
+    ws = wb.create_sheet(title)
+    for c, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.alignment = HEADER_ALIGN
+        cell.border = CELL_BORDER
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+    ws.row_dimensions[1].height = 28
+    wrap_idx = {i for i, h in enumerate(headers, start=1) if h in WRAP_COLS}
+    for r, row in enumerate(rows, start=2):
+        fill = None
+        if row_fill_key and fill_map:
+            fill = fill_map.get(str(row.get(row_fill_key, "")).upper())
+        for c, h in enumerate(headers, start=1):
+            cell = ws.cell(row=r, column=c, value=row.get(h, ""))
+            cell.border = CELL_BORDER
+            cell.alignment = WRAP_ALIGN if c in wrap_idx else TOP_ALIGN
+            if fill and (fill_column is None or h == fill_column):
+                cell.fill = _fill(fill)
+    ncols = len(headers)
+    ws.freeze_panes = "A2"
+    if ncols >= 1:
+        ws.auto_filter.ref = f"A1:{get_column_letter(ncols)}{max(ws.max_row, 1)}"
+    for i, h in enumerate(headers, start=1):
+        letter = get_column_letter(i)
+        if h in WRAP_COLS:
+            ws.column_dimensions[letter].width = WIDE_WIDTH
+            continue
+        widest = len(str(h))
+        for cell in ws[letter]:
+            v = cell.value
+            if v is None:
+                continue
+            widest = max(widest, len(str(v)))
+        ws.column_dimensions[letter].width = max(10, min(NARROW_MAX, widest + 3))
+    return ws
+
+
+def _color_column_by_value(ws, header_name, fill_map):
+    """Fill each data cell in the named column by its own value (e.g. Konfidens -> band colour).
+    Per-cell colouring, applied after _sheet so it overrides the zebra band on that one column."""
+    headers = [c.value for c in ws[1]]
+    if header_name not in headers:
+        return
+    col = headers.index(header_name) + 1
+    for r in range(2, ws.max_row + 1):
+        cell = ws.cell(row=r, column=col)
+        fill = fill_map.get(str(cell.value or "").upper())
+        if fill:
+            cell.fill = _fill(fill)
 
 
 # Editor-bound header sets per entity (the converter's KEEP list). Exact Editor spelling.
@@ -215,13 +299,21 @@ def build(data, out_path):
       "client", "account_id", "period", "today",
       "active_campaigns": ["string"],   # active campaign names; account-level negatives fan out across these
       "negatives": [ {keyword, match_type (EXACT|PHRASE), level (ad_group|campaign|account),
-                      campaign, ad_group, wasted_spend_dkk, reason} ],
-      "winners":   [ {term, campaign, ad_group, conversions, cpa_dkk, reason} ],   # promote->Exact, Paused
+                      campaign, ad_group, wasted_spend_dkk, reason,
+                      band (GROEN|GUL|ROED), clicks, impressions, thin_data (bool),
+                      band_adjustment ("script: X -> agent: Y (grund: ...)")} ],
+      "winners":   [ {term, campaign, ad_group, conversions, cpa_dkk, reason, agent_note} ],  # promote->Exact, Paused
       "rsa_rows":  [ {campaign, ad_group, headlines[], descriptions[], paths[2], final_url,
-                      status (Paused), reason} ]
+                      status (Paused), reason} ],
+      "all_terms": [ {term, campaign, ad_group, cost_dkk, clicks, conversions, cpa_dkk,
+                      bucket (VINDER|RELEVANT|PLACEMENT_PROBLEM|IRRELEVANT|GRAENSE)} ],  # overview, never CSV
+      "skipped_winners": [ {term, campaign, ad_group, conversions, cost_dkk,
+                            covered_by:{keyword, match_type}} ]                         # 'Sprunget over', never CSV
     }
     Every RSA row is a NET-NEW challenger (Paused). The loop never edits a live RSA in place
     (resets learning + Editor CSV can't reliably match an RSA) — see the RSA tab comment.
+    The `band`/`thin_data`/`bucket` fields come from lib/select.py's deterministic sweep; the
+    agent may override `band` (logged in `band_adjustment`) and assigns `bucket`.
     """
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -245,6 +337,19 @@ def build(data, out_path):
     active_campaigns = data.get("active_campaigns") or []
     account_level_notes = []
     neg_rows = []
+
+    def _neg_meta(n):
+        """Confidence + significance metadata (converter DROPS all of these)."""
+        return {
+            "Konfidens": n.get("band", ""),
+            "Klik": n.get("clicks", ""),
+            "Impressions": n.get("impressions", ""),
+            "Tynd data": "ja" if n.get("thin_data") else "",
+            "Konfidens-justering": n.get("band_adjustment", ""),
+            "Spildt budget (DKK)": n.get("wasted_spend_dkk", n.get("cost_dkk", "")),
+            "Begrundelse": n.get("reason", ""),
+        }
+
     for n in data.get("negatives", []):
         level = (n.get("level") or "campaign").lower()
         if level == "account":
@@ -258,8 +363,7 @@ def build(data, out_path):
                     "Negative keyword": n.get("keyword", ""),
                     "Match type": _match(n.get("match_type", "")),
                     "Niveau (oprindeligt)": "account -> fanned to campaign",
-                    "Spildt budget (DKK)": n.get("wasted_spend_dkk", ""),
-                    "Begrundelse": n.get("reason", ""),
+                    **_neg_meta(n),
                 })
             continue
         neg_rows.append({
@@ -270,8 +374,7 @@ def build(data, out_path):
             "Match type": _match(n.get("match_type", "")),
             # metadata (dropped by converter):
             "Niveau (oprindeligt)": level,
-            "Spildt budget (DKK)": n.get("wasted_spend_dkk", ""),
-            "Begrundelse": n.get("reason", ""),
+            **_neg_meta(n),
         })
     # Readme first (inserted at index 0). Built here so it can list the account-level notes
     # computed in the negatives loop above.
@@ -279,8 +382,13 @@ def build(data, out_path):
 
     # No explicit widths: the shared style system autosizes short columns and wraps the prose
     # column (Begrundelse) at a comfortable width, exactly like the setup assembler workbook.
-    _sheet(wb, "Negative keywords", NEGATIVES_EDITOR,
-           ["Niveau (oprindeligt)", "Spildt budget (DKK)", "Begrundelse"], neg_rows)
+    # Metadata band carries the confidence/significance columns (all dropped by the converter).
+    neg_meta_headers = ["Niveau (oprindeligt)", "Konfidens", "Klik", "Impressions", "Tynd data",
+                        "Konfidens-justering", "Spildt budget (DKK)", "Begrundelse"]
+    neg_ws = _sheet(wb, "Negative keywords", NEGATIVES_EDITOR, neg_meta_headers, neg_rows)
+    # Colour the Konfidens CELL by band (the relevance axis: GROEN/GUL/ROED). Per-cell, not whole
+    # row, so it doesn't fight the zebra banding on the other columns.
+    _color_column_by_value(neg_ws, "Konfidens", BAND_FILLS)
 
     # --- Keyword expansion tab (promote winners to Exact, Paused) ---
     kw_rows = []
@@ -295,9 +403,10 @@ def build(data, out_path):
             "Konverteringer": w.get("conversions", ""),
             "CPA (DKK)": w.get("cpa_dkk", ""),
             "Begrundelse": w.get("reason", ""),
+            "Agent-note": w.get("agent_note", ""),
         })
     _sheet(wb, "Nye keywords (vindere)", KEYWORDS_EDITOR,
-           ["Konverteringer", "CPA (DKK)", "Begrundelse"], kw_rows)
+           ["Konverteringer", "CPA (DKK)", "Begrundelse", "Agent-note"], kw_rows)
 
     # --- RSA challengers tab ---
     # EVERY RSA change is a NET-NEW challenger (Paused), never an in-place edit. Rationale
@@ -329,6 +438,45 @@ def build(data, out_path):
         row["Begrundelse"] = r.get("reason", "")
         rsa_rows.append(row)
     _sheet(wb, "RSA challengers", rsa_editor_headers, ["Begrundelse"], rsa_rows)
+
+    # --- Sprunget over (vindere) — >=2-conv terms a script reason filtered out (reference only) ---
+    # Named so it matches NO editor-csv-export alias -> never becomes a CSV. Answers "why did this
+    # >=2-conv term not appear as a new keyword?" with the exact covering keyword.
+    skipped = data.get("skipped_winners", [])
+    if skipped:
+        sk_rows = [{
+            "Søgeterm": s.get("term", ""),
+            "Kampagne": s.get("campaign", ""),
+            "Ad group": s.get("ad_group", ""),
+            "Konverteringer": s.get("conversions", ""),
+            "Cost (DKK)": s.get("cost_dkk", ""),
+            "Sprunget over fordi": "Allerede dækket af eksisterende keyword",
+            "Dækket af (keyword)": (s.get("covered_by") or {}).get("keyword", ""),
+            "Match type": (s.get("covered_by") or {}).get("match_type", ""),
+        } for s in skipped]
+        _reference_sheet(wb, "Sprunget over",
+                         ["Søgeterm", "Kampagne", "Ad group", "Konverteringer", "Cost (DKK)",
+                          "Sprunget over fordi", "Dækket af (keyword)", "Match type"], sk_rows)
+
+    # --- Alle søgetermer — full overview of every term >=5 DKK, coloured by BUCKET (reference) ---
+    # Named so it matches NO editor-csv-export alias -> never becomes a CSV. The action tabs above
+    # are distilled subsets of this. Colour axis here is the classification bucket (NOT confidence).
+    all_terms = data.get("all_terms", [])
+    if all_terms:
+        ov_rows = [{
+            "Søgeterm": t.get("term", ""),
+            "Kampagne": t.get("campaign", ""),
+            "Ad group": t.get("ad_group", ""),
+            "Cost (DKK)": t.get("cost_dkk", ""),
+            "Klik": t.get("clicks", ""),
+            "Konverteringer": t.get("conversions", ""),
+            "CPA (DKK)": t.get("cpa_dkk", "") if t.get("cpa_dkk") is not None else "",
+            "Gruppe": t.get("bucket", ""),
+        } for t in all_terms]
+        _reference_sheet(wb, "Alle søgetermer",
+                         ["Søgeterm", "Kampagne", "Ad group", "Cost (DKK)", "Klik",
+                          "Konverteringer", "CPA (DKK)", "Gruppe"], ov_rows,
+                         row_fill_key="Gruppe", fill_map=BUCKET_FILLS)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)
