@@ -14,9 +14,10 @@ builders run on either — one converter, no fork. It lives in google-ads-genera
 it serves both setup and optimization (Cowork can't share the .py cross-plugin, so a per-plugin
 copy would guarantee drift).
 
-Pure transform: reads ONE local .xlsx, writes up to 6 local .csv files. No Google Ads API call,
-no push, no external read/write. The human imports the CSVs in Editor (Account > Import > From
-file) after review.
+Pure transform: reads ONE local .xlsx, writes ONE local .zip bundling up to 6 Editor CSVs. No
+Google Ads API call, no push, no external read/write. The human unzips and imports the CSVs in
+Editor (Account > Import > From file) after review. The CSVs are named with a numeric prefix
+(1-campaigns.csv ... 6-negatives.csv) so the extracted bundle sorts into Editor's import order.
 
 Read the workbook BY HEADER NAME, never by column index — Editor headers are case- and
 space-insensitive (answer 57747: `daily budget` == `DailyBudget`), and reading by name makes the
@@ -46,6 +47,8 @@ import json
 import os
 import re
 import sys
+import tempfile
+import zipfile
 
 # openpyxl bootstrap: reuse the RSA layout's installer if reachable, else pip-install inline.
 try:
@@ -350,59 +353,77 @@ def main():
             "optimization-loop workbook?"
         )
 
+    # The deliverable is ONE zip named after the workbook. Compute its path now and clear any
+    # stale copy from a previous run into the same outdir, BEFORE the guards. That way a guard
+    # failure (below) leaves no zip for this workbook in outdir — the "no importable bundle from a
+    # flawed workbook" guarantee holds even when re-running into a dirty outdir that still holds an
+    # earlier (now out-of-date) good run's zip.
+    base = os.path.splitext(os.path.basename(args.workbook))[0]
+    zip_path = os.path.join(args.outdir, f"{base} - editor-csv.zip")
+    if os.path.exists(zip_path):
+        os.remove(zip_path)
+
     # Re-run the two hard guards at this boundary (a human may have edited the Excel).
+    # These run BEFORE any write — if either fires, no .zip is produced and we exit non-zero,
+    # so a flawed workbook can never sail into an importable bundle.
     guard_keywords(keywords)
     guard_rsa_lengths(rsas)
 
-    written = []
+    # Build the CSVs into a throwaway temp dir, then bundle them into ONE .zip in --outdir.
+    # Writing to a temp dir first lets _write_csv stay untouched (BOM-correct utf-8-sig bytes),
+    # and the zip copies those exact bytes verbatim — no re-encoding, so Danish æ/ø/å survive.
+    # The numeric arcname prefix (1-campaigns ... 6-negatives) makes the extracted bundle sort
+    # into Editor's documented import order, so the human imports top-to-bottom without guessing.
+    entities = [
+        ("1-campaigns.csv", build_campaigns(settings),
+         ["Campaign", "Campaign type", "Budget", "Bid strategy type",
+          "Networks", "Language targeting", "Campaign status"]),
+        ("2-adgroups.csv", build_adgroups(agroups),
+         ["Campaign", "Ad group", "Max CPC", "Ad group status"]),
+        ("3-keywords.csv", build_keywords(keywords),
+         ["Campaign", "Ad group", "Keyword", "Match type", "Status"]),
+        ("5-assets.csv", build_assets(assets),
+         ["Campaign", "Ad group", "Sitelink text", "Final URL",
+          "Description line 1", "Description line 2", "Callout text",
+          "Header", "Snippet values"]),
+        ("6-negatives.csv", build_negatives(negatives),
+         ["Campaign", "Ad group", "Keyword", "Type"]),
+    ]
+    # ads.csv (slot 4) carries dynamic #Original passthrough fields, so its header is built per-run.
+    ads_fields, ads_rows = build_ads(rsas)
 
-    rows = build_campaigns(settings)
-    if rows:
-        p = os.path.join(args.outdir, "campaigns.csv")
-        _write_csv(p, ["Campaign", "Campaign type", "Budget", "Bid strategy type",
-                       "Networks", "Language targeting", "Campaign status"], rows)
-        written.append((p, len(rows)))
+    written = []  # (arcname, row count) — what's inside the zip, retained in the JSON summary
 
-    rows = build_adgroups(agroups)
-    if rows:
-        p = os.path.join(args.outdir, "adgroups.csv")
-        _write_csv(p, ["Campaign", "Ad group", "Max CPC", "Ad group status"], rows)
-        written.append((p, len(rows)))
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = []  # (arcname, temp path)
+        for arcname, rows, fieldnames in entities:
+            if rows:
+                tmp_path = os.path.join(tmp, arcname)
+                _write_csv(tmp_path, fieldnames, rows)
+                staged.append((arcname, tmp_path))
+                written.append((arcname, len(rows)))
+        if ads_rows:
+            tmp_path = os.path.join(tmp, "4-ads.csv")
+            _write_csv(tmp_path, ads_fields, ads_rows)
+            staged.append(("4-ads.csv", tmp_path))
+            written.append(("4-ads.csv", len(ads_rows)))
 
-    rows = build_keywords(keywords)
-    if rows:
-        p = os.path.join(args.outdir, "keywords.csv")
-        _write_csv(p, ["Campaign", "Ad group", "Keyword", "Match type", "Status"], rows)
-        written.append((p, len(rows)))
-
-    rows = build_negatives(negatives)
-    if rows:
-        p = os.path.join(args.outdir, "negatives.csv")
-        _write_csv(p, ["Campaign", "Ad group", "Keyword", "Type"], rows)
-        written.append((p, len(rows)))
-
-    fields, rows = build_ads(rsas)
-    if rows:
-        p = os.path.join(args.outdir, "ads.csv")
-        _write_csv(p, fields, rows)
-        written.append((p, len(rows)))
-
-    rows = build_assets(assets)
-    if rows:
-        p = os.path.join(args.outdir, "assets.csv")
-        _write_csv(p, ["Campaign", "Ad group", "Sitelink text", "Final URL",
-                       "Description line 1", "Description line 2", "Callout text",
-                       "Header", "Snippet values"], rows)
-        written.append((p, len(rows)))
+        # Stable, import-order zip member order regardless of dialect (loop workbooks skip slots).
+        staged.sort(key=lambda s: s[0])
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for arcname, tmp_path in staged:
+                zf.write(tmp_path, arcname=arcname)
 
     print(json.dumps({
         "workbook": args.workbook,
         "outdir": args.outdir,
-        "files": [{"path": p, "rows": n} for p, n in written],
-        "note": "Editor CSVs. Import in Editor (Account > Import > From file) in order: campaigns "
-                "> adgroups > keywords > ads > assets > negatives, Check Changes after each. The "
-                "277-term shared negative list is NOT in any CSV — attach it by reference in "
-                "Editor. Snippet header CSV column ('Header') is UNVERIFIED — confirm via one "
+        "zip": zip_path,
+        "files": [{"name": name, "rows": n} for name, n in sorted(written)],
+        "note": "ONE .zip bundling the Editor CSVs. Unzip, then import in Editor (Account > Import "
+                "> From file) in order: campaigns > adgroups > keywords > ads > assets > negatives "
+                "(the numeric filename prefix already sorts them this way), Check Changes after "
+                "each. The 277-term shared negative list is NOT in any CSV — attach it by reference "
+                "in Editor. Snippet header CSV column ('Header') is UNVERIFIED — confirm via one "
                 "Editor round-trip. Nothing was pushed to any account.",
     }, ensure_ascii=False, indent=2))
 

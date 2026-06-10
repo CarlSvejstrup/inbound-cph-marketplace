@@ -1,6 +1,6 @@
 ---
 name: editor-csv-export
-description: Konvertér en bekræftet Google Ads review-workbook (.xlsx) til Google Ads Editor import-CSV'er. Læser TO workbook-dialekter med samme kontrakt - (a) campaign-build assembler-workbooken (fuld ny kampagne) og (b) optimerings-loopets review-workbook (delmængde - negatives, vinder-keywords, RSA-challengers). Anden halvdel af Excel-only-grænsen - workbooken er bekræftelses-artefaktet, denne skill dropper den ned til de flade per-entitet CSV'er Editor importerer (Editor importerer KUN CSV, ikke .xlsx). Ren transform - læser én lokal .xlsx, skriver op til 6 lokale .csv. Pusher ALDRIG til Google Ads API'et; mennesket importerer CSV'erne i Editor. Genkører de to hårde guards (ingen Broad/blank positiv keyword, LEN-tjek) fordi et menneske kan have redigeret Excel'en efter godkendelse. Den arvede 277-term delte negativliste kommer ALDRIG i en CSV - den tilknyttes by-reference i Editor. Brug når brugeren siger "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav import-filer", eller har en godkendt kampagne- eller optimerings-workbook der skal importeres. Svarer på dansk.
+description: Konvertér en bekræftet Google Ads review-workbook (.xlsx) til Google Ads Editor import-CSV'er bundtet i ÉN .zip. Læser TO workbook-dialekter med samme kontrakt - (a) campaign-build assembler-workbooken (fuld ny kampagne) og (b) optimerings-loopets review-workbook (delmængde - negatives, vinder-keywords, RSA-challengers). Anden halvdel af Excel-only-grænsen - workbooken er bekræftelses-artefaktet, denne skill dropper den ned til de flade per-entitet CSV'er Editor importerer (Editor importerer KUN CSV, ikke .xlsx). Ren transform - læser én lokal .xlsx, skriver ÉN lokal .zip med op til 6 CSV'er indeni (nummereret 1-campaigns ... 6-negatives så de sorterer i Editors import-rækkefølge). Pusher ALDRIG til Google Ads API'et; mennesket udpakker og importerer CSV'erne i Editor. Genkører de to hårde guards (ingen Broad/blank positiv keyword, LEN-tjek) fordi et menneske kan have redigeret Excel'en efter godkendelse. Den arvede 277-term delte negativliste kommer ALDRIG i en CSV - den tilknyttes by-reference i Editor. Brug når brugeren siger "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav import-filer", "lav en zip med CSV'erne", eller har en godkendt kampagne- eller optimerings-workbook der skal importeres. Svarer på dansk.
 ---
 
 # editor-csv-export
@@ -8,13 +8,13 @@ description: Konvertér en bekræftet Google Ads review-workbook (.xlsx) til Goo
 Den **delte workbook→CSV-konverter** for begge Google Ads-workflows. Editor importerer KUN CSV,
 ikke .xlsx ([answer 30564](https://support.google.com/google-ads/editor/answer/30564)) — så begge
 workflows leverer en pæn, menneske-redigerbar Excel til review, og DENNE skill dropper den
-bekræftede Excel ned til de flade per-entitet CSV'er Editor faktisk importerer.
+bekræftede Excel ned til de flade per-entitet CSV'er Editor faktisk importerer, bundtet i ÉN .zip.
 
 ```
 SETUP (google-ads-setup):     campaign-build → assembler       → fuld .xlsx        ─┐
 OPTIMIZE (optimization-loop):  live-analyse   → review_workbook  → delmængde .xlsx   ─┤
                                                                   [mennesket bekræfter/redigerer]
-                                              editor-csv-export → op til 6 Editor-CSV'er → [import i Editor]
+                                              editor-csv-export → ÉN .zip (op til 6 Editor-CSV'er) → [udpak + import i Editor]
 ```
 
 **Hvorfor ÉN delt skill (ikke én per workflow):** begge workbooks taler bevidst SAMME
@@ -25,9 +25,11 @@ hvilke faner der findes — ingen fork, ingen duplikeret builder-logik, ingen dr
 `.py` på tværs af plugins, så en kopi i hvert plugin ville garantere drift — derfor én delt skill,
 ikke en setup-specifik.)
 
-**Ren transform:** læser ÉN lokal `.xlsx`, skriver op til 6 lokale `.csv`. Ingen Google Ads
-API-kald, intet push, ingen ekstern read/write. Mennesket importerer CSV'erne i Editor
-(Account → Import → From file) efter review. Dialekt-detaljen står lige nedenfor.
+**Ren transform:** læser ÉN lokal `.xlsx`, skriver ÉN lokal `.zip` med op til 6 `.csv` indeni.
+Ingen Google Ads API-kald, intet push, ingen ekstern read/write. Mennesket udpakker og importerer
+CSV'erne i Editor (Account → Import → From file) efter review. CSV'erne er nummereret
+(`1-campaigns.csv` … `6-negatives.csv`) så det udpakkede bundt sorterer i Editors
+import-rækkefølge. Dialekt-detaljen står lige nedenfor.
 
 ## To workbook-dialekter, én kontrakt
 
@@ -63,8 +65,8 @@ er ikke til forhandling (repo-CLAUDE.md).
 ## Hvornår
 
 Triggerfraser: "lav CSV'er", "konvertér til Editor", "export til Editor", "editor-csv", "lav
-import-filer", "gør workbooken klar til Editor", eller når en godkendt kampagne-workbook skal
-importeres.
+import-filer", "lav en zip med CSV'erne", "gør workbooken klar til Editor", eller når en godkendt
+kampagne-workbook skal importeres.
 
 ## Trin 0 — Kontekst
 
@@ -86,12 +88,15 @@ python3 ${CLAUDE_SKILL_DIR}/export_csv.py \
   --outdir ./editor-csv
 ```
 
-Output: op til 6 CSV'er i `--outdir` + en JSON-opsummering på stdout.
+Output: ÉN `.zip` i `--outdir` (`<workbook-navn> - editor-csv.zip`) med op til 6 nummererede CSV'er
+indeni + en JSON-opsummering på stdout (peger på zip'en, beholder rækketal per fil indeni).
 
-- **Exit 0:** alle CSV'er skrevet.
-- **Exit ≠ 0 (en guard stoppede):** INGEN CSV skrevet. Enten (a) en positiv keyword er blank/Broad
-  i workbooken, eller (b) et RSA-felt er over hård grænse (et menneske redigerede Excel'en efter
-  godkendelse). Ret i workbooken (fane 03 hhv. fane 06) og kør igen — overstyr aldrig guarden.
+- **Exit 0:** zip'en skrevet med alle relevante CSV'er.
+- **Exit ≠ 0 (en guard stoppede):** INGEN zip for denne workbook i `--outdir` — en evt. ældre zip
+  fra et tidligere kør af samme workbook ryddes FØR guarden, så en fejlende kørsel aldrig efterlader
+  et vildledende importérbart bundt. Enten (a) en positiv keyword er blank/Broad i workbooken, eller
+  (b) et RSA-felt er over hård grænse (et menneske redigerede Excel'en efter godkendelse). Ret i
+  workbooken (fane 03 hhv. fane 06) og kør igen — overstyr aldrig guarden.
 
 ### Hvorfor guards genkøres her
 
@@ -100,16 +105,20 @@ mellem godkendelse og konvertering. En Broad-keyword eller en for-lang headline 
 ellers sejle direkte ind i en CSV. Konverteren tjekker derfor igen ved SIN egen grænse
 (contract §6).
 
-## Trin 3 — De 6 CSV'er (én per entitet)
+## Trin 3 — De 6 CSV'er i zip'en (én per entitet, nummereret i import-rækkefølge)
 
-| CSV | Fra workbook-fane | Editor-entitet |
+| CSV (i zip) | Fra workbook-fane | Editor-entitet |
 |---|---|---|
-| `campaigns.csv` | 01 Campaign settings | kampagne (status altid `Paused`) |
-| `adgroups.csv` | 02 Ad groups | ad groups (+ Max CPC) |
-| `keywords.csv` | 03 Keywords | positive keywords (Exact/Phrase, `Paused`) |
-| `negatives.csv` | 04 Negative keywords | **kun klient-specifikke** negatives |
-| `ads.csv` | 06 RSAs | RSA'er (Headline 1-15, Description 1-4, Path 1-2) |
-| `assets.csv` | 07 Assets | sitelinks / callouts / structured snippets |
+| `1-campaigns.csv` | 01 Campaign settings | kampagne (status altid `Paused`) |
+| `2-adgroups.csv` | 02 Ad groups | ad groups (+ Max CPC) |
+| `3-keywords.csv` | 03 Keywords | positive keywords (Exact/Phrase, `Paused`) |
+| `4-ads.csv` | 06 RSAs | RSA'er (Headline 1-15, Description 1-4, Path 1-2) |
+| `5-assets.csv` | 07 Assets | sitelinks / callouts / structured snippets |
+| `6-negatives.csv` | 04 Negative keywords | **kun klient-specifikke** negatives |
+
+Nummerprefikset gør at de udpakkede filer sorterer i præcis den rækkefølge Editor skal have dem
+importeret. En loop-dialekt der kun har 3 faner giver et 3-filers bundt (fx `3`, `4`, `6`) — huller
+i nummereringen er harmløse, rækkefølgen holder.
 
 Faner der ALDRIG bliver en CSV: 00 README, 05 Monitor negatives, 08 Launch QA, 09 Validation
 (review-only metadata). Snippet-/keyword-review-kolonner (`Notes`, `Keyword display`, `Test
@@ -131,11 +140,11 @@ Ser du de 277 i en CSV: stop — reglen er brudt.
 ## Trin 5 — Output + import-vejledning
 
 Lever:
-1. **Stierne** til de skrevne CSV'er (+ rækketal per fil).
-2. **Import-rækkefølgen** (afhængigheder): `campaigns → adgroups → keywords → ads → assets →
-   negatives`. Kør **Check Changes** efter hver. I Editor: Account → Import → From file → vælg
-   CSV'en → tjek kolonne-headers (Editor auto-mapper engelske headers; ret i dropdown hvis nødvendigt)
-   → Import → Review imported changes.
+1. **Stien** til den skrevne `.zip` (+ rækketal per CSV indeni, fra JSON-opsummeringen).
+2. **Udpak zip'en**, så **import-rækkefølgen** (afhængigheder): `campaigns → adgroups → keywords →
+   ads → assets → negatives` — nummerprefikset sorterer dem allerede sådan. Kør **Check Changes**
+   efter hver. I Editor: Account → Import → From file → vælg CSV'en → tjek kolonne-headers (Editor
+   auto-mapper engelske headers; ret i dropdown hvis nødvendigt) → Import → Review imported changes.
 3. **Den delte negativliste tilknyttes manuelt** by-reference (id `6688642473`) — IKKE i nogen CSV.
 4. **Manuelt efter import:** sprog = Dansk, Denmark = Presence (ikke Presence-or-Interest),
    verificér leadgen-konverteringshandlingen, status = **Paused**, kør launch-QA (workbookens

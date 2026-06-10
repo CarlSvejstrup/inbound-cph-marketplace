@@ -5,8 +5,9 @@ workbook into Google Ads Editor import CSVs. It reads **two dialects on one cont
 dialects): the `google-ads-setup` `assembler` workbook (full new campaign) and the
 optimization-loop review workbook (a subset). If SKILL.md and this file disagree, this file wins.
 
-Pure transform: ONE local `.xlsx` in → up to 6 local `.csv` out. No Google Ads API call, no push,
-no external read/write.
+Pure transform: ONE local `.xlsx` in → ONE local `.zip` out, bundling up to 6 `.csv` (numbered
+`1-campaigns.csv` … `6-negatives.csv` so the extracted bundle sorts into Editor's import order).
+No Google Ads API call, no push, no external read/write.
 
 ## Authority of the target schema (read this first)
 
@@ -29,6 +30,25 @@ What the public docs DID confirm (and we rely on):
 - Account-level assets use the literal **`<Account-level>`** in the Campaign column (answer 56368).
 - Multi-value cells separate values with **semicolons** (`en;de`) (answer 56368).
 - Unicode encoding → we write **UTF-8 with BOM** (Danish æ/ø/å load-bearing).
+
+## Packaging: ONE .zip, numbered members
+
+The converter writes a single `<workbook-name> - editor-csv.zip` into `--outdir` and leaves no
+loose CSVs beside it. Inside, each CSV is named with a numeric prefix matching Editor's import
+order: `1-campaigns.csv`, `2-adgroups.csv`, `3-keywords.csv`, `4-ads.csv`, `5-assets.csv`,
+`6-negatives.csv`. So when the human extracts the bundle, the files sort top-to-bottom into the
+exact order Editor needs them imported — the bundle is self-documenting.
+
+- The CSVs are built into a temp dir with the unchanged `utf-8-sig` writer, then `zipfile` copies
+  those exact bytes into the archive — the BOM (Danish æ/ø/å, load-bearing) is preserved verbatim,
+  no re-encoding.
+- A loop dialect with only 3 entity tabs yields a 3-member zip (e.g. `3`, `4`, `6`); gaps in the
+  numbering are harmless and the order still holds.
+- Any stale zip for this workbook in `--outdir` is removed BEFORE the guards run; the guards
+  (§Two hard guards) then run before any write, so if either fires NO zip for this workbook is left
+  behind and the process exits non-zero. A flawed workbook never reaches an importable bundle —
+  even on a re-run into a dirty outdir that still holds an earlier good run's zip.
+- The JSON summary on stdout points at the `.zip` and retains the per-CSV row counts.
 
 ## The 6 CSVs (column ← workbook cell). **Bold** = value transform, not a straight copy.
 
@@ -127,18 +147,22 @@ must honor:
 ## Smoke-test invariants (run before declaring done)
 
 **Assembler dialect** — run the assembler on a golden input set, then this converter on the output:
-1. 6 CSVs written; UTF-8 BOM; æ/ø/å survive.
+1. ONE `.zip` written in `--outdir` (no loose CSVs); its 6 members named `1-campaigns.csv` …
+   `6-negatives.csv` and listed in that sorted order; every member carries the UTF-8 BOM; æ/ø/å survive.
 2. negatives.csv contains ONLY client-specific rows — no `[SHARED LIST ...]` line, no monitor
    candidate, no enumeration of the 277.
 3. campaigns.csv: status `Paused`, numeric budget present, networks remapped.
 4. keywords.csv: only Exact/Phrase, status `Paused`.
 5. assets.csv: account-level rows carry the literal `<Account-level>` in Campaign; snippet values
    semicolon-joined.
-6. Feed an over-length headline → guard fires, NO CSV written, non-zero exit.
-7. Feed a Broad/blank positive keyword → guard fires, NO CSV written, non-zero exit.
+6. Feed an over-length headline → guard fires, NO zip for this workbook left in `--outdir`, non-zero exit.
+7. Feed a Broad/blank positive keyword → guard fires, NO zip left, non-zero exit.
+   (Bonus: run a good workbook into an outdir, then re-run the SAME workbook with a guard-failing
+   edit → the earlier zip is gone, confirming the pre-guard cleanup.)
 
 **Loop dialect** — run `review_workbook.py` on a synthetic findings set, then this converter:
-8. Only the 3 loop CSVs written (negatives, keywords, ads) — no campaigns/adgroups/assets.
+8. The zip carries only the 3 loop CSVs (`3-keywords.csv`, `4-ads.csv`, `6-negatives.csv`) — no
+   campaigns/adgroups/assets members.
 9. An account-level negative fans out to one `Campaign negative` row per active campaign.
 10. ads.csv carries NO `#Original` columns (loop RSAs are all net-new), even if the findings
     carried legacy `is_edit`/`original` (the builder ignores them).
