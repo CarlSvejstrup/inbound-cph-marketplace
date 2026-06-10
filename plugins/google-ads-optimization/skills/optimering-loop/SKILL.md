@@ -91,14 +91,39 @@ Udled så meget som muligt fra samtalen først. Saml i ét kald:
 3. **Gem-destination** — `Drive (klientens mappe)`, `Lokalt (.xlsx)`, eller begge. Drive = ekstern
    write → bekræft én gang før gem.
 
+## Trin 1.5 — Phase 0: byg virksomhedsprofilen FØRST (én sub-agent, før alt andet)
+
+Klassifikation er meningsløs uden at vide hvad klienten faktisk sælger — taksonomien definerer
+IRRELEVANT som "passer ikke klientens tilbud". Så **én offering-brief-sub-agent kører FØRST** og
+bygger grundsandheden, der fodres ind i alle tre diagnoser. Læs `references/offering-brief.md` for
+det fulde skema; kort version:
+
+Sub-agenten:
+1. **Henter landingsside-URL'erne** — kør `ad_group_ads_query` (eller `list_accessible_accounts` +
+   en hurtig kampagne-pull) for at få ad-gruppernes `final_urls`, og **scrap dem** (Firecrawl,
+   `firecrawl-scrape` / connector) for hvad klienten sælger + til hvem.
+2. **Udleder fra konto-signaler** — kampagne-/ad-group-navne + eksisterende RSA-headlines (hvad de
+   ALLEREDE annoncerer). Krydstjek mod landingssiden; noter uoverensstemmelser.
+3. **Skriver `offering.md`** til run-mappen efter skemaet i `references/offering-brief.md`: hvad de
+   sælger, hvem, geografi/sprog, brand-varianter, **IKKE-en-del-af-tilbuddet** (out-of-scope), og
+   en maskinlæsbar `OFFERING_TOKENS:`-linje (offering-vokabularet — IKKE out-of-scope-ord).
+
+**Fallback:** hvis scrape fejler/er tynd (JS-side, login), fald tilbage til kun konto-signaler og
+SKRIV det i `offering.md`s `Kilde`-linje — fabrikér aldrig et tilbud.
+
+`offering.md` er **intern kontekst** (ikke en workbook-fane), bygget frisk hver kørsel. Dens fulde
+tekst gives ind i hver af de tre diagnose-sub-agenters prompt nedenfor.
+
 ## Trin 2 — Kør de tre diagnoser (én sub-agent hver, parallelt)
 
 Spawn **én sub-agent per diagnose** (kontekst-isolation: rå GAQL-svar fylder ikke main-loopet; hver
 sub-agent returnerer kun struktureret JSON). De tre er uafhængige — kør dem parallelt.
 
-Hver sub-agent får: `customer_id`, vinduet, stien til dette skills `lib/`, og besked om at (a) hente
-GAQL-strengen fra det rette `lib/gaql`-modul, (b) køre den via `run_custom_gaql` (kun ENABLED
-kampagner — pausede ekskluderes), (c) post-processe via modulets normaliser, (d) returnere JSON.
+Hver sub-agent får: `customer_id`, vinduet, stien til dette skills `lib/`, **hele `offering.md` som
+kontekst** (Phase 0-grundsandheden — det er den der gør relevans-kald rigtige), og besked om at
+(a) hente GAQL-strengen fra det rette `lib/gaql`-modul, (b) køre den via `run_custom_gaql` (kun
+ENABLED kampagner — pausede ekskluderes), (c) post-processe via modulets normaliser, (d) returnere
+JSON.
 
 - **Søgeterm-agent** → `SearchTermFindings`. GAQL: `lib/gaql/search_terms.py`
   (`search_terms_query`, `keyword_map_query`, `ad_group_ads_query`, `account_search_cost_query`).
@@ -106,10 +131,13 @@ kampagner — pausede ekskluderes), (c) post-processe via modulets normaliser, (
   rygraden, se `references/selection-spec.md`):
   ```python
   import sweep   # lib/sweep.py — IKKE 'select' (det skygger Pythons stdlib)
+  offering_tokens = sweep.parse_offering_tokens(open("offering.md").read())  # fra Phase 0
   w   = sweep.sweep_winners(search_term_rows, keyword_map_rows)   # {winners, skipped}
   neg = sweep.sweep_negatives(search_term_rows, offering_tokens)  # [{band, thin_data, ...}]
   ov  = sweep.all_terms_overview(search_term_rows)                # alle >=5 DKK termer
   ```
+  `offering_tokens` kommer fra Phase 0's `offering.md` (ikke håndholdt) — det gør de foreslåede
+  negative-bånd forankret i det FAKTISKE tilbud. Tom liste (scrape fejlede) → alle foreslås GUL.
   - `w["winners"]` (≥2 konv + matcher INTET eksisterende keyword på nogen match type) er
     **garanteret** på "Nye keywords"-fanen. `w["skipped"]` (≥2 konv men allerede dækket) går på
     "Sprunget over"-fanen MED det dækkende keyword — så intet forsvinder usynligt.
@@ -119,8 +147,10 @@ kampagner — pausede ekskluderes), (c) post-processe via modulets normaliser, (
     `band_adjustment` (`script: GUL -> agent: GROEN (grund: ...)`). Tilføj `level` + en dansk
     `reason` per negativ. Tilføj aldrig/fjern aldrig en kandidat — kun juster band + begrundelse.
   - **Agentens øvrige rolle:** tildel hver overview-term en `bucket` (VINDER / RELEVANT /
-    PLACEMENT_PROBLEM / IRRELEVANT / GRÆNSE) mod `lib/classify/taxonomy.md`, forankret i det
-    scrapede tilbud (offering). Sæt `low_confidence=true` hvis konto-konverteringer < 10.
+    PLACEMENT_PROBLEM / IRRELEVANT / GRÆNSE) mod `lib/classify/taxonomy.md`, **forankret i
+    `offering.md`** (Phase 0) — det er nu den eksplicitte grundsandhed for "passer dette tilbuddet?",
+    inkl. out-of-scope-listen (en term der rammer den → konfident IRRELEVANT/GROEN). Sæt
+    `low_confidence=true` hvis konto-konverteringer < 10.
   Returnér `winners`, `negatives`, `all_terms` (m. bucket), `skipped_winners`, `active_campaigns`,
   `low_confidence` — præcis de felter `review_workbook.build()` læser.
 - **Asset-hygiejne-agent** → `AssetHygieneFindings`. GAQL: `lib/gaql/asset_view.py`
@@ -188,8 +218,9 @@ Mørkeblå kolonner på de andre faner = Editor-felter (konverteren beholder); l
   `lib/gaql/*` (query-strenge + normalisering), `lib/sweep.py` (den deterministiske kandidat-sweep
   — vinder/negative/overview), `lib/review_workbook.py` (bygger .xlsx), `lib/classify/taxonomy.md`.
   Selektions-designet (hvorfor scriptet ejer "intet glemmes", konfidens-banderne, de to farve-akser,
-  CSV-isoleringen) står i `references/selection-spec.md` — læs den før du ændrer sweep- eller
-  workbook-logik.
+  CSV-isoleringen) står i `references/selection-spec.md`; Phase 0-grundsandheden (offering-brief,
+  kilder, `offering.md`-skema, token-kontrakten) i `references/offering-brief.md` — læs dem før du
+  ændrer sweep-, offering- eller workbook-logik.
 - **Navne-gotcha:** modulet hedder `sweep.py`, IKKE `select.py` — `select` skygger Pythons stdlib
   `select` som `subprocess` (i review_workbook) afhænger af → import-crash hvis de deler proces.
 - `lib/*` er **kopier** harmoniseret med `editor-csv-export`-kontrakten (negatives taler samme

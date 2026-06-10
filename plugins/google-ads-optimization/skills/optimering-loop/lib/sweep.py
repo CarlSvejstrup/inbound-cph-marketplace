@@ -61,6 +61,26 @@ def _tokens(text) -> set:
     return {t for t in re.split(r"[^0-9a-zæøåA-ZÆØÅ]+", str(text or "").lower()) if len(t) > 2}
 
 
+def parse_offering_tokens(offering_md: str) -> set:
+    """Extract the OFFERING_TOKENS set from a Phase 0 offering.md (see
+    references/offering-brief.md). The brief carries a machine-readable line:
+
+        OFFERING_TOKENS: hoejskole, højskole, grupperejse, bali, ...
+
+    These ARE the offering vocabulary the negative-band proposal uses. Returns a normalised
+    lowercase set; empty set if the line is absent (then sweep_negatives proposes GUL for all,
+    since it can't claim 'clearly off-offering' without offering context). Robust to the line
+    sitting inside an HTML comment block or carrying trailing whitespace/markers.
+    """
+    if not offering_md:
+        return set()
+    m = re.search(r"OFFERING_TOKENS\s*:\s*(.+)", offering_md, re.IGNORECASE)
+    if not m:
+        return set()
+    raw = m.group(1).split("-->")[0].splitlines()[0]   # stop at a closing comment / line end
+    return {t.strip().lower() for t in raw.split(",") if len(t.strip()) > 1}
+
+
 def _row_metrics(row: dict) -> dict:
     """Pull the metrics + identity off a raw search_term_view GAQL row into a flat dict."""
     m = row.get("metrics", {})
