@@ -107,12 +107,16 @@ def _one_row(raw: dict) -> dict | None:
         cost_dkk = cost_dkk / 1_000_000
     cost_dkk = round(cost_dkk, 2)
 
-    # --- already-a-keyword status (the report carries this; GAQL does not) ---
-    # The MCP report marks terms that have been added as keywords. Field name varies, so probe a
-    # few; "status" == "ADDED" / added==True / a non-empty added_keyword all mean "already a kw".
+    # --- already-a-keyword status ---
+    # BOTH sources carry it, in different places:
+    #   - MCP get_search_terms_report: flat `search_term_status` ("ADDED"/"NONE"/"EXCLUDED").
+    #   - raw search_term_view GAQL: NESTED `search_term_view.status` (same values).
+    # ADDED = already a keyword; EXCLUDED = already a negative; both mean "don't suggest as new".
     already = None
     match_type = raw.get("keyword_match_type") or raw.get("match_type") or None
-    status = str(raw.get("status") or raw.get("search_term_status") or raw.get("keyword_status") or "").upper()
+    stv = raw.get("search_term_view", {}) if isinstance(raw.get("search_term_view"), dict) else {}
+    status = str(raw.get("status") or raw.get("search_term_status") or raw.get("keyword_status")
+                 or stv.get("status") or "").upper()
     if raw.get("added") is True or raw.get("is_keyword") is True or status in {"ADDED", "ADDED_EXCLUDED"}:
         already = True
     elif raw.get("added") is False or raw.get("is_keyword") is False or status in {"NONE", "UNKNOWN", "NOT_ADDED"}:

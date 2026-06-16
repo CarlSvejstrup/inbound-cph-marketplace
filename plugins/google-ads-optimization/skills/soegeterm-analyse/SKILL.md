@@ -39,8 +39,12 @@ Udled så meget som muligt fra samtalen først. Saml i ét kald:
 1. **Klient + `customer_id`** — bekræft hvis nævnt; ellers `list_accessible_accounts` → find id'et →
    bekræft. (Klientnoter ligger i vault `clients/*.md`.)
 2. **Analysevindue** — default **sidste 90 dage**. Vis `Sidste 90 dage (Anbefalet)`, `Sidste 30 dage`,
-   `Andet`. `get_search_terms_report` tager et `date_range`; for 90 dage / >30 dage send
-   `BETWEEN '<YYYY-MM-DD>' AND '<YYYY-MM-DD>'` (rå `LAST_90_DAYS` afvises af API'et — beregn datoerne).
+   `Andet`. **VIGTIGT (verificeret live):** `get_search_terms_report`s `date_range` går ind i en
+   `DURING`-operator og accepterer KUN Googles dato-literaler (`LAST_30_DAYS`, `LAST_14_DAYS`,
+   `LAST_7_DAYS`, `THIS_MONTH`, `LAST_MONTH`). Både `BETWEEN '...'` OG `LAST_90_DAYS` afvises af den.
+   Så vinduet bestemmer kilden (se Trin 3): **≤30 dage → `get_search_terms_report`** (præ-aggregeret,
+   fladt status-felt); **>30 dage / custom (inkl. 90 dage) → `run_custom_gaql` på `search_term_view`**
+   med `WHERE segments.date BETWEEN '<start>' AND '<slut>'`.
 3. **Scope** — `Hele kontoen` eller `Specifik kampagne`. Specifik → brug `campaign_id` på rapporten
    (færre rækker, hurtigere, og ofte det brugeren faktisk vil). 
 4. **Hvilken konvertering tæller** — på lead-gen-konti er der ofte flere conversion actions (formular,
@@ -68,17 +72,41 @@ outputtets kontekst-linje. Fabrikér aldrig et tilbud.
 
 ## Trin 3 — Hent + slank (FØR kontekst)
 
+Vælg kilde efter vinduet (se Trin 1). `slim.slim()` håndterer BEGGE shapes (fladt rapport-felt OG
+nested `search_term_view.status`; cost i DKK ELLER micros), så resten er ens.
+
+**≤30 dage — `get_search_terms_report`** (foretrukket: præ-aggregeret, fladt status, let):
 ```python
-# get_search_terms_report(customer_id, date_range, campaign_id?, limit) -> rapport-rækker
-import slim   # lib/slim.py
-res = slim.slim(report_rows)          # spend_floor=0 default; sæt kun et gulv på en KÆMPE konto
-terms = res["terms"]                  # rene slanke rækker, sorteret efter cost
+# get_search_terms_report(customer_id, date_range=LAST_30_DAYS, campaign_id?, limit)
+import slim
+res = slim.slim(report_rows)
+terms = res["terms"]
 ```
 
-`get_search_terms_report` er præ-aggregeret, fortæller **selv** om termen allerede er et keyword
-(`already_keyword`), og er let — ingen `resource_name`-pløre, intet 2.500-rækkers keyword-map, ingen
-cost-bånd-shuffling. For en almindelig konto: læg HELE `terms` i kontekst. Kun hvis listen er enorm,
-sæt et spend-gulv (og `dropped_below_floor` rapporterer hvor mange — aldrig en tavs trunkering).
+**>30 dage / custom (inkl. default 90 dage) — `run_custom_gaql`** (rapporten kan ikke; se Trin 1):
+```sql
+SELECT search_term_view.search_term, search_term_view.status,
+       campaign.name, ad_group.name,
+       metrics.impressions, metrics.clicks, metrics.cost_micros,
+       metrics.conversions, metrics.conversions_value
+FROM search_term_view
+WHERE segments.date BETWEEN '<start>' AND '<slut>'
+  AND metrics.cost_micros > 0          -- drop 0-spend støj med det samme
+ORDER BY metrics.cost_micros DESC      -- de DYRESTE først (det er der spild + vindere bor)
+LIMIT 1000                              -- loft; se note nedenfor
+```
+Dette svar bliver STORT (rå GAQL slæber `resource_name`-strenge). **Læs det ALDRIG i kontekst** —
+det gemmes til en fil, og du kører `slim.slim()` på filen (fil-side), som smider skraldet væk og
+giver de rene rækker. På `search_term_view` optræder samme term i flere ad groups; overvej at
+aggregere per term (sum cost/klik/konv) før du dømmer, så hver term dømmes én gang.
+
+**Loftet er IKKE tilfældigt — det er `ORDER BY cost DESC` + `LIMIT`, altså top-N efter forbrug.**
+Spild og vindere ligger i de højest-forbrugende termer; en 0,10-kr-term kan hverken være. **Rapportér
+altid "trak X af Y termer"** så et loft aldrig er tavst (slim har `dropped_below_floor` til spend-gulvet;
+for GAQL-loftet: sammenlign LIMIT mod en hurtig `COUNT`-fornemmelse og nævn det hvis det bed). Et
+**spend-gulv + højt loft** (fx top 1000 over ~5 kr) er bedre end et lavt loft: fanger alt der betyder
+noget uden at slæbe halen med. Loftet skærer på COST, ikke på konverteringer — så på en enorm konto,
+hæv loftet hellere end at risikere at en lav-cost-men-konverterende term falder udenfor.
 
 ## Trin 4 — Døm HELE listen i ét pass (det er her værdien er)
 
