@@ -91,14 +91,22 @@ SELECT search_term_view.search_term, search_term_view.status,
        metrics.conversions, metrics.conversions_value
 FROM search_term_view
 WHERE segments.date BETWEEN '<start>' AND '<slut>'
-  AND metrics.cost_micros > 0          -- drop 0-spend støj med det samme
+  AND metrics.cost_micros >= 50000000  -- DEFAULT spend-gulv: 50 kr. Halverer rækkerne; alt under
+                                       -- kan hverken være spild eller vinder. Sænk kun bevidst.
 ORDER BY metrics.cost_micros DESC      -- de DYRESTE først (det er der spild + vindere bor)
 LIMIT 1000                              -- loft; se note nedenfor
 ```
-Dette svar bliver STORT (rå GAQL slæber `resource_name`-strenge). **Læs det ALDRIG i kontekst** —
-det gemmes til en fil, og du kører `slim.slim()` på filen (fil-side), som smider skraldet væk og
-giver de rene rækker. På `search_term_view` optræder samme term i flere ad groups; overvej at
-aggregere per term (sum cost/klik/konv) før du dømmer, så hver term dømmes én gang.
+**Hvorfor 50-kr-gulvet (det er fixet på "det der tog lang tid"):** rå GAQL på `search_term_view` er
+tungt — uden gulv var Capios 90-dages-pull ~360k tegn / 500+ rækker, hvoraf 2/3 var lavvolumen-halé
+med <5 klik (ren støj). `cost_micros >= 50000000` (50 kr) skærer halen FØR den forlader API'et →
+markant mindre payload, hurtigere, og du taber intet handlingsbart (en term der har kostet <50 kr på
+90 dage er hverken et spild-problem eller en vinder). Sænk kun gulvet hvis brugeren udtrykkeligt vil
+have den lange hale med.
+
+Svaret er stadig for stort til kontekst (resource_name-strenge). **Læs det ALDRIG i kontekst** — det
+gemmes til en fil, og du kører `slim.slim()` på filen (fil-side), som smider skraldet væk og giver de
+rene rækker. På `search_term_view` optræder samme term i flere ad groups; **aggregér per term** (sum
+cost/klik/konv, behold status) før du dømmer, så hver term dømmes én gang.
 
 **Loftet er IKKE tilfældigt — det er `ORDER BY cost DESC` + `LIMIT`, altså top-N efter forbrug.**
 Spild og vindere ligger i de højest-forbrugende termer; en 0,10-kr-term kan hverken være. **Rapportér
