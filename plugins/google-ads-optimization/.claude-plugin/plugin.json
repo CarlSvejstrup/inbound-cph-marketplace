@@ -1,7 +1,7 @@
 {
   "name": "google-ads-optimization",
   "description": "Google Ads OPTIMIZATION skills for Inbound CPH: diagnose and improve LIVE client accounts. soegeterm-analyse (the lean, correct search-terms analysis: pull the pre-aggregated get_search_terms_report, slim it BEFORE context, let Claude judge the whole list in one pass with correct rules incl. '0 conversions != waste when people phone' → ONE flat colour-coded list; replaces the old search-terms approach), annonce-optimering (post-launch RSA asset-hygiene diagnosis, champion-challenger coverage, feeds a gap-brief back into the setup plugin's responsive-search-ads), optimering-loop (runs the whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score in parallel → ONE editable Excel workbook the expert edits, then editor-csv-export makes the Editor CSVs; v1 is diagnose→workbook, the measure/closed-loop phase is v2), search-terms (DEPRECATED — the old heavy 8-tab sweep version, superseded by soegeterm-analyse, kept for reference only). All read-only against Google Ads (recommend-only, never writes to the account; every RSA suggestion is a NEW challenger, never an in-place edit). For building NEW campaigns see google-ads-setup; for audit reports + change-logs + the workbook→CSV converter see google-ads-general. Danish-default.",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

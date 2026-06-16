@@ -67,9 +67,9 @@ VERDICT_LABEL = {
 # Main-sheet columns. Match type + Level sit on the main sheet so the auto-derived Negativ/Vinder
 # sheets (and the future editor-csv-export bridge) have every Editor field they need without a
 # second pass. Dom is the column the human edits; the two derived sheets FILTER on it.
-COLUMNS = ["Søgeterm", "Foreslået keyword", "Kampagne", "Ad group", "Triggerende keyword",
-           "Keyword match type", "Budget brugt (DKK)", "Impressions", "Klik", "CTR (%)",
-           "Konverteringer", "CPA (DKK)", "Match type", "Level", "Allerede keyword?",
+COLUMNS = ["Søgeterm", "Foreslået keyword", "Foreslået match type", "Kampagne", "Ad group",
+           "Triggerende keyword", "Keyword match type", "Budget brugt (DKK)", "Impressions",
+           "Klik", "CTR (%)", "Konverteringer", "CPA (DKK)", "Level", "Allerede keyword?",
            "Dom", "Begrundelse"]
 WRAP_COLS = {"Begrundelse"}
 DOM_COL = "Dom"            # the column the derived sheets filter on
@@ -270,7 +270,10 @@ def build(data, out_path):
             # Editor-bound fields for the derived sheets + the future CSV bridge. Defaults are
             # sensible and editable: negatives default to Phrase + campaign level; a promoted
             # winner defaults to Exact. The agent may override per term in the judged JSON.
-            "Match type": t.get("match_type") or ("Exact" if verdict == "VINDER" else "Phrase"),
+            # Match type for the SUGGESTED keyword (what gets added) — NOT the triggering keyword's
+            # match type (that's the read-only "Keyword match type" column). This is what flows to
+            # the Nye/Negative sheets -> Editor. Default Exact for a winner, Phrase for a negative.
+            "Foreslået match type": t.get("match_type") or ("Exact" if verdict == "VINDER" else "Phrase"),
             "Level": t.get("level") or ("ad_group" if verdict == "VINDER" else "campaign"),
             "Allerede keyword?": _already(t.get("already_keyword")),
             "Dom": verdict,
@@ -316,7 +319,7 @@ def build(data, out_path):
         [("Action", None), ("Customer ID", None),
          ("Negative keyword list name", None), ("Negative Keyword List ID", None),
          ("Negative keyword", _col(SUGGESTED_COL)), ("Keyword or list", None),
-         ("Match type", _col("Match type"))],
+         ("Match type", _col("Foreslået match type"))],
         constants={"Action": "Add", "Customer ID": "",
                    "Negative keyword list name": "<INDSÆT NEGATIVLISTE-NAVN>",
                    "Negative Keyword List ID": "", "Keyword or list": "keyword"},
@@ -328,7 +331,7 @@ def build(data, out_path):
         wb, "Nye keywords (vindere)", ws.title, data_first, data_last, "VINDER",
         [("Action", None), ("Keyword status", None),
          ("Campaign", _col("Kampagne")), ("Ad group", _col("Ad group")),
-         ("Keyword", _col(SUGGESTED_COL)), ("Match Type", _col("Match type"))],
+         ("Keyword", _col(SUGGESTED_COL)), ("Match Type", _col("Foreslået match type"))],
         constants={"Action": "Add", "Keyword status": "Paused"},
     )
 
