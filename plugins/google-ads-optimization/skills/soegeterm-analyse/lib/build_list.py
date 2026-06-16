@@ -141,9 +141,69 @@ def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map,
     return ws
 
 
+def _ngram_sheet(wb, ngram_rows):
+    """Write the N-gram analysis tab: each n-gram's aggregated metrics across all terms containing
+    it. Reference only (never an Editor import). Coloured by a SYSTEMIC heuristic so patterns pop:
+    red = systemic waste (>=50 kr spend across the terms, 0 conversions); green = systemic winner
+    (>=2 conversions); else neutral. The agent refines these calls — the colour is a starting read.
+    The point: a word like 'gratis' that bleeds across 40 cheap terms shows up as ONE red row."""
+    ws = wb.create_sheet("N-gram analyse")
+    ws["A1"] = ("N-gram analyse: hvert ord/frase aggregeret på tværs af ALLE søgetermer der "
+                "indeholder det. Find systemisk spild (rød) og vindende temaer (grøn) som enkelt-"
+                "termer skjuler. Bloker/promovér ét n-gram i stedet for mange termer.")
+    ws["A1"].font = Font(italic=True, size=10, color="606060")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+
+    headers = ["N-gram", "Ord", "Antal termer", "Budget brugt (DKK)", "Impressions", "Klik",
+               "CTR (%)", "Konverteringer", "CPA (DKK)", "Konv.rate (%)", "Eksempel-termer"]
+    hr = 2
+    for c, h in enumerate(headers, start=1):
+        cell = ws.cell(row=hr, column=c, value=h)
+        cell.fill = HEADER_FILL; cell.font = HEADER_FONT
+        cell.alignment = HEAD_ALIGN; cell.border = BORDER
+    ws.row_dimensions[hr].height = 24
+
+    SYSTEMIC_WASTE = "F6D6D6"   # red:  spend across many terms, 0 conv
+    SYSTEMIC_WIN = "D6EFD6"     # green: real conversions across the n-gram
+    for i, g in enumerate(ngram_rows):
+        rr = hr + 1 + i
+        cost = _num_local(g.get("cost_dkk")); conv = _num_local(g.get("conversions"))
+        fill = None
+        if conv == 0 and cost >= 50:
+            fill = SYSTEMIC_WASTE
+        elif conv >= 2:
+            fill = SYSTEMIC_WIN
+        vals = [g.get("ngram", ""), g.get("words", ""), g.get("term_count", ""),
+                g.get("cost_dkk", ""), g.get("impressions", ""), g.get("clicks", ""),
+                g.get("ctr_pct", ""), g.get("conversions", ""), g.get("cpa_dkk", ""),
+                g.get("conv_rate_pct", ""), g.get("example_terms", "")]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row=rr, column=c, value=v)
+            cell.border = BORDER
+            cell.alignment = WRAP if headers[c - 1] == "Eksempel-termer" else TOP
+            if fill:
+                cell.fill = _fill(fill)
+            elif rr % 2 == 1:
+                cell.fill = _fill(BAND)
+    ws.freeze_panes = ws.cell(row=hr + 1, column=1).coordinate
+    if ngram_rows:
+        ws.auto_filter.ref = f"A{hr}:{get_column_letter(len(headers))}{hr + len(ngram_rows)}"
+    for i, w in enumerate([26, 6, 12, 16, 12, 8, 9, 13, 10, 12, 50], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    return ws
+
+
+def _num_local(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def build(data, out_path):
-    """data = {client, account_id, period, today, scope, conversion_note, terms:[...]}
-    Each term: slim fields + verdict + reason (+ optional match-type display)."""
+    """data = {client, account_id, period, today, scope, conversion_note, terms:[...], ngrams:[...]}
+    Each term: slim fields + verdict + reason (+ optional suggested_keyword/match_type/level).
+    ngrams (optional): ngram.analyse() output -> the N-gram analyse tab."""
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Søgetermer"
@@ -191,10 +251,12 @@ def build(data, out_path):
         fill = VERDICT_FILL.get(verdict)
         row_vals = {
             "Søgeterm": t.get("term", ""),
-            # The keyword to actually add (negative or new) — defaults to the search term but the
-            # agent/user may set something broader (e.g. term 'helkropsscanning pris' -> keyword
+            # The keyword to actually add (negative or new). ONLY shown when the term is NOT already
+            # a keyword (no point suggesting one that exists — Carl). Defaults to the search term,
+            # but the agent/user may set something broader (e.g. 'helkropsscanning pris' ->
             # 'helkropsscanning'). The Negativ/Vinder sheets pull THIS, not the raw søgeterm.
-            "Foreslået keyword": t.get("suggested_keyword") or t.get("term", ""),
+            "Foreslået keyword": ("" if t.get("already_keyword")
+                                  else (t.get("suggested_keyword") or t.get("term", ""))),
             "Kampagne": t.get("campaign", ""),
             "Ad group": t.get("ad_group", ""),
             "Triggerende keyword": t.get("trigger_keyword", ""),
@@ -269,6 +331,10 @@ def build(data, out_path):
          ("Keyword", _col(SUGGESTED_COL)), ("Match Type", _col("Match type"))],
         constants={"Action": "Add", "Keyword status": "Paused"},
     )
+
+    # --- N-gram analyse (systemiske mønstre på tværs af termer; reference, ikke import) ---
+    if data.get("ngrams"):
+        _ngram_sheet(wb, data["ngrams"])
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)

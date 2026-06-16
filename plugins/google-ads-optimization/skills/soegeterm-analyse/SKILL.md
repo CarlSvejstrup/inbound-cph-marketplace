@@ -164,8 +164,27 @@ De fem domme: **VINDER / RELEVANT / FORKERT_PLACERET / NEGATIV / GRÆNSE.**
 NEGATIV + VINDER: sæt `suggested_keyword` til det keyword du vil tilføje. Tit er det BREDERE end
 søgetermet — fx søgeterm `helkropsscanning pris` → foreslået keyword `helkropsscanning` (fang hele
 pris-familien med ét negativ/keyword i stedet for den eksakte streng). Default = søgetermet hvis du
-ikke sætter andet. Det er DENNE værdi der flyder over i Negativ/Vinder-fanerne. Sæt også `match_type`
-(Exact/Phrase/Broad) for det tilføjede keyword.
+ikke sætter andet. **Vises KUN hvis termen ikke allerede er et keyword** (`already_keyword=False`) —
+ingen grund til at foreslå et keyword der findes. Det er DENNE værdi der flyder over i Negativ/Vinder-
+fanerne. Sæt også `match_type` (Exact/Phrase/Broad) for det tilføjede keyword.
+
+## Trin 4.5 — N-gram analyse (systemiske mønstre)
+
+Kør `ngram.analyse(slim_terms)` (helst på det UFILTREREDE sæt — fil-side, aldrig i kontekst — for det
+er i den lange hale mønstrene bor). Den tokeniserer hver term i 1/2/3-grams og **aggregerer cost/klik/
+konv på tværs af ALLE termer der indeholder hvert n-gram**. Det afslører systemisk spild/vindere som
+enkelt-termer skjuler:
+```python
+import ngram
+ng = ngram.analyse(slim_terms)   # [{ngram, words, term_count, cost_dkk, conversions, ...}] sorteret efter cost
+```
+Verificeret på Capio: `helkropsscanning` optræder i **36 termer = 3.697 kr, 0 konv** → ÉT systemisk
+fund (mod 36 spredte sub-50-kr-rækker gulvet ellers smed væk); `hvad koster` = 16 termer, 0 konv =
+pris-research-tema; `capio`/`hellerup` = systemiske vindere. Send `ng` med i `judged.json` som
+`ngrams` → bygger **"N-gram analyse"-fanen** (rød = systemisk spild, grøn = systemisk vinder).
+**Komplementær til cost-gulvet:** gulvet gør den dyre top hurtig, n-grammet genfinder halens signal.
+Lad de stærkeste n-grams informere række-dommen + `suggested_keyword` (et bevist spild-n-gram som
+`gratis` → termer der indeholder det læner NEGATIV med `suggested_keyword` = n-grammet selv).
 
 ## Trin 5 — Byg listen + aflever
 
