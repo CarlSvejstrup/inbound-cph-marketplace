@@ -141,12 +141,27 @@ python3 ${CLAUDE_SKILL_DIR}/lib/build_list.py --in <judged.json> \
 ```
 
 `judged.json` = `{client, account_id, period, scope, conversion_note, today, terms:[...]}` hvor hver
-term er en slank række + `verdict` + `reason`. `conversion_note` SKAL bære opkald-forbeholdet hvis
-konverteringer ikke kun er primære/leads.
+term er en slank række + `verdict` + `reason` (+ valgfrit `match_type` og `level` — ellers defaulter
+builderen: negativ → Phrase/campaign, vinder → Exact/ad_group). `conversion_note` SKAL bære
+opkald-forbeholdet hvis konverteringer ikke kun er primære/leads.
 
-Output = **ÉN fane**, alle termer på ét blad, hele rækken farvet efter dom, lille farve-legende +
-kontekst øverst, sorteret efter cost. Det er sådan en Google Ads-ekspert selv læser en
-søgeterm-rapport — ikke faner at hoppe mellem.
+Output = **tre faner**:
+1. **`Søgetermer`** — hovedfanen: alle termer på ét blad, hele rækken farvet efter `Dom`-kolonnen,
+   farve-legende + kontekst øverst, sorteret efter cost. Det er sådan en Google Ads-ekspert selv
+   læser en søgeterm-rapport. Brugeren retter `Dom`-kolonnen direkte her.
+2. **`Negative keywords`** + 3. **`Nye keywords (vindere)`** — **auto-genereret** via Google Sheets
+   `FILTER()` på `Dom`-kolonnen (Dom=NEGATIV → negativ-fanen, Dom=VINDER → vinder-fanen). Retter
+   brugeren en `GRÆNSE` til `NEGATIV` på hovedfanen, **opdaterer negativ-fanen sig selv** (i Google
+   Sheets). De to faner er navngivet og kolonne-strukturet PRÆCIS som `editor-csv-export` forventer
+   (negatives: Campaign/Level/Ad group/Negative keyword/Match type; vindere: Campaign/Ad group/
+   Keyword/Match type/Status) — så CSV-broen er nul-ekstra-arbejde.
+
+**VIGTIGT om FILTER + CSV-broen:** `FILTER()` er live i Google Sheets (brugerens redigerings-flade),
+men openpyxl/en offline-læser kan IKKE læse et spildt FILTER-resultat (formler evalueres ikke
+offline). Så når CSV-broen bygges, skal den **re-materialisere** de to faner fra den redigerede
+`Dom`-kolonne på hovedfanen (som openpyxl GODT kan læse) — ikke læse FILTER-fanerne direkte. Det
+holder fanerne live for mennesket OG korrekte for konverteren. (Det er en bevidst kontrakt, ikke en
+skjult fælde.)
 
 Aflever desuden en **kort dom i chatten**: hovedmønstre (fx "systemisk: alle lokale geo-termer har 0
 sporede konv → opkald spores ikke, tjek call-tracking"), de få vigtigste negatives (med spend), de få

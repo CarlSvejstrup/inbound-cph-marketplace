@@ -64,9 +64,14 @@ VERDICT_LABEL = {
     "GRAENSE": "GRÆNSE — grænsetilfælde, kræver et menneskeligt skøn",
 }
 
+# Main-sheet columns. Match type + Level sit on the main sheet so the auto-derived Negativ/Vinder
+# sheets (and the future editor-csv-export bridge) have every Editor field they need without a
+# second pass. Dom is the column the human edits; the two derived sheets FILTER on it.
 COLUMNS = ["Søgeterm", "Kampagne", "Ad group", "Budget brugt (DKK)", "Impressions", "Klik",
-           "CTR (%)", "Konverteringer", "CPA (DKK)", "Allerede keyword?", "Dom", "Begrundelse"]
+           "CTR (%)", "Konverteringer", "CPA (DKK)", "Match type", "Level",
+           "Allerede keyword?", "Dom", "Begrundelse"]
 WRAP_COLS = {"Begrundelse"}
+DOM_COL = "Dom"   # the column the derived sheets filter on
 
 
 def _fill(hexv):
@@ -79,6 +84,59 @@ def _already(v):
     if v is False:
         return "nej"
     return ""
+
+
+def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map, constants=None):
+    """Create a sheet whose rows are a live Google-Sheets FILTER of the main sheet, keeping only
+    rows where the main sheet's Dom column == `verdict`. Updates automatically when the user edits
+    Dom in Google Sheets (the chosen edit surface).
+
+    title:     sheet name — use editor-csv-export's exact alias so the CSV bridge needs no rework.
+    src_title: the main sheet's title (quoted in the formula).
+    col_map:   [(editor_header, src_col_letter_or_None), ...] mapping main columns -> Editor names.
+               A None src means the column is a constant (see constants).
+    constants: {editor_header: literal} for non-column columns (e.g. Status="Paused").
+
+    Each column gets ONE FILTER() in row 2 that spills down. The Dom condition column on the main
+    sheet is fixed (column M = 13 in COLUMNS). A constant column uses the SAME filter shape so it
+    spills to identical height: FILTER(IF(<dom range>=v, "Paused", ), <dom range>=v).
+    """
+    constants = constants or {}
+    ws = wb.create_sheet(title)
+    sq = src_title.replace("'", "''")           # escape single quotes for the sheet ref
+    dom_col = get_column_letter(COLUMNS.index(DOM_COL) + 1)   # main-sheet Dom column letter
+    dom_rng = f"'{sq}'!{dom_col}{data_first}:{dom_col}{data_last}"
+    cond = f'{dom_rng}="{verdict}"'
+
+    # A short note above the table so a human opening the sheet understands it is auto-derived.
+    ws["A1"] = (f"Auto-genereret fra 'Søgetermer' (Dom = {verdict}). Ret Dom på hovedfanen, "
+                f"så opdaterer denne sig selv i Google Sheets.")
+    ws["A1"].font = Font(italic=True, size=10, color="606060")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(col_map), 2))
+
+    header_row = 2
+    for c, (hdr, _src) in enumerate(col_map, start=1):
+        cell = ws.cell(row=header_row, column=c, value=hdr)
+        cell.fill = HEADER_FILL; cell.font = HEADER_FONT
+        cell.alignment = HEAD_ALIGN; cell.border = BORDER
+    ws.row_dimensions[header_row].height = 22
+
+    formula_row = header_row + 1
+    for c, (hdr, src) in enumerate(col_map, start=1):
+        letter = get_column_letter(c)
+        if src is None:                          # constant column, spilled to match height
+            lit = constants.get(hdr, "")
+            f = f'=FILTER(IF({cond},"{lit}",),{cond})'
+        else:
+            src_rng = f"'{sq}'!{src}{data_first}:{src}{data_last}"
+            f = f'=FILTER({src_rng},{cond})'
+        ws.cell(row=formula_row, column=c, value=f)
+
+    widths = [26, 16, 22, 30, 14]
+    for i in range(1, len(col_map) + 1):
+        ws.column_dimensions[get_column_letter(i)].width = widths[i - 1] if i - 1 < len(widths) else 18
+    ws.freeze_panes = ws.cell(row=formula_row, column=1).coordinate
+    return ws
 
 
 def build(data, out_path):
@@ -139,6 +197,11 @@ def build(data, out_path):
             "CTR (%)": t.get("ctr_pct", ""),
             "Konverteringer": t.get("conversions", ""),
             "CPA (DKK)": t.get("cpa_dkk", ""),
+            # Editor-bound fields for the derived sheets + the future CSV bridge. Defaults are
+            # sensible and editable: negatives default to Phrase + campaign level; a promoted
+            # winner defaults to Exact. The agent may override per term in the judged JSON.
+            "Match type": t.get("match_type") or ("Exact" if verdict == "VINDER" else "Phrase"),
+            "Level": t.get("level") or ("ad_group" if verdict == "VINDER" else "campaign"),
             "Allerede keyword?": _already(t.get("already_keyword")),
             "Dom": verdict,
             "Begrundelse": t.get("reason", ""),
@@ -156,9 +219,31 @@ def build(data, out_path):
     last = header_row + len(terms)
     ws.freeze_panes = ws.cell(row=header_row + 1, column=1).coordinate
     ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(COLUMNS))}{max(last, header_row)}"
-    widths = [30, 26, 22, 16, 12, 8, 9, 14, 10, 15, 16, 52]
+    widths = [30, 24, 20, 15, 11, 7, 8, 13, 9, 11, 11, 14, 15, 50]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
+
+    # --- the two auto-derived sheets (Sheets FILTER on the Dom column) ---
+    # Named EXACTLY as editor-csv-export's tab aliases so the CSV bridge is zero-rework later, and
+    # carrying the Editor column contract. Live FILTER() = they update when the user edits Dom in
+    # Google Sheets. NOTE: openpyxl cannot READ a spilled FILTER result (formulas aren't evaluated
+    # offline) — so the CSV bridge must RE-MATERIALISE these from the edited Dom column at export
+    # time, reading the main sheet's hand-typed Dom cells (which openpyxl CAN read). That keeps the
+    # sheet live for the human AND correct for the converter; it is not a silent trap.
+    data_first = header_row + 1
+    data_last = header_row + len(terms)
+    _filter_sheet(
+        wb, "Negative keywords", ws.title, data_first, data_last, "NEGATIV",
+        # (display header, source column letter on the main sheet) — maps main cols -> Editor names
+        [("Campaign", "B"), ("Level", "K"), ("Ad group", "C"),
+         ("Negative keyword", "A"), ("Match type", "J")],
+    )
+    _filter_sheet(
+        wb, "Nye keywords (vindere)", ws.title, data_first, data_last, "VINDER",
+        [("Campaign", "B"), ("Ad group", "C"), ("Keyword", "A"),
+         ("Match type", "J"), ("Status", None)],   # Status is a constant ("Paused"), not a column
+        constants={"Status": "Paused"},
+    )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)
