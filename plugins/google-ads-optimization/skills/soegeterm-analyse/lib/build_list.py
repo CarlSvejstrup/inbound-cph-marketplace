@@ -148,23 +148,33 @@ def _ngram_sheet(wb, ngram_rows):
     (>=2 conversions); else neutral. The agent refines these calls — the colour is a starting read.
     The point: a word like 'gratis' that bleeds across 40 cheap terms shows up as ONE red row."""
     ws = wb.create_sheet("N-gram analyse")
+    SYSTEMIC_WASTE = "F6D6D6"   # red:  spend across many terms, 0 conv
+    SYSTEMIC_WIN = "D6EFD6"     # green: real conversions across the n-gram
     ws["A1"] = ("N-gram analyse: hvert ord/frase aggregeret på tværs af ALLE søgetermer der "
-                "indeholder det. Find systemisk spild (rød) og vindende temaer (grøn) som enkelt-"
-                "termer skjuler. Bloker/promovér ét n-gram i stedet for mange termer.")
+                "indeholder det. Find systemisk spild og vindende temaer som enkelt-termer skjuler. "
+                "Bloker/promovér ét n-gram i stedet for mange termer.")
     ws["A1"].font = Font(italic=True, size=10, color="606060")
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
+
+    # Colour legend (same pattern as the main sheet) — swatch in A, label in B.
+    ws.cell(row=2, column=1, value="Farvekoder:").font = BODY_FONT
+    legend = [(SYSTEMIC_WASTE, "RØD — systemisk spild: ≥50 kr forbrug på tværs af termerne, 0 konverteringer → kandidat til at blokere n-grammet"),
+              (SYSTEMIC_WIN, "GRØN — systemisk vinder: ≥2 konverteringer på tværs → vindende tema, overvej at styrke det"),
+              (BAND, "NEUTRAL — hverken tydeligt spild eller vinder; vurdér i kontekst")]
+    for i, (hexv, label) in enumerate(legend):
+        r = 3 + i
+        sw = ws.cell(row=r, column=1, value=""); sw.fill = _fill(hexv); sw.border = BORDER
+        lab = ws.cell(row=r, column=2, value=label); lab.font = BODY_FONT
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=11)
 
     headers = ["N-gram", "Ord", "Antal termer", "Budget brugt (DKK)", "Impressions", "Klik",
                "CTR (%)", "Konverteringer", "CPA (DKK)", "Konv.rate (%)", "Eksempel-termer"]
-    hr = 2
+    hr = 7   # table header below the legend
     for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=hr, column=c, value=h)
         cell.fill = HEADER_FILL; cell.font = HEADER_FONT
         cell.alignment = HEAD_ALIGN; cell.border = BORDER
     ws.row_dimensions[hr].height = 24
-
-    SYSTEMIC_WASTE = "F6D6D6"   # red:  spend across many terms, 0 conv
-    SYSTEMIC_WIN = "D6EFD6"     # green: real conversions across the n-gram
     for i, g in enumerate(ngram_rows):
         rr = hr + 1 + i
         cost = _num_local(g.get("cost_dkk")); conv = _num_local(g.get("conversions"))

@@ -85,27 +85,31 @@ def analyse(slim_terms: list, max_n: int = MAX_N, min_term_count: int = MIN_TERM
         impr = int(_num(row.get("impressions")))
         conv = _num(row.get("conversions"))
         for g in _ngrams_of(words, max_n):
-            a = agg.setdefault(g, {"ngram": g, "words": len(g.split()), "term_count": 0,
+            a = agg.setdefault(g, {"ngram": g, "words": len(g.split()),
                                    "cost_dkk": 0.0, "clicks": 0, "impressions": 0,
-                                   "conversions": 0.0, "_terms": []})
-            a["term_count"] += 1
+                                   "conversions": 0.0, "_termset": set(), "_terms": []})
+            # cost/clicks/conv sum ALL rows (real total spend on the n-gram); but term_count is the
+            # number of DISTINCT search terms (same term recurs across ad groups — don't inflate).
             a["cost_dkk"] += cost
             a["clicks"] += clicks
             a["impressions"] += impr
             a["conversions"] += conv
-            if len(a["_terms"]) < 3:
-                a["_terms"].append(term)
+            if term:
+                a["_termset"].add(term)
+                if term not in a["_terms"] and len(a["_terms"]) < 3:
+                    a["_terms"].append(term)
 
     out = []
     for a in agg.values():
-        if a["term_count"] < min_term_count:
+        term_count = len(a["_termset"])
+        if term_count < min_term_count:
             continue
         cost = round(a["cost_dkk"], 2)
         conv = round(a["conversions"], 1)
         out.append({
             "ngram": a["ngram"],
             "words": a["words"],
-            "term_count": a["term_count"],
+            "term_count": term_count,
             "cost_dkk": cost,
             "clicks": a["clicks"],
             "impressions": a["impressions"],
