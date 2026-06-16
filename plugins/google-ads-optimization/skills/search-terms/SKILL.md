@@ -1,9 +1,17 @@
 ---
 name: search-terms
-description: Run a focused Google Ads search terms analysis for one client and deliver a colour-coded spreadsheet (eight tabs) that classifies every term as relevant (well placed), winner-to-promote, placement-problem (structural or intent mismatch with ad/LP), irrelevant, or borderline, grounds the calls in the client's scraped offering, pulls each ad group's ads + landing-page URL for intent-check, and hands back an import-ready negative-keyword list. The exact analysis window is computed and shown everywhere (Oversigt + filename). Read-only against Google Ads; builds a fresh .xlsx and saves to Drive or locally (runs in Cowork). Use when the user says "search term analyse", "soegetermer for [klient]", "find spild i [klient]", "negative keyword kandidater", "hvilke soegetermer konverterer", or "analyser search terms".
+description: "[FORÆLDET - brug soegeterm-analyse i stedet.] Tidligere tung søgeterm-analyse (rå GAQL + deterministisk sweep + 8-fane workbook). Afløst 2026-06-16 fordi den lavede vurderingen i kode og fejlflagede on-offering lokal-trafik som spild (0 konv != spild når folk ringer). Den nye soegeterm-analyse henter den præ-aggregerede get_search_terms_report, slanker FØR kontekst, og lader Claude dømme hele listen i ét hug -> én flad farvekodet liste. Trigger IKKE denne på normale søgeterm-forespørgsler; den er kun bevaret for reference indtil soegeterm-analyse er bevist live. Kør kun hvis brugeren EKSPLICIT beder om den gamle 8-fane-version ved navn."
 ---
 
-# search-terms
+# search-terms — FORÆLDET (DEPRECATED)
+
+> **Denne skill er afløst af [`soegeterm-analyse`](../soegeterm-analyse/SKILL.md) (2026-06-16).**
+> Den lavede søgeterm-vurderingen i kode (deterministisk sweep + keyword-map + 8 faner) og var både
+> langsom (tung rå GAQL, payload-shuffling) og upålidelig (flagede on-offering lokal-trafik som
+> spild, fordi "0 konverteringer" er forkert på konti hvor folk ringer). `soegeterm-analyse` slanker
+> rapporten FØR kontekst og lader Claude dømme hele listen i ét hug med korrekte regler, og leverer
+> ÉN flad farvekodet liste i stedet for 8 faner. **Brug `soegeterm-analyse`.** Denne fil er bevaret
+> for reference indtil den nye er bevist live, og fjernes derefter (git-historik beholder den).
 
 Produce an action-oriented search terms analysis for one Google Ads account and deliver it as a colour-coded Google Sheet. The deep, single-purpose version of the keyword module in `ads-audit-report`: one job, done thoroughly, output as a worklist the ads team can act on.
 
@@ -33,9 +41,9 @@ Negatives can live at three levels (ad group / campaign / account-shared list). 
 
 ## Trin 0 - Kontekst
 
-Read `../../context/drive-map.md` to find the client's Drive working folder (where the sheet should land).
+The client's Drive working folder (where the sheet should land) is resolved via `search_files` under `${user_config.inbound_root_folder_id}`; if it can't be resolved, ask for a folder name/ID, else save locally.
 
-The Drive upload is an external write, gated behind explicit confirmation. Everything against Google Ads is read-only.
+The Drive upload is an external write, gated behind explicit confirmation (show what and where, wait for `yes`, then write). Everything against Google Ads is read-only. **Dansk** for all finding text and sheet copy unless the user writes in English.
 
 ## Trin 1 - Intake (one question at a time)
 
@@ -183,7 +191,7 @@ Assemble the summary: account ID, period, scope, spend filter, the distribution 
 
 A fresh `.xlsx` is built each run by `build-sheet.py` (openpyxl) and saved to Drive via the connector, or locally. Mirrors rsa-copy: no `gws` CLI, no Sheets API, no remote clone, no 403 fallback. Tab colours, header fills, and the Spild cost colour-scale are baked into the `.xlsx` layer, so they survive upload to Drive and stay intact when opened as a Google Sheet. **Runs in Cowork and locally.**
 
-**Destination:** client's Drive working folder from `context/drive-map.md` if known, else ask for a folder name/ID (maps under `${user_config.inbound_root_folder_id}`), else save locally.
+**Destination:** client's Drive working folder resolved via `search_files` under `${user_config.inbound_root_folder_id}` if known, else ask for a folder name/ID, else save locally.
 
 Steps:
 
