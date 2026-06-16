@@ -178,13 +178,18 @@ enkelt-termer skjuler:
 import ngram
 ng = ngram.analyse(slim_terms)   # [{ngram, words, term_count, cost_dkk, conversions, ...}] sorteret efter cost
 ```
-Verificeret på Capio: `helkropsscanning` optræder i **36 termer = 3.697 kr, 0 konv** → ÉT systemisk
-fund (mod 36 spredte sub-50-kr-rækker gulvet ellers smed væk); `hvad koster` = 16 termer, 0 konv =
+Verificeret på Capio: `helkropsscanning` optræder i **13 distinkte termer = 3.697 kr, 0 konv** → ÉT
+systemisk fund (mod spredte sub-50-kr-rækker gulvet ellers smed væk); `hvad koster` = 0 konv =
 pris-research-tema; `capio`/`hellerup` = systemiske vindere. Send `ng` med i `judged.json` som
-`ngrams` → bygger **"N-gram analyse"-fanen** (rød = systemisk spild, grøn = systemisk vinder).
-**Komplementær til cost-gulvet:** gulvet gør den dyre top hurtig, n-grammet genfinder halens signal.
-Lad de stærkeste n-grams informere række-dommen + `suggested_keyword` (et bevist spild-n-gram som
-`gratis` → termer der indeholder det læner NEGATIV med `suggested_keyword` = n-grammet selv).
+`ngrams` → bygger **"N-gram analyse"-fanen** (rød = systemisk spild, grøn = systemisk vinder, med
+farve-legende). **Komplementær til cost-gulvet:** gulvet gør den dyre top hurtig, n-grammet genfinder
+halens signal. Lad de stærkeste n-grams informere række-dommen + `suggested_keyword` (et bevist
+spild-n-gram som `gratis` → termer der indeholder det læner NEGATIV med `suggested_keyword` = n-grammet).
+
+**SKRIV en kort analyse af n-grammene** (overordnet: hvilke temaer bløder, hvilke konverterer, hvad
+er første handling) og send den med som `ngram_analysis` (en streng; adskil afsnit med blank linje).
+Den rendres som en pæn **"Analyse"-boks** øverst på N-gram-fanen (navy bjælke + blødt panel, ét ombrudt
+afsnit pr. blank-linje-blok). Det er her din ekspert-læsning af mønstrene lever — ikke kun tallene.
 
 ## Trin 5 — Byg listen + aflever
 

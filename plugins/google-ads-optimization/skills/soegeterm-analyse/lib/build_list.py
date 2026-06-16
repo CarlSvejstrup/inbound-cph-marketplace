@@ -18,6 +18,7 @@ The five verdicts (the model assigns exactly one per term):
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -141,35 +142,71 @@ def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map,
     return ws
 
 
-def _ngram_sheet(wb, ngram_rows):
+def _ngram_sheet(wb, ngram_rows, analysis=None):
     """Write the N-gram analysis tab: each n-gram's aggregated metrics across all terms containing
     it. Reference only (never an Editor import). Coloured by a SYSTEMIC heuristic so patterns pop:
     red = systemic waste (>=50 kr spend across the terms, 0 conversions); green = systemic winner
     (>=2 conversions); else neutral. The agent refines these calls — the colour is a starting read.
-    The point: a word like 'gratis' that bleeds across 40 cheap terms shows up as ONE red row."""
+    The point: a word like 'gratis' that bleeds across 40 cheap terms shows up as ONE red row.
+
+    analysis: optional written prose (the agent's overall read of the n-grams). Rendered as a styled
+    box at the top — a navy 'Analyse'-bar + a bordered light panel, one wrapped row per paragraph
+    (paragraphs split on blank lines). Sized to be pleasant to read for a longer write-up."""
     ws = wb.create_sheet("N-gram analyse")
+    NCOLS = 11
     SYSTEMIC_WASTE = "F6D6D6"   # red:  spend across many terms, 0 conv
     SYSTEMIC_WIN = "D6EFD6"     # green: real conversions across the n-gram
-    ws["A1"] = ("N-gram analyse: hvert ord/frase aggregeret på tværs af ALLE søgetermer der "
-                "indeholder det. Find systemisk spild og vindende temaer som enkelt-termer skjuler. "
-                "Bloker/promovér ét n-gram i stedet for mange termer.")
-    ws["A1"].font = Font(italic=True, size=10, color="606060")
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=11)
+    PANEL = "EEF1F7"            # soft panel background for the analysis box
+    r = 1
 
-    # Colour legend (same pattern as the main sheet) — swatch in A, label in B.
-    ws.cell(row=2, column=1, value="Farvekoder:").font = BODY_FONT
+    # --- styled Analyse-box (only if the agent supplied prose) ---
+    if analysis and str(analysis).strip():
+        bar = ws.cell(row=r, column=1, value="Analyse")
+        bar.fill = HEADER_FILL; bar.font = Font(bold=True, size=12, color=NAVY_TEXT)
+        bar.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=NCOLS)
+        ws.row_dimensions[r].height = 24
+        r += 1
+        # one merged, wrapped row per paragraph; height scales with text length so nothing clips.
+        paras = [p.strip() for p in re.split(r"\n\s*\n", str(analysis).strip()) if p.strip()]
+        for p in paras:
+            cell = ws.cell(row=r, column=1, value=p)
+            cell.fill = _fill(PANEL); cell.font = BODY_FONT
+            cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True, indent=1)
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=NCOLS)
+            # ~ characters-per-line across the merged width (~140), ~16 px per wrapped line.
+            lines = max(1, -(-len(p) // 140))
+            ws.row_dimensions[r].height = max(18, lines * 16 + 6)
+            r += 1
+        ws.row_dimensions[r].height = 6  # spacer
+        r += 1
+
+    # --- intro note ---
+    note = ws.cell(row=r, column=1, value=("N-gram analyse: hvert ord/frase aggregeret på tværs af "
+            "ALLE søgetermer der indeholder det. Find systemisk spild og vindende temaer som "
+            "enkelt-termer skjuler. Bloker/promovér ét n-gram i stedet for mange termer."))
+    note.font = Font(italic=True, size=10, color="606060")
+    note.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=NCOLS)
+    ws.row_dimensions[r].height = 30
+    r += 1
+
+    # --- colour legend (swatch in A, label spanning B:) ---
+    ws.cell(row=r, column=1, value="Farvekoder:").font = BODY_FONT
+    r += 1
     legend = [(SYSTEMIC_WASTE, "RØD — systemisk spild: ≥50 kr forbrug på tværs af termerne, 0 konverteringer → kandidat til at blokere n-grammet"),
               (SYSTEMIC_WIN, "GRØN — systemisk vinder: ≥2 konverteringer på tværs → vindende tema, overvej at styrke det"),
               (BAND, "NEUTRAL — hverken tydeligt spild eller vinder; vurdér i kontekst")]
-    for i, (hexv, label) in enumerate(legend):
-        r = 3 + i
+    for hexv, label in legend:
         sw = ws.cell(row=r, column=1, value=""); sw.fill = _fill(hexv); sw.border = BORDER
         lab = ws.cell(row=r, column=2, value=label); lab.font = BODY_FONT
-        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=11)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=NCOLS)
+        r += 1
+    r += 1  # spacer
 
     headers = ["N-gram", "Ord", "Antal termer", "Budget brugt (DKK)", "Impressions", "Klik",
                "CTR (%)", "Konverteringer", "CPA (DKK)", "Konv.rate (%)", "Eksempel-termer"]
-    hr = 7   # table header below the legend
+    hr = r   # table header sits below the analysis box + legend
     for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=hr, column=c, value=h)
         cell.fill = HEADER_FILL; cell.font = HEADER_FONT
@@ -347,7 +384,7 @@ def build(data, out_path):
 
     # --- N-gram analyse (systemiske mønstre på tværs af termer; reference, ikke import) ---
     if data.get("ngrams"):
-        _ngram_sheet(wb, data["ngrams"])
+        _ngram_sheet(wb, data["ngrams"], analysis=data.get("ngram_analysis"))
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     wb.save(out_path)
