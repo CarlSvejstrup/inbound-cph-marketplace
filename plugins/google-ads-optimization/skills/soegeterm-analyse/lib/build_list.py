@@ -67,9 +67,9 @@ VERDICT_LABEL = {
 # Main-sheet columns. Match type + Level sit on the main sheet so the auto-derived Negativ/Vinder
 # sheets (and the future editor-csv-export bridge) have every Editor field they need without a
 # second pass. Dom is the column the human edits; the two derived sheets FILTER on it.
-COLUMNS = ["Søgeterm", "Kampagne", "Ad group", "Budget brugt (DKK)", "Impressions", "Klik",
-           "CTR (%)", "Konverteringer", "CPA (DKK)", "Match type", "Level",
-           "Allerede keyword?", "Dom", "Begrundelse"]
+COLUMNS = ["Søgeterm", "Kampagne", "Ad group", "Triggerende keyword", "Keyword match type",
+           "Budget brugt (DKK)", "Impressions", "Klik", "CTR (%)", "Konverteringer", "CPA (DKK)",
+           "Match type", "Level", "Allerede keyword?", "Dom", "Begrundelse"]
 WRAP_COLS = {"Begrundelse"}
 DOM_COL = "Dom"   # the column the derived sheets filter on
 
@@ -191,6 +191,8 @@ def build(data, out_path):
             "Søgeterm": t.get("term", ""),
             "Kampagne": t.get("campaign", ""),
             "Ad group": t.get("ad_group", ""),
+            "Triggerende keyword": t.get("trigger_keyword", ""),
+            "Keyword match type": t.get("trigger_match_type", ""),
             "Budget brugt (DKK)": t.get("cost_dkk", ""),
             "Impressions": t.get("impressions", ""),
             "Klik": t.get("clicks", ""),
@@ -219,9 +221,9 @@ def build(data, out_path):
     last = header_row + len(terms)
     ws.freeze_panes = ws.cell(row=header_row + 1, column=1).coordinate
     ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(COLUMNS))}{max(last, header_row)}"
-    widths = [30, 24, 20, 15, 11, 7, 8, 13, 9, 11, 11, 14, 15, 50]
-    for i, w in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+    widths = [30, 22, 18, 24, 14, 14, 10, 7, 8, 12, 9, 11, 10, 13, 14, 46]
+    for i in range(1, len(COLUMNS) + 1):
+        ws.column_dimensions[get_column_letter(i)].width = widths[i - 1] if i - 1 < len(widths) else 16
 
     # --- the two auto-derived sheets (Sheets FILTER on the Dom column) ---
     # Named EXACTLY as editor-csv-export's tab aliases so the CSV bridge is zero-rework later, and
@@ -230,18 +232,21 @@ def build(data, out_path):
     # offline) — so the CSV bridge must RE-MATERIALISE these from the edited Dom column at export
     # time, reading the main sheet's hand-typed Dom cells (which openpyxl CAN read). That keeps the
     # sheet live for the human AND correct for the converter; it is not a silent trap.
+    # Source column letters are derived from COLUMNS so they stay correct if the layout changes.
+    def _col(name):
+        return get_column_letter(COLUMNS.index(name) + 1)
     data_first = header_row + 1
     data_last = header_row + len(terms)
     _filter_sheet(
         wb, "Negative keywords", ws.title, data_first, data_last, "NEGATIV",
         # (display header, source column letter on the main sheet) — maps main cols -> Editor names
-        [("Campaign", "B"), ("Level", "K"), ("Ad group", "C"),
-         ("Negative keyword", "A"), ("Match type", "J")],
+        [("Campaign", _col("Kampagne")), ("Level", _col("Level")), ("Ad group", _col("Ad group")),
+         ("Negative keyword", _col("Søgeterm")), ("Match type", _col("Match type"))],
     )
     _filter_sheet(
         wb, "Nye keywords (vindere)", ws.title, data_first, data_last, "VINDER",
-        [("Campaign", "B"), ("Ad group", "C"), ("Keyword", "A"),
-         ("Match type", "J"), ("Status", None)],   # Status is a constant ("Paused"), not a column
+        [("Campaign", _col("Kampagne")), ("Ad group", _col("Ad group")), ("Keyword", _col("Søgeterm")),
+         ("Match type", _col("Match type")), ("Status", None)],  # Status constant ("Paused")
         constants={"Status": "Paused"},
     )
 

@@ -34,6 +34,33 @@ import re
 # judgement; it only drops rows too small to be worth a human's eyes when the list is enormous.
 DEFAULT_SPEND_FLOOR_DKK = 0
 
+# The RECOMMENDED default threshold for the heavy (>30-day GAQL) path: 50 kr of spend. Spend is
+# what defines waste/winners, so a cost floor is the safe default (an impressions floor can drop a
+# high-spend, low-impression term). The threshold is chosen at runtime via the intake question.
+DEFAULT_COST_FLOOR_DKK = 50
+
+
+def where_predicate(dimension: str, value) -> str:
+    """Build the GAQL WHERE predicate for the runtime-chosen filter threshold. This is the
+    EFFICIENT, server-side filter (it shrinks the payload before it leaves the API — that is what
+    fixed the slow pull). The agent appends the returned string to the search_term_view query.
+
+        where_predicate("cost", 50)         -> "metrics.cost_micros >= 50000000"
+        where_predicate("impressions", 100) -> "metrics.impressions >= 100"
+        where_predicate("all", None)        -> "metrics.cost_micros > 0"   (no floor, heavy)
+
+    dimension: "cost" (DKK) | "impressions" | "all" (no threshold, just drop 0-spend).
+    Cost is the recommended default; "all" is the heavy long-tail pull (warn the user).
+    """
+    dim = (dimension or "cost").strip().lower()
+    if dim == "impressions":
+        n = max(0, int(_num(value)))
+        return f"metrics.impressions >= {n}"
+    if dim in ("all", "none", "0"):
+        return "metrics.cost_micros > 0"
+    kr = _num(value) if value is not None else DEFAULT_COST_FLOOR_DKK
+    return f"metrics.cost_micros >= {int(kr * 1_000_000)}"
+
 
 def _num(v) -> float:
     """Metrics arrive as int/float/str/None across the report + GAQL shapes; coerce safely."""
@@ -125,6 +152,17 @@ def _one_row(raw: dict) -> dict | None:
     if status in {"EXCLUDED", "ADDED_EXCLUDED"}:
         already = True
 
+    # --- triggering keyword (WHICH keyword matched this search term + its match type) ---
+    # In raw search_term_view GAQL this comes from segments.keyword.info.{text,match_type} (verified
+    # live). The flat MCP report doesn't carry it; flat keys probed too for forward-compat.
+    seg_kw = {}
+    seg = raw.get("segments", {})
+    if isinstance(seg, dict):
+        seg_kw = (seg.get("keyword", {}) or {}).get("info", {}) or {}
+    trigger_keyword = (raw.get("trigger_keyword") or raw.get("triggering_keyword")
+                       or seg_kw.get("text") or "")
+    trigger_match_type = (raw.get("trigger_match_type") or seg_kw.get("match_type") or match_type or "")
+
     return {
         "term": term,
         "ad_group": str(ad_group or ""),
@@ -137,6 +175,9 @@ def _one_row(raw: dict) -> dict | None:
         "cpa_dkk": _cpa(cost_dkk, conversions),
         "already_keyword": already,
         "keyword_match_type": match_type,
+        # which keyword caught this term (and at what match type) — answers "what matched?"
+        "trigger_keyword": str(trigger_keyword or ""),
+        "trigger_match_type": str(trigger_match_type or ""),
     }
 
 

@@ -47,11 +47,20 @@ Udled så meget som muligt fra samtalen først. Saml i ét kald:
    med `WHERE segments.date BETWEEN '<start>' AND '<slut>'`.
 3. **Scope** — `Hele kontoen` eller `Specifik kampagne`. Specifik → brug `campaign_id` på rapporten
    (færre rækker, hurtigere, og ofte det brugeren faktisk vil). 
-4. **Hvilken konvertering tæller** — på lead-gen-konti er der ofte flere conversion actions (formular,
+4. **Filter-tærskel** (kun relevant på `run_custom_gaql`-vejen, >30 dage). Tærsklen er DYNAMISK —
+   spørg hvilken dimension + værdi, og byg WHERE-prædikatet med `slim.where_predicate(dim, value)`:
+   - `Forbrug ≥ 50 kr (anbefalet)` — default; `cost`/50. Forbrug definerer spild/vindere, så et
+     cost-gulv er det sikre valg.
+   - `Forbrug ≥ andet beløb` — `cost`/<beløb> hvis brugeren vil have et andet niveau.
+   - `Impressions ≥ N` — `impressions`/N (fanger volumen-termer; men kan tabe en høj-forbrugs-term
+     med få visninger — nævn det).
+   - `Alt (ingen tærskel)` — `all`; den tunge lange hale. **Advar:** stort payload, langsommere.
+   Rapportér altid "trak X termer (tærskel: …)" så valget er synligt.
+5. **Hvilken konvertering tæller** — på lead-gen-konti er der ofte flere conversion actions (formular,
    **opkald**, nyhedsbrev, PDF). Spørg "tæller alle konverteringer, eller kun de primære (leads/opkald)?"
    Det ændrer direkte hvad der er en vinder og hvad der er spild. Hvis brugeren ikke ved det: antag
    alle, men SKRIV forbeholdet i outputtet.
-5. **Gem** — `Lokalt (.xlsx)` (default) eller `Drive (klientens mappe)`. Drive = ekstern write →
+6. **Gem** — `Lokalt (.xlsx)` (default) eller `Drive (klientens mappe)`. Drive = ekstern write →
    bekræft først; kan fejle på store filer, fald tilbage til lokalt.
 
 ## Trin 2 — Forstå tilbuddet BILLIGT (forside + ad groups)
@@ -86,16 +95,26 @@ terms = res["terms"]
 **>30 dage / custom (inkl. default 90 dage) — `run_custom_gaql`** (rapporten kan ikke; se Trin 1):
 ```sql
 SELECT search_term_view.search_term, search_term_view.status,
+       segments.keyword.info.text, segments.keyword.info.match_type,  -- HVILKET keyword matchede
        campaign.name, ad_group.name,
        metrics.impressions, metrics.clicks, metrics.cost_micros,
        metrics.conversions, metrics.conversions_value
 FROM search_term_view
 WHERE segments.date BETWEEN '<start>' AND '<slut>'
-  AND metrics.cost_micros >= 50000000  -- DEFAULT spend-gulv: 50 kr. Halverer rækkerne; alt under
-                                       -- kan hverken være spild eller vinder. Sænk kun bevidst.
+  AND <FILTER-PRÆDIKAT>                 -- fra intake (Trin 1) via sweep-helper, se nedenfor
 ORDER BY metrics.cost_micros DESC      -- de DYRESTE først (det er der spild + vindere bor)
 LIMIT 1000                              -- loft; se note nedenfor
 ```
+**`<FILTER-PRÆDIKAT>`** bygges af `slim.where_predicate(dimension, value)` ud fra brugerens valg i
+Trin 1: `cost`/50 → `metrics.cost_micros >= 50000000` (default), `impressions`/N →
+`metrics.impressions >= N`, `all` → `metrics.cost_micros > 0` (tung; advar). Filtrér ALTID
+server-side (i WHERE) — det er DER hastigheden kommer fra; ikke client-side i slim.
+
+**`segments.keyword.info.text` + `.match_type`** giver det TRIGGERENDE keyword pr. søgeterm (verificeret
+live: `helkropsscanning` trigges af PHRASE-keywordet `helkrops mr scanning`). `slim` læser dem som
+`trigger_keyword` + `trigger_match_type` → de bliver til kolonnerne **"Triggerende keyword"** +
+**"Keyword match type"** på hovedfanen. (At tilføje `segments.keyword.*` segmenterer rækkerne pr.
+keyword — det er den ønskede granularitet; aggregér pr. søgeterm hvis du vil have én række pr. term.)
 **Hvorfor 50-kr-gulvet (det er fixet på "det der tog lang tid"):** rå GAQL på `search_term_view` er
 tungt — uden gulv var Capios 90-dages-pull ~360k tegn / 500+ rækker, hvoraf 2/3 var lavvolumen-halé
 med <5 klik (ren støj). `cost_micros >= 50000000` (50 kr) skærer halen FØR den forlader API'et →
