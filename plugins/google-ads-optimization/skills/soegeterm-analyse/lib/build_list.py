@@ -67,11 +67,13 @@ VERDICT_LABEL = {
 # Main-sheet columns. Match type + Level sit on the main sheet so the auto-derived Negativ/Vinder
 # sheets (and the future editor-csv-export bridge) have every Editor field they need without a
 # second pass. Dom is the column the human edits; the two derived sheets FILTER on it.
-COLUMNS = ["Søgeterm", "Kampagne", "Ad group", "Triggerende keyword", "Keyword match type",
-           "Budget brugt (DKK)", "Impressions", "Klik", "CTR (%)", "Konverteringer", "CPA (DKK)",
-           "Match type", "Level", "Allerede keyword?", "Dom", "Begrundelse"]
+COLUMNS = ["Søgeterm", "Foreslået keyword", "Kampagne", "Ad group", "Triggerende keyword",
+           "Keyword match type", "Budget brugt (DKK)", "Impressions", "Klik", "CTR (%)",
+           "Konverteringer", "CPA (DKK)", "Match type", "Level", "Allerede keyword?",
+           "Dom", "Begrundelse"]
 WRAP_COLS = {"Begrundelse"}
-DOM_COL = "Dom"   # the column the derived sheets filter on
+DOM_COL = "Dom"            # the column the derived sheets filter on
+SUGGESTED_COL = "Foreslået keyword"   # the keyword that flows to Negativ/Vinder (need NOT == søgeterm)
 
 
 def _fill(hexv):
@@ -97,9 +99,9 @@ def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map,
                A None src means the column is a constant (see constants).
     constants: {editor_header: literal} for non-column columns (e.g. Status="Paused").
 
-    Each column gets ONE FILTER() in row 2 that spills down. The Dom condition column on the main
-    sheet is fixed (column M = 13 in COLUMNS). A constant column uses the SAME filter shape so it
-    spills to identical height: FILTER(IF(<dom range>=v, "Paused", ), <dom range>=v).
+    Each column gets ONE FILTER() in row 2 that spills down. The Dom condition column is looked up
+    dynamically from COLUMNS (stays correct if the layout shifts). A constant column uses the SAME
+    filter shape so it spills to identical height: FILTER(IF(<dom range>=v, "Add", ), <dom range>=v).
     """
     constants = constants or {}
     ws = wb.create_sheet(title)
@@ -189,6 +191,10 @@ def build(data, out_path):
         fill = VERDICT_FILL.get(verdict)
         row_vals = {
             "Søgeterm": t.get("term", ""),
+            # The keyword to actually add (negative or new) — defaults to the search term but the
+            # agent/user may set something broader (e.g. term 'helkropsscanning pris' -> keyword
+            # 'helkropsscanning'). The Negativ/Vinder sheets pull THIS, not the raw søgeterm.
+            "Foreslået keyword": t.get("suggested_keyword") or t.get("term", ""),
             "Kampagne": t.get("campaign", ""),
             "Ad group": t.get("ad_group", ""),
             "Triggerende keyword": t.get("trigger_keyword", ""),
@@ -221,7 +227,7 @@ def build(data, out_path):
     last = header_row + len(terms)
     ws.freeze_panes = ws.cell(row=header_row + 1, column=1).coordinate
     ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(COLUMNS))}{max(last, header_row)}"
-    widths = [30, 22, 18, 24, 14, 14, 10, 7, 8, 12, 9, 11, 10, 13, 14, 46]
+    widths = [28, 26, 20, 18, 22, 13, 13, 10, 7, 8, 12, 9, 11, 10, 13, 13, 44]
     for i in range(1, len(COLUMNS) + 1):
         ws.column_dimensions[get_column_letter(i)].width = widths[i - 1] if i - 1 < len(widths) else 16
 
@@ -237,17 +243,31 @@ def build(data, out_path):
         return get_column_letter(COLUMNS.index(name) + 1)
     data_first = header_row + 1
     data_last = header_row + len(terms)
+
+    # --- Negative keywords = Google Ads Editor's NEGATIVE-LIST bulk-upload template (Carl's screenshot 1).
+    # Required: Action, Negative keyword list name OR Negative Keyword List ID, Negative keyword,
+    # Keyword or list, Match type. The list NAME we cannot know -> a loud placeholder the user fills
+    # (fails the import visibly rather than guessing). The keyword pulled is "Foreslået keyword"
+    # (need not equal the søgeterm). Customer ID left blank (only needed for MCC multi-account upload).
     _filter_sheet(
         wb, "Negative keywords", ws.title, data_first, data_last, "NEGATIV",
-        # (display header, source column letter on the main sheet) — maps main cols -> Editor names
-        [("Campaign", _col("Kampagne")), ("Level", _col("Level")), ("Ad group", _col("Ad group")),
-         ("Negative keyword", _col("Søgeterm")), ("Match type", _col("Match type"))],
+        [("Action", None), ("Customer ID", None),
+         ("Negative keyword list name", None), ("Negative Keyword List ID", None),
+         ("Negative keyword", _col(SUGGESTED_COL)), ("Keyword or list", None),
+         ("Match type", _col("Match type"))],
+        constants={"Action": "Add", "Customer ID": "",
+                   "Negative keyword list name": "<INDSÆT NEGATIVLISTE-NAVN>",
+                   "Negative Keyword List ID": "", "Keyword or list": "keyword"},
     )
+    # --- Nye keywords = Editor's ADD-KEYWORD template (screenshot 2). Required on create: Keyword;
+    # required: Campaign + Ad group (by name). Action=Add, Keyword status=Paused (champion-challenger
+    # safe). Keyword pulled is "Foreslået keyword".
     _filter_sheet(
         wb, "Nye keywords (vindere)", ws.title, data_first, data_last, "VINDER",
-        [("Campaign", _col("Kampagne")), ("Ad group", _col("Ad group")), ("Keyword", _col("Søgeterm")),
-         ("Match type", _col("Match type")), ("Status", None)],  # Status constant ("Paused")
-        constants={"Status": "Paused"},
+        [("Action", None), ("Keyword status", None),
+         ("Campaign", _col("Kampagne")), ("Ad group", _col("Ad group")),
+         ("Keyword", _col(SUGGESTED_COL)), ("Match Type", _col("Match type"))],
+        constants={"Action": "Add", "Keyword status": "Paused"},
     )
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)

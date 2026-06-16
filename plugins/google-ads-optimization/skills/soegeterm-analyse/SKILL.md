@@ -160,6 +160,13 @@ præcis det den gamle pipeline fik galt):
 
 De fem domme: **VINDER / RELEVANT / FORKERT_PLACERET / NEGATIV / GRÆNSE.**
 
+**`suggested_keyword` (det keyword der faktisk tilføjes — behøver IKKE være = søgetermet).** For
+NEGATIV + VINDER: sæt `suggested_keyword` til det keyword du vil tilføje. Tit er det BREDERE end
+søgetermet — fx søgeterm `helkropsscanning pris` → foreslået keyword `helkropsscanning` (fang hele
+pris-familien med ét negativ/keyword i stedet for den eksakte streng). Default = søgetermet hvis du
+ikke sætter andet. Det er DENNE værdi der flyder over i Negativ/Vinder-fanerne. Sæt også `match_type`
+(Exact/Phrase/Broad) for det tilføjede keyword.
+
 ## Trin 5 — Byg listen + aflever
 
 ```bash
@@ -168,9 +175,9 @@ python3 ${CLAUDE_SKILL_DIR}/lib/build_list.py --in <judged.json> \
 ```
 
 `judged.json` = `{client, account_id, period, scope, conversion_note, today, terms:[...]}` hvor hver
-term er en slank række + `verdict` + `reason` (+ valgfrit `match_type` og `level` — ellers defaulter
-builderen: negativ → Phrase/campaign, vinder → Exact/ad_group). `conversion_note` SKAL bære
-opkald-forbeholdet hvis konverteringer ikke kun er primære/leads.
+term er en slank række + `verdict` + `reason` + valgfrit `suggested_keyword` (default = søgetermet) +
+`match_type` (Exact/Phrase/Broad) + `level`. `conversion_note` SKAL bære opkald-forbeholdet hvis
+konverteringer ikke kun er primære/leads.
 
 Output = **tre faner**:
 1. **`Søgetermer`** — hovedfanen: alle termer på ét blad, hele rækken farvet efter `Dom`-kolonnen,
@@ -179,9 +186,16 @@ Output = **tre faner**:
 2. **`Negative keywords`** + 3. **`Nye keywords (vindere)`** — **auto-genereret** via Google Sheets
    `FILTER()` på `Dom`-kolonnen (Dom=NEGATIV → negativ-fanen, Dom=VINDER → vinder-fanen). Retter
    brugeren en `GRÆNSE` til `NEGATIV` på hovedfanen, **opdaterer negativ-fanen sig selv** (i Google
-   Sheets). De to faner er navngivet og kolonne-strukturet PRÆCIS som `editor-csv-export` forventer
-   (negatives: Campaign/Level/Ad group/Negative keyword/Match type; vindere: Campaign/Ad group/
-   Keyword/Match type/Status) — så CSV-broen er nul-ekstra-arbejde.
+   Sheets). De to faner matcher **Google Ads Editors RIGTIGE bulk-upload-skemaer** (Carls templates),
+   med de PÅKRÆVEDE kolonner og faste værdier:
+   - **Negative keywords** (negativ-LISTE bulk-upload): `Action`(Add) · `Customer ID` · `Negative
+     keyword list name` · `Negative Keyword List ID` · `Negative keyword`(= Foreslået keyword) ·
+     `Keyword or list`(keyword) · `Match type`. **`Negative keyword list name` er en placeholder
+     `<INDSÆT NEGATIVLISTE-NAVN>`** — brugeren SKAL udfylde den (vi kan ikke kende listens navn; den
+     fejler synligt ved import frem for at gætte). Brug enten list-navn ELLER list-ID, ikke begge.
+   - **Nye keywords (vindere)** (tilføj-keyword): `Action`(Add) · `Keyword status`(Paused) ·
+     `Campaign` · `Ad group` · `Keyword`(= Foreslået keyword) · `Match Type`.
+   Begge trækker **Foreslået keyword** (ikke den rå søgeterm). Klar til Editor-import direkte.
 
 **VIGTIGT om FILTER + CSV-broen:** `FILTER()` er live i Google Sheets (brugerens redigerings-flade),
 men openpyxl/en offline-læser kan IKKE læse et spildt FILTER-resultat (formler evalueres ikke
@@ -205,11 +219,18 @@ sporede konv → opkald spores ikke, tjek call-tracking"), de få vigtigste nega
   forkert kald.
 - **Æ Ø Å altid** i alt output — aldrig ASCII-translitteration.
 
-## Til konvertering (valgfrit)
+## Fra dom til Editor-import
 
-Den flade liste er en menneske-leverance, ikke et Editor-import-format. Vil ad-teamet have
-Editor-CSV'er ud af de NEGATIV- og VINDER-domme, er det et separat skridt via `editor-csv-export` —
-men det er bevidst IKKE en del af denne skill. Denne skill leverer dommen; mennesket beslutter.
+`Søgetermer`-fanen er menneske-leverancen (læs + ret `Dom`). De to andre faner ER allerede Google
+Ads Editors bulk-upload-format — så vejen til kontoen er direkte, INGEN `editor-csv-export` nødvendig:
+1. Ret `Dom` på `Søgetermer` (+ evt. `Foreslået keyword` / `Match type`) i Google Sheets → Negativ/
+   Vinder-fanerne opdaterer sig selv.
+2. Udfyld `<INDSÆT NEGATIVLISTE-NAVN>` på negativ-fanen (hvilken delt negativliste skal ordene i).
+3. Eksportér den relevante fane som CSV (File → Download → CSV i Sheets) og importér i Google Ads
+   Editor (eller upload negativlisten direkte). Read-only herfra og ud — mennesket trykker Send.
+
+(Den gamle `editor-csv-export` er til campaign-build/optimering-loop-workbooks; denne skill behøver
+den ikke, fordi fanerne allerede er i import-format.)
 
 ## Maintenance
 
