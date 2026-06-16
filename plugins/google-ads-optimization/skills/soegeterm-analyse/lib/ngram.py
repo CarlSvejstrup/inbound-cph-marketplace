@@ -84,10 +84,12 @@ def analyse(slim_terms: list, max_n: int = MAX_N, min_term_count: int = MIN_TERM
         clicks = int(_num(row.get("clicks")))
         impr = int(_num(row.get("impressions")))
         conv = _num(row.get("conversions"))
+        already = row.get("already_keyword") is True   # this term is already a keyword/negative
         for g in _ngrams_of(words, max_n):
             a = agg.setdefault(g, {"ngram": g, "words": len(g.split()),
                                    "cost_dkk": 0.0, "clicks": 0, "impressions": 0,
-                                   "conversions": 0.0, "_termset": set(), "_terms": []})
+                                   "conversions": 0.0, "_termset": set(), "_covered": set(),
+                                   "_terms": []})
             # cost/clicks/conv sum ALL rows (real total spend on the n-gram); but term_count is the
             # number of DISTINCT search terms (same term recurs across ad groups — don't inflate).
             a["cost_dkk"] += cost
@@ -96,6 +98,8 @@ def analyse(slim_terms: list, max_n: int = MAX_N, min_term_count: int = MIN_TERM
             a["conversions"] += conv
             if term:
                 a["_termset"].add(term)
+                if already:
+                    a["_covered"].add(term)             # distinct terms already a keyword
                 if term not in a["_terms"] and len(a["_terms"]) < 3:
                     a["_terms"].append(term)
 
@@ -106,6 +110,7 @@ def analyse(slim_terms: list, max_n: int = MAX_N, min_term_count: int = MIN_TERM
             continue
         cost = round(a["cost_dkk"], 2)
         conv = round(a["conversions"], 1)
+        covered = len(a["_covered"])
         out.append({
             "ngram": a["ngram"],
             "words": a["words"],
@@ -117,6 +122,12 @@ def analyse(slim_terms: list, max_n: int = MAX_N, min_term_count: int = MIN_TERM
             "cpa_dkk": round(cost / conv, 0) if conv else "",
             "ctr_pct": round(a["clicks"] / a["impressions"] * 100, 1) if a["impressions"] else "",
             "conv_rate_pct": round(conv / a["clicks"] * 100, 1) if a["clicks"] else "",
+            # "already covered": how many of the n-gram's distinct terms are ALREADY keywords.
+            # A winner n-gram is only an EXPANSION opportunity to the extent it is NOT covered.
+            # Free signal (already_keyword rides on each search-term row — no extra keyword pull).
+            "covered_count": covered,
+            "covered_share_pct": round(covered / term_count * 100) if term_count else 0,
+            "covered_text": f"{covered}/{term_count}",
             "example_terms": ", ".join(a["_terms"]),
         })
     out.sort(key=lambda x: -x["cost_dkk"])

@@ -195,7 +195,8 @@ def _ngram_sheet(wb, ngram_rows, analysis=None):
     ws.cell(row=r, column=1, value="Farvekoder:").font = BODY_FONT
     r += 1
     legend = [(SYSTEMIC_WASTE, "RØD — systemisk spild: ≥50 kr forbrug på tværs af termerne, 0 konverteringer → kandidat til at blokere n-grammet"),
-              (SYSTEMIC_WIN, "GRØN — systemisk vinder: ≥2 konverteringer på tværs → vindende tema, overvej at styrke det"),
+              (SYSTEMIC_WIN, "GRØN — systemisk vinder OG udækket: konverterer, og termerne er endnu ikke keywords → ægte udvidelses-gab"),
+              ("D6E4F5", "BLÅ — konverterer, men ≥80% af termerne er ALLEREDE keywords → dækket, ikke et udvidelses-gab (se 'Allerede dækket')"),
               (BAND, "NEUTRAL — hverken tydeligt spild eller vinder; vurdér i kontekst")]
     for hexv, label in legend:
         sw = ws.cell(row=r, column=1, value=""); sw.fill = _fill(hexv); sw.border = BORDER
@@ -204,26 +205,31 @@ def _ngram_sheet(wb, ngram_rows, analysis=None):
         r += 1
     r += 1  # spacer
 
-    headers = ["N-gram", "Ord", "Antal termer", "Budget brugt (DKK)", "Impressions", "Klik",
-               "CTR (%)", "Konverteringer", "CPA (DKK)", "Konv.rate (%)", "Eksempel-termer"]
+    headers = ["N-gram", "Ord", "Antal termer", "Allerede dækket", "Budget brugt (DKK)",
+               "Impressions", "Klik", "CTR (%)", "Konverteringer", "CPA (DKK)", "Konv.rate (%)",
+               "Eksempel-termer"]
     hr = r   # table header sits below the analysis box + legend
     for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=hr, column=c, value=h)
         cell.fill = HEADER_FILL; cell.font = HEADER_FONT
         cell.alignment = HEAD_ALIGN; cell.border = BORDER
     ws.row_dimensions[hr].height = 24
+    COVERED_WIN = "D6E4F5"   # blue: would be a winner, but already mostly covered -> not an expansion gap
     for i, g in enumerate(ngram_rows):
         rr = hr + 1 + i
         cost = _num_local(g.get("cost_dkk")); conv = _num_local(g.get("conversions"))
+        covered_share = _num_local(g.get("covered_share_pct"))
         fill = None
         if conv == 0 and cost >= 50:
-            fill = SYSTEMIC_WASTE
+            fill = SYSTEMIC_WASTE                       # red: systemic waste
         elif conv >= 2:
-            fill = SYSTEMIC_WIN
+            # a converting theme — but if it's already ~fully covered by keywords it's NOT an
+            # expansion gap (Carl's point), so tone it blue instead of green.
+            fill = COVERED_WIN if covered_share >= 80 else SYSTEMIC_WIN
         vals = [g.get("ngram", ""), g.get("words", ""), g.get("term_count", ""),
-                g.get("cost_dkk", ""), g.get("impressions", ""), g.get("clicks", ""),
-                g.get("ctr_pct", ""), g.get("conversions", ""), g.get("cpa_dkk", ""),
-                g.get("conv_rate_pct", ""), g.get("example_terms", "")]
+                g.get("covered_text", ""), g.get("cost_dkk", ""), g.get("impressions", ""),
+                g.get("clicks", ""), g.get("ctr_pct", ""), g.get("conversions", ""),
+                g.get("cpa_dkk", ""), g.get("conv_rate_pct", ""), g.get("example_terms", "")]
         for c, v in enumerate(vals, start=1):
             cell = ws.cell(row=rr, column=c, value=v)
             cell.border = BORDER
@@ -235,7 +241,7 @@ def _ngram_sheet(wb, ngram_rows, analysis=None):
     ws.freeze_panes = ws.cell(row=hr + 1, column=1).coordinate
     if ngram_rows:
         ws.auto_filter.ref = f"A{hr}:{get_column_letter(len(headers))}{hr + len(ngram_rows)}"
-    for i, w in enumerate([26, 6, 12, 16, 12, 8, 9, 13, 10, 12, 50], start=1):
+    for i, w in enumerate([26, 6, 12, 14, 16, 12, 8, 9, 13, 10, 12, 50], start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
     return ws
 
