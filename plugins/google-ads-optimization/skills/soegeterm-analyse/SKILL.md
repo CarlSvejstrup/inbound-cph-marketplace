@@ -161,12 +161,21 @@ præcis det den gamle pipeline fik galt):
 De fem domme: **VINDER / RELEVANT / FORKERT_PLACERET / NEGATIV / GRÆNSE.**
 
 **`suggested_keyword` (det keyword der faktisk tilføjes — behøver IKKE være = søgetermet).** For
-NEGATIV + VINDER: sæt `suggested_keyword` til det keyword du vil tilføje. Tit er det BREDERE end
+NEGATIV + VINDER: sæt ALTID `suggested_keyword` til det keyword du vil tilføje. Tit er det BREDERE end
 søgetermet — fx søgeterm `helkropsscanning pris` → foreslået keyword `helkropsscanning` (fang hele
-pris-familien med ét negativ/keyword i stedet for den eksakte streng). Default = søgetermet hvis du
-ikke sætter andet. **Vises KUN hvis termen ikke allerede er et keyword** (`already_keyword=False`) —
-ingen grund til at foreslå et keyword der findes. Det er DENNE værdi der flyder over i Negativ/Vinder-
-fanerne. Sæt også `match_type` (Exact/Phrase/Broad) for det tilføjede keyword.
+pris-familien med ét negativ/keyword i stedet for den eksakte streng), eller søgeterm `naya kardiologi
+og mr scanning` → negativ `naya kardiologi` (fang konkurrentnavnet, ikke den eksakte streng). Default =
+søgetermet hvis du ikke sætter andet. Det er DENNE værdi der flyder over i Negativ/Vinder-fanerne, så
+den SKAL have indhold på NEGATIV/VINDER. Sæt også `match_type` (Exact/Phrase/Broad) for det tilføjede
+keyword.
+
+**VIGTIGT — `already_keyword` blanker IKKE Negativ/Vinder.** På NEGATIV + VINDER vises `Foreslået
+keyword` ALTID, også når `already_keyword=True`. Det er bevidst: en term bliver tit en negativ netop
+fordi den allerede fanges (for bredt) af et keyword — fx blev `naya kardiologi og mr scanning` (status
+ADDED, trigget af et MR-keyword) til en negativ, og hvis kolonnen blankes der, kommer negativ-fanen
+tom ud (den fejl Carl fangede). For de andre domme (RELEVANT/FORKERT_PLACERET/GRÆNSE) blankes kolonnen
+stadig når termen allerede er et keyword — der er intet at tilføje. `lib/build_list.py::_suggested_kw`
+håndhæver dette; rør det ikke uden at læse hvorfor.
 
 ## Trin 4.5 — N-gram analyse (systemiske mønstre)
 

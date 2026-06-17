@@ -35,6 +35,7 @@ _ensure_openpyxl()
 import openpyxl  # noqa: E402
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side  # noqa: E402
 from openpyxl.utils import get_column_letter  # noqa: E402
+from openpyxl.worksheet.formula import ArrayFormula  # noqa: E402
 
 NAVY = "1F2A44"
 NAVY_TEXT = "FFFFFF"
@@ -89,6 +90,31 @@ def _already(v):
     return ""
 
 
+# Verdicts whose whole purpose is to feed an action sheet (negative list / new keywords). For these
+# the "Foreslået keyword" column must NEVER be blank, regardless of already_keyword — otherwise the
+# derived FILTER sheet pulls an empty cell and the row is useless (Carl's bug).
+ACTION_VERDICTS = {"NEGATIV", "VINDER"}
+
+
+def _suggested_kw(t, verdict):
+    """The keyword that actually gets added, and that the Negativ/Vinder sheets pull.
+
+    - ACTION verdict (NEGATIV/VINDER): ALWAYS return a value. Prefer an explicit suggested_keyword
+      (often broader than the term, e.g. søgeterm 'naya kardiologi og mr scanning' -> 'naya
+      kardiologi'); fall back to the raw søgeterm so the cell is never empty.
+    - other verdicts: keep the old behaviour — suppress when the term is already a keyword (nothing
+      to add), else default to the søgeterm.
+    """
+    v = str(verdict or "").upper()
+    explicit = (t.get("suggested_keyword") or "").strip()
+    term = t.get("term", "")
+    if v in ACTION_VERDICTS:
+        return explicit or term
+    if t.get("already_keyword"):
+        return ""
+    return explicit or term
+
+
 def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map, constants=None):
     """Create a sheet whose rows are a live Google-Sheets FILTER of the main sheet, keeping only
     rows where the main sheet's Dom column == `verdict`. Updates automatically when the user edits
@@ -128,12 +154,27 @@ def _filter_sheet(wb, title, src_title, data_first, data_last, verdict, col_map,
     for c, (hdr, src) in enumerate(col_map, start=1):
         letter = get_column_letter(c)
         if src is None:                          # constant column, spilled to match height
-            lit = constants.get(hdr, "")
-            f = f'=FILTER(IF({cond},"{lit}",),{cond})'
+            lit = str(constants.get(hdr, "")).replace('"', '""')
+            # A constant column must still produce a COLUMN VECTOR of the same height as the matched
+            # rows, otherwise it desyncs from the data columns and the table goes ragged / shows
+            # phantom half-rows (the bug Carl saw). The robust Google-Sheets idiom: FILTER a literal
+            # array that is built per source row. ARRAYFORMULA forces the inner IF to evaluate over
+            # the WHOLE range (a bare =IF(range=…) does implicit intersection → one wrong row, which
+            # is exactly the "catches the wrong thing" symptom). The literal sits in BOTH IF branches
+            # so the produced array length always equals the condition range, then FILTER keeps the
+            # matched rows. IFERROR → "" so a zero-match sheet renders blank, not #N/A.
+            f = (f'=IFERROR(FILTER(ARRAYFORMULA(IF({cond},"{lit}","{lit}")),{cond}),"")')
         else:
             src_rng = f"'{sq}'!{src}{data_first}:{src}{data_last}"
-            f = f'=FILTER({src_rng},{cond})'
-        ws.cell(row=formula_row, column=c, value=f)
+            # Data column: FILTER pulls the matched source cells directly. IFERROR → "" on no match.
+            f = f'=IFERROR(FILTER({src_rng},{cond}),"")'
+        # FILTER is a dynamic-array (spilling) function. Write the cell as an array formula
+        # (<f t="array" ref="…">) so Excel/Editor treat it as a spill anchor rather than a legacy
+        # scalar formula that returns only the top-left match via implicit intersection. Google
+        # Sheets auto-spills FILTER on import regardless, but the flag makes the file correct in
+        # Excel too. The spill height is decided at recalc by the match count.
+        anchor = f"{letter}{formula_row}"
+        ws.cell(row=formula_row, column=c, value=ArrayFormula(anchor, f))
 
     widths = [26, 16, 22, 30, 14]
     for i in range(1, len(col_map) + 1):
@@ -304,12 +345,15 @@ def build(data, out_path):
         fill = VERDICT_FILL.get(verdict)
         row_vals = {
             "Søgeterm": t.get("term", ""),
-            # The keyword to actually add (negative or new). ONLY shown when the term is NOT already
-            # a keyword (no point suggesting one that exists — Carl). Defaults to the search term,
-            # but the agent/user may set something broader (e.g. 'helkropsscanning pris' ->
-            # 'helkropsscanning'). The Negativ/Vinder sheets pull THIS, not the raw søgeterm.
-            "Foreslået keyword": ("" if t.get("already_keyword")
-                                  else (t.get("suggested_keyword") or t.get("term", ""))),
+            # The keyword to actually add (negative or new). For an ACTION verdict (NEGATIV / VINDER)
+            # this column MUST always be populated — it is the value the Negativ/Vinder sheets pull,
+            # so blanking it silently empties those sheets (the bug Carl hit: a NEGATIV term that was
+            # already a keyword matching too broadly, e.g. 'naya kardiologi', came through with an
+            # empty negative-keyword cell). Default to the søgeterm; the agent may set something
+            # broader (e.g. 'helkropsscanning pris' -> 'helkropsscanning'). For non-action verdicts
+            # (RELEVANT/FORKERT_PLACERET/GRÆNSE) we still suppress it when the term is already a
+            # keyword — there's nothing to add and a suggestion would be noise.
+            "Foreslået keyword": _suggested_kw(t, verdict),
             "Kampagne": t.get("campaign", ""),
             "Ad group": t.get("ad_group", ""),
             "Triggerende keyword": t.get("trigger_keyword", ""),
