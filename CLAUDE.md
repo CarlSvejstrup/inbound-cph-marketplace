@@ -47,6 +47,24 @@ These skills operate against the client's institutional memory (Drive) and live 
 
 ---
 
+## Hard rule: preload the client's AI Context first
+
+**Every skill that acts on a named client MUST load that client's AI Context file into its working context BEFORE doing anything else (research, audit, build, optimization, export).** This is a read, so it is never gated — but it is mandatory. It is how a skill inherits everything Inbound knows about the client (IDs, contacts, hard rammer, naming convention, bid-strategy norm, KPIs, paused-campaign intent) instead of starting blind.
+
+The procedure (do this as step 0):
+
+1. **Identify the client (the "customer").** Take the client the user names (their input — a name, domain, or account). If it is missing or ambiguous, ask which client before proceeding.
+2. **Open the master client-index in Drive** via the Drive connector (`search_files` for the Google Doc titled `Inbound CPH — Google Ads klient-index (AI Context)`; current id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, in the "A - Kunder" Drive folder). Read it (`read_file_content`). It maps every client to its Google Ads ID, HubSpot ID, ClickUp folder, **Stage**, Drive-mappe, and **AI Context-fil** link.
+3. **Find the client's row**, resolving by name/domain/Ads-ID. Note the **Stage** (customer / lead / opportunity / "ikke tagget") — a non-`customer` stage means it is not a closed paying account; weight recommendations accordingly and never assume an active retainer. For shared-folder groups (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI), pick the row for the specific market/account.
+4. **Open the client's AI Context `.md`** via its Drive link from the index row (`read_file_content`) and pull it into your working context. This file holds the operational brief: IDs, contacts, hard rammer (read before you act), goals/KPIs, naming convention, how-we-run-it, and the changelog/optimeringslog link (read the changelog doc too if the task needs change history — it is kept separate, linked from the AI Context file).
+5. **Only then** start the skill's real work, treating the AI Context as ground truth for client facts.
+
+If the client has no row in the index or no AI Context file yet, say so and proceed with whatever context you can gather (Drive folder, Ads MCP) — but flag the gap. Never silently skip the lookup.
+
+Pure transforms that never touch a specific client's account or context (e.g. `editor-csv-export` converting an already-confirmed workbook) may skip this — but if a skill takes a client name as input, it preloads.
+
+---
+
 ## Reading is free, writing is gated
 
 The corollary: **read aggressively, write conservatively.**

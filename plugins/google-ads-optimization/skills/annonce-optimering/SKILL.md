@@ -35,7 +35,25 @@ En **læse-skill**: henter per-asset data via Google Ads MCP (`run_custom_gaql`)
 
 **Runs on any machine.** Eneste forudsætning er Python 3 med `pip`. `build-sheet.py` self-bootstrapper openpyxl hvis det mangler. Drive-connector kræves kun hvis der gemmes til Drive; lokal gem kræver kun Python.
 
-## Trin 0 — Kontekst
+## Trin 0 — Hent klient-kontekst (AI Context) FØRST
+
+Før al anden handling på en navngiven klient — og **før det første Google Ads MCP-kald** — skal du hente klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated), men obligatorisk: sådan arver du alt Inbound ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er, pausede-kampagner-intention) i stedet for at diagnosticere blindt.
+
+For et **optimerings-skill** som dette er fire ting i AI Context'en særligt bærende, fordi de direkte styrer hvad der må flages og hvor hårdt der må anbefales:
+- **Hårde rammer** — afgrænser hvad du overhovedet må røre/anbefale (læs før du dømmer en asset eller foreslår en challenger).
+- **Budstrategi-norm** — er kontoen tCPA/tROAS/manuel? Det afgør om en "for ny / Google lærer"-status er forventet, og hvordan du formulerer dødvægt-anbefalinger.
+- **Pausede-kampagner-intention** — bekræfter at pausede kampagner/annoncer er bevidste; de ekskluderes og flages aldrig som negativt fund (matcher hard rule i Trin 2).
+- **Stage** — en ikke-`customer`-stage betyder en ikke-lukket konto; vægt anbefalinger derefter og antag aldrig en aktiv retainer.
+
+1. **Identificér klienten (kunden).** Tag den klient brugeren nævner (navn, domæne eller konto). Er det uklart, så spørg hvilken klient før du fortsætter.
+2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en med titlen `Inbound CPH — Google Ads klient-index (AI Context)` (aktuelt id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, **Stage**, Drive-mappe og **AI Context-fil**.
+3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér **Stage** (customer / lead / opportunity / "ikke tagget"). For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
+4. **Åbn klientens AI Context-`.md`** via Drive-linket i indeksrækken (`read_file_content`) og tag den ind i din kontekst. Den indeholder driftsbriefen: ID'er, kontakter, hårde rammer (læs før du handler), mål/KPI'er, navngivningskonvention, sådan-kører-vi-den, samt link til changelog/optimeringslog (læs også changelog-doc'et hvis opgaven kræver ændringshistorik — den holdes separat, linket fra AI Context-filen).
+5. **Først derefter** går du videre til forudsætnings-tjekket nedenfor og resten af forløbet, med AI Context som ground truth for klient-fakta (også til at bekræfte `customer_id` i Trin 1).
+
+Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, og fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP) — men flag hullet. Spring aldrig opslaget stille over.
+
+## Trin 0.5 — Forudsætninger & kontekst
 
 At gemme filen er en ekstern write — gated bag eksplicit bekræftelse.
 

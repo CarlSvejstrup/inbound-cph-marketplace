@@ -32,15 +32,27 @@ Forholdet: `change_event` ⊆ den konto-mutérende delmængde af changelog'en, m
 
 ## Trin 0 - Kontekst og skrivegrænse
 
-Læs `../../context/drive-map.md` (hvordan klientmapper findes på Drive) først. Skrivegate + sprogpolitik følger plugin-kontrakten (auto-loadet).
+Klientmapper findes på Drive via `search_files` scoped til klientmappen under `${user_config.inbound_root_folder_id}` (navnemønster + placering varierer per klient — se Trin 4). **Skrive-gate:** enhver ekstern write er gated bag eksplicit bekræftelse (vis hvad og hvor, vent på `ja`, skriv så) — men dette skill skriver IKKE selv (se nedenfor). **Sprog: alt på dansk** medmindre brugeren skriver engelsk.
 
 **Vigtig værktøjsgrænse (afgør hele leveringsformen):** Drive-connectoren kan **kun oprette nye filer** (`create_file`), ikke appende til eller redigere et eksisterende Doc. Der findes intet `update`/`append`-værktøj til Drive. Derfor kan skillet **ikke** selv skrive ind i den eksisterende changelog. Leveringsformen er derfor:
 
 > **Udkast → mennesket indsætter.** Skillet producerer den præcise tekstblok (formatmatchet til changelog'en) + dokumentets navn/ID/sti, så specialisten åbner Doc'et og sætter blokken ind øverst under den aktuelle måned.
 
-Dette er fuldt i tråd med human-in-the-loop-reglen: alt det tunge (hente, filtrere, kollapse bulk, formatere) er automatiseret; kun det sidste tastetryk er menneskets. Hvis Drive-connectoren en dag får et append/update-værktøj, kan Trin 6 opgraderes til en gated skrivning efter den firetrins-godkendelsesproces i CLAUDE.md - indtil da: udkast-til-indsæt.
+Dette er fuldt i tråd med human-in-the-loop-reglen: alt det tunge (hente, filtrere, kollapse bulk, formatere) er automatiseret; kun det sidste tastetryk er menneskets. Hvis Drive-connectoren en dag får et append/update-værktøj, kan Trin 6 opgraderes til en gated skrivning efter den firetrins-godkendelsesproces (vis target-Doc + blok, vent på eksplicit `ja`, skriv, bekræft tilbage) - indtil da: udkast-til-indsæt.
 
 Alt mod Google Ads er read-only.
+
+## Trin 0.5 — Hent klient-kontekst (AI Context) FØRST
+
+Før du henter ændringshistorik eller resolver changelog-Doc'et på en navngiven klient skal du hente klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated), men obligatorisk — sådan arver du alt Inbound ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er, pausede-kampagner-intention) i stedet for at starte blindt. Specielt for dette skill: AI Context-filen linker klientens separate changelog/optimeringslog-Doc, så preloadet hjælper dig direkte med at finde det rigtige Doc i Trin 4.
+
+1. **Identificér klienten (kunden).** Tag den klient brugeren nævner (navn, domæne eller konto). Er det uklart, så spørg hvilken klient før du fortsætter. (I PER PERSON-tilstand: gør dette per berørt kunde inden du resolver hver kundes changelog-Doc.)
+2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en med titlen `Inbound CPH — Google Ads klient-index (AI Context)` (aktuelt id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, **Stage**, Drive-mappe og **AI Context-fil**.
+3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér **Stage** (customer / lead / opportunity / "ikke tagget") — en ikke-`customer`-stage betyder en ikke-lukket konto; antag aldrig en aktiv retainer. For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
+4. **Åbn klientens AI Context-`.md`** via Drive-linket i indeksrækken (`read_file_content`) og tag den ind i din kontekst. Den indeholder driftsbriefen: ID'er, kontakter, hårde rammer, mål/KPI'er, navngivningskonvention, sådan-kører-vi-den, samt link til changelog/optimeringslog — brug det link som første kandidat når du resolver Doc'et i Trin 4 (den holdes separat, linket fra AI Context-filen).
+5. **Først derefter** går du videre til Trin 1-intake, med AI Context som ground truth for klient-fakta.
+
+Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, og fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP) — men flag hullet. Spring aldrig opslaget stille over.
 
 ## Trin 1 - Intake (ét spørgsmål ad gangen)
 
@@ -120,7 +132,7 @@ Fremgang:
 ## Trin 5 - Formatmatch (skriv IKKE et nyt format)
 
 Match changelog'ens eksisterende stil (verificeret fra Capio-loggen som kanonisk eksempel):
-- **Omvendt kronologisk, nyeste øverst** (bekræftet i plugin-CLAUDE.md's memory-ordning også).
+- **Omvendt kronologisk, nyeste øverst** (memory/log-ordning: nyeste indførsel i toppen, altid).
 - **Måneds-header**: `## Juni 2026`. Hvis ny måned siden sidste indførsel: lav headeren.
 - **Datolinje**: `DD.MM.YYYY` (f.eks. `04.06.2026`), derunder punktopstilling med handlingerne.
 - **Dansk**, kort, faktuelt. Ingen emojis, ingen tankestreger (brug komma/kolon).
@@ -152,7 +164,7 @@ Connectoren kan ikke appende til et eksisterende Doc (Trin 0), så skillet skriv
 2. Per kunde: den formatmatchede blok i sin egen kodeblok.
 3. Et samlet chat-resumé øverst: "[Person] rørte N konti i [periode]: [liste]. Ingen aktivitet på: [liste]." plus den ærlige optælling (distinkte handlinger, ikke rå events).
 
-Hvis Drive-connectoren senere får et append/update-værktøj: opgradér dette trin til den gated firetrins-skrivning fra CLAUDE.md (vis target-Doc + blok, vent på eksplicit `ja`, skriv, bekræft tilbage). Vis ALTID hvert target-Doc - skriv aldrig et Doc der ikke er vist.
+Hvis Drive-connectoren senere får et append/update-værktøj: opgradér dette trin til en gated firetrins-skrivning (vis target-Doc + blok, vent på eksplicit `ja`, skriv, bekræft tilbage). Vis ALTID hvert target-Doc - skriv aldrig et Doc der ikke er vist.
 
 ## Trin 7 - Output
 

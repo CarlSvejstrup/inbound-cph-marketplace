@@ -42,7 +42,37 @@ Hele forløbet og alt output er på **dansk**.
 - **Python 3 + pip** — `lib/build_docx.py` self-bootstrapper `python-docx`.
 - Vault `clients/*.md` for `drive_folder` + `google_ads_id` (slå op, gæt aldrig).
 
-## Trin 0 — Kontekst
+## Trin 0 — Hent klient-kontekst (AI Context) FØRST
+
+Før al anden handling på en navngiven klient skal du hente klientens AI Context-fil ind i din
+kontekst. Det er en læsning (aldrig gated), men obligatorisk hvor den findes , sådan arver du alt
+Inbound allerede ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention,
+budstrategi-norm, KPI'er, pausede-kampagner-intention) i stedet for at starte blindt. **Vigtigt for
+dette skill:** opstart-analyse kører på NYE kunder, så AI Context-filen findes måske endnu ikke for
+en helt ny klient , det er forventet, ikke en fejl.
+
+1. **Identificér klienten (kunden).** Tag den klient brugeren nævner (navn, domæne eller konto). Er
+   det uklart, så spørg hvilken klient før du fortsætter.
+2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en
+   med titlen `Inbound CPH — Google Ads klient-index (AI Context)` (aktuelt id
+   `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med
+   `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe,
+   **Stage**, Drive-mappe og **AI Context-fil**.
+3. **Find klientens række** (match på navn/domæne/Ads-ID). For delte mapper (Lime, Retriever/Infomedia,
+   GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
+4. **Hvis klienten allerede har en AI Context-fil i indekset, hent den** via Drive-linket i
+   indeksrækken (`read_file_content`) og tag den ind i din kontekst. Den indeholder driftsbriefen:
+   ID'er, kontakter, hårde rammer (læs før du handler), mål/KPI'er, navngivningskonvention,
+   sådan-kører-vi-den, samt link til changelog/optimeringslog (læs også changelog-doc'et hvis
+   opgaven kræver ændringshistorik , den holdes separat, linket fra AI Context-filen).
+5. **Hvis der ikke er nogen række eller AI Context-fil (ny klient), så er det forventet** , fortsæt
+   og **flag at den ikke findes endnu** ("[klient] har ingen AI Context-fil endnu , forventet for en
+   ny kunde; jeg kører på det jeg kan samle fra Drive-mappen + Ads MCP"). Spring aldrig opslaget
+   stille over.
+6. **Først derefter** starter du skillens egentlige arbejde, med AI Context som ground truth for
+   klient-fakta hvor den findes.
+
+## Trin 0b — Kontekst (skrive-gate + sprog)
 
 **Skrive-gate:** den eneste eksterne write er .docx'en til Drive — gated bag eksplicit bekræftelse
 (vis mappe + filnavn, vent på `ja`, upload så). **Read-only mod Google Ads, altid** — ingen mutate,
@@ -115,6 +145,12 @@ Hver sub-agent får: `customer_id`, analysegrundlaget, de relevante punkter + GA
   `get_age_gender_performance`, `get_account_details`) , **kun ENABLED kampagner i tællinger**, pausede ekskluderes,
 - (b) for hvert punkt afgøre `status` (`ok`/`warn`/`critical`/`no_data`) efter doms-reglen i
   reference-filen,
+- (b2) sætte `kind` på hvert punkt , **`"lookup"`** hvis det er et faktuelt opslag (eksisterer en
+  udvidelse? er display select slået fra? hvilke lister findes?) eller **`"judgment"`** hvis det er
+  en vurdering (er teksten velskrevet? er broad kontrolleret? er strukturen fornuftig?). Kopiér
+  `kind` fra reference-filens kolonne , gæt ikke. Det styrer tjeklistens Ekspert-boks: lookup-punkter
+  får INGEN Ekspert-boks (intet at efterse), judgment-punkter får én (eksperten bekræfter agentens
+  skøn).
 - (c) skrive en kort dansk `finding` med det **faktiske tal/navn bag** (fx "3 af 7 kampagner har
   <4 sitelinks: Brand, Generisk-DK, Lufthavn"), aldrig en påstand uden data,
 - (c2) **lokalisere hvert fund** , når et punkt peger på noget konkret (en stavefejl, en POOR
@@ -135,11 +171,14 @@ Hver sub-agent får: `customer_id`, analysegrundlaget, de relevante punkter + GA
   ```json
   {"key": "C", "title": "Modul C — Annoncetekster (ad copy)",
    "items": [{"n": 13, "punkt": "<ordret fra reference>", "status": "warn",
+              "kind": "judgment",
               "finding": "<kort dansk konstatering m. tal>",
               "details": "<valgfri længere prosa: fordeling, per-ad-group, eksempler>",
               "evidence": ["Kampagne 'IC | GSN | Hele DK' › ad group 'Aalborg' › headline 'Bestil taxi til Aaborg' → skal være 'Aalborg'"],
               "pointer": "<valgfri: for fuld dybde kør optimering-loop (kræver kørselshistorik)>"}]}
   ```
+  (`kind` er påkrævet , `lookup` eller `judgment`. Et lookup-punkt ser sådan ud:
+  `{"n": 1, "punkt": "Sitelinks: min. 4 på hver kampagne", "status": "ok", "kind": "lookup", "finding": "..."}`.)
 
 **GAQL-gotchas (fra live-test 2026-06-10, giv dem videre):**
 - `product_link.data_partner.*` / `.google_ads.*` / `.merchant_center.*` kan IKKE selectes sammen

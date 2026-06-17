@@ -27,7 +27,21 @@ Vælg én artefakt-mappe for kørslen (fx `.campaign-build/<klient>-<dato>/` i c
 angiver) og giv stien til hver fase. Alle fase-JSON'er skrives dertil; det er lokale arbejdsfiler (ingen
 write-gate). Kun den endelige workbook → Drive er en gated ekstern write.
 
-## Trin 0 — Intake (resolv én gang, genbrug overalt)
+## Trin 0 — Hent klient-kontekst (AI Context) FØRST
+
+Før al anden handling på en navngiven klient skal du hente klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated), men obligatorisk — sådan arver du alt Inbound ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er, pausede-kampagner-intention) i stedet for at starte blindt.
+
+**Som orkestrator henter du AI Context ÉN gang her i toppen og giver den VIDERE til hver fase-subagent** (sammen med reference-stien, artefakt-mappen og intake-felterne). Faserne arver dermed klient-konteksten og må IKKE hver især slå klienten op igen — opslaget sker kun her.
+
+1. **Identificér klienten (kunden).** Tag den klient brugeren nævner (navn, domæne eller konto). Er det uklart, så spørg hvilken klient før du fortsætter.
+2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en med titlen `Inbound CPH — Google Ads klient-index (AI Context)` (aktuelt id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, **Stage**, Drive-mappe og **AI Context-fil**.
+3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér **Stage** (customer / lead / opportunity / "ikke tagget") — en ikke-`customer`-stage betyder en ikke-lukket konto; vægt anbefalinger derefter og antag aldrig en aktiv retainer. For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
+4. **Åbn klientens AI Context-`.md`** via Drive-linket i indeksrækken (`read_file_content`) og tag den ind i din kontekst. Den indeholder driftsbriefen: ID'er, kontakter, hårde rammer (læs før du handler), mål/KPI'er, navngivningskonvention, sådan-kører-vi-den, samt link til changelog/optimeringslog (læs også changelog-doc'et hvis opgaven kræver ændringshistorik — den holdes separat, linket fra AI Context-filen).
+5. **Først derefter** går du videre til intake (Trin 0.5) og faserne, med AI Context som ground truth for klient-fakta — og send den med til hver subagent.
+
+Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, og fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP) — men flag hullet. Spring aldrig opslaget stille over.
+
+## Trin 0.5 — Intake (resolv én gang, genbrug overalt)
 
 Saml de få ting alle faser deler, så ingen subagent gen-spørger:
 - **Klient + landingsside-URL** (påkrævet).
@@ -93,8 +107,8 @@ Rapportér så:
 ## Safety
 
 - **Ingen API-push, nogensinde.** Hele pipelinen er recommend-/build-only. Read-only MCP-kald er fine.
-- **Den endelige workbook → Drive er en gated write** — bekræft før upload (human-in-the-loop, repo
-  CLAUDE.md).
+- **Den endelige workbook → Drive er en gated write** — bekræft før upload (human-in-the-loop: vis
+  sti + filnavn, vent på eksplicit `ja`, upload så).
 - **Stop ved Phase-2-gaten.** Kør aldrig creative før mennesket har godkendt structuring.
 - **Fail loud, ikke stille.** En assembler-guard der stopper (exit 1) betyder ret upstream — overstyr
   aldrig en guard for at tvinge en build igennem.
