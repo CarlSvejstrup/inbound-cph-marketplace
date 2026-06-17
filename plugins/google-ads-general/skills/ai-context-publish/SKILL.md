@@ -18,9 +18,13 @@ All client-facing content is **Danish**.
    - **Idempotency by search-first.** Before creating a folder, `search_files` for it and reuse if it exists. Before creating a Doc, the AI Context folder must be empty of that client's Doc.
    - Cleanup of any stray/leftover file is a **Drive-UI step for the human** — surface it as a flag, never attempt it.
 
-2. **Format = native Google Doc, NOT a .md file.** Uploading `text/markdown` caused conversion problems and occasional duplicate-Doc artifacts. The reliable path is: upload `contentMimeType: text/plain` with NO `disableConversionToGoogleType` flag, so Drive converts the plain text into a native Google Doc. Title carries **no `.md` suffix**: `<Client Name> - <HubSpotID>`. (Markdown `#`/`-`/`|` in the body render as literal text in the Doc — that is expected and acceptable; keep them for readable structure.)
+2. **Format = true `.md` file (decided 2026-06-17 run).** Upload `contentMimeType: "text/markdown"` AND `disableConversionToGoogleType: true`, title WITH the `.md` suffix: `<Client Name> - <HubSpotID>.md`. This keeps it a real Markdown file (the format an AI agent in Cowork reads most cleanly). Carl explicitly chose this over a native Google Doc (a Doc renders cleaner in the Drive UI, but "Open in Docs" on a .md spawns a stray `.docx`, which he dislikes; and the Doc shows `#`/`|` as literal noise). If `<HubSpotID>` is missing for a market, use the literal `ingen-HubSpot` in the title (e.g. `GSGroup SE - ingen-HubSpot.md`). NOTE: `create_file` intermittently returns a generic "Internal error" — when it does, **search the folder before retrying** (the create usually did NOT happen, but verify, never blind-retry).
 
 3. **The content is already-cleaned, timeless context.** The source is each client's `## Klientoverblik` in `work/inbound-cph/clients/<slug>.md`, which was deliberately stripped of point-in-time performance (no ROAS/CPA/CTR/counts/LAST_30_DAYS). Carry it VERBATIM. Never re-add live numbers. Configured settings (tCPA/budget caps), naming conventions, and structural caveats stay. See the vault rule [feedback-inbound-klientoverblik-timeless-only] and `references/klientoverblik-build-contract.md` in the vault.
+
+   **EXCLUDE from the published file (decided 2026-06-17):** the YAML frontmatter; any `### Reconcile-flag` block or `<!-- RECONCILE ... -->` comment (internal audit only); any embedded changelog entries or `## Changelog` section (keep only the changelog_file LINK in the ID-block — changelog stays a SEPARATE doc); the `## Drive files` / `## Drive-filer` list (Carl: omit entirely); and empty placeholder sections. INCLUDE the ID-block with **ClickUp folder ID + HubSpot lifecycle stage** (omit the stage line only when the folder is untagged and stage is unknown), plus the durable human sections + full Klientoverblik + the Aftaleark digest.
+
+   **Ground truth = the Drive folder name.** The "A - Kunder" client folders are now named `<Name> - [HubSpotID] (stage=<lifecyclestage>)`. That bracketed HubSpot ID + stage is authoritative; adopt it and flag any disagreement vs other sources. Untagged plain folders carry no stage — record "stage ikke tagget" and source the ID from the domain-matched HubSpot record.
 
 4. **Real Æ Ø Å, always.** Danish output uses real æ ø å Æ Ø Å — never ASCII transliteration (aa/oe/ae). Grep your content before uploading.
 
@@ -46,15 +50,17 @@ Keep the note's budget figure as "vejledende" + point to the ark as source of tr
 
 For a batch, **divide clients across subagents (one client per subagent)** using the exact contract in `references/publish-contract.md`. Hand each subagent the client's resolved IDs + Drive client-folder ID + note path. Each subagent:
 
-1. **Find the target subfolder.** The Doc goes in an "AI Context" subfolder INSIDE the client's paid-search/Google-Ads folder, NOT loose in the client top folder. `search_files` with `parentId = '<CLIENT_FOLDER_ID>'`; pick the ads folder by name priority: `Paid Search` > `Paid ads`/`Paid Ads` > `Google Bing Ads`/`Google/Bing Ads` > `Google Ads`. Frontmatter `paid_search` hints which (`yes` / `legacy-gba` / `none`). If there is genuinely no ads subfolder (ads files loose at top level), use the client top folder and flag it. If the client folder is missing/ambiguous, STOP and ask.
-2. **Create/reuse the "AI Context" folder** inside that ads folder (search-first; reuse if present).
-3. **Build the content** from the vault note per the fixed format (see `references/publish-contract.md` and `references/doc-template.md`): `Sidst opdateret` line at the very top, H1 + intro, ID table (with pacing-ark on the Budget line), then the durable human sections that exist, then the `## Klientoverblik` verbatim, then `## Drive-filer` with full URLs. Drop YAML frontmatter; convert `[[wikilinks]]` to plain text; skip empty vault sections (don't fabricate missing headers).
-4. **Create the Doc ONCE** as a native Google Doc, title `<Client Name> - <HubSpotID>` (no .md), `contentMimeType: text/plain`.
-5. **Verify read-only** (`search_files` the AI Context folder: exactly one correctly-named Doc, mimeType `application/vnd.google-apps.document`). Flag any duplicate or pre-existing leftover for human cleanup; never try to delete.
+1. **Find the canonical client folder.** Prefer the renamed `<Name> - [HubSpotID] (stage=)` folder in "A - Kunder" (resolve by `title contains '<name>'`); fall back to the old plain-named folder only if no renamed one exists. The note's `drive_folder` frontmatter is the fallback. If missing/ambiguous, STOP and ask.
+2. **Create/reuse the "AI Context" folder.** `search_files parentId='<CLIENT_FOLDER_ID>' and mimeType='application/vnd.google-apps.folder'`. **Ian already creates these folders himself and drops his own files in them** (e.g. DBI's holds his Projektoverblik + Optimeringslog + Demo-brief) — REUSE the existing one; our uniquely-named file sits alongside his. Watch for case variants: Ian used **"AI context"** (lowercase c) on InboundCPH — reuse it rather than spawn a near-duplicate. Note: Ian places the folder at the **client-folder root**, not inside Paid Search — follow that. Only create a new "AI Context" folder if none exists.
+3. **Build the content** from the vault note (see `references/publish-contract.md`): `Sidst opdateret` line at top, H1 + intro, ID-block (with ClickUp folder ID + lifecycle stage + changelog LINK + pacing-ark on Budget), durable human sections that exist, `## Klientoverblik` verbatim, `## Aftaleark & kundebrief` digest. Drop YAML frontmatter; convert `[[wikilinks]]` to plain text; skip empty sections. EXCLUDE the Reconcile-flag, embedded changelog entries, and the Drive-filer list (see point 3 in "Why this skill is shaped...").
+4. **Create the file ONCE** as a true `.md`: title `<Client Name> - <HubSpotID>.md`, `contentMimeType: "text/markdown"`, `disableConversionToGoogleType: true`. Search the folder for that exact title FIRST; if it exists, STOP (don't duplicate).
+5. **Verify read-only** (`search_files` the AI Context folder: exactly one correctly-named file, mimeType `text/markdown`). Flag any duplicate/leftover for human cleanup; never try to delete.
 
-**Shared-Drive-folder clients** (Lime ×6, GSGroup ×4, Nemco ×3, Retriever ×4 + Infomedia, Julemærket ×2, PhoneAlone ×2): one AI Context folder per shared Drive folder, holding all the siblings' Docs (one Doc per sibling, each with its own IDs). Clients with no own folder (e.g. Phone Alone Sverige points at PhoneAlone) get their Doc in the shared folder and a note; clients with no folder at all are skipped + flagged in the index.
+**Shared-Drive-folder clients** (Lime ×6, GSGroup ×4, Nemco ×3, Retriever ×4 + Infomedia, Julemærket ×2, PhoneAlone ×2, DI ×2): ONE AI Context folder per shared Drive folder, holding all siblings' `.md` files (one per sibling, distinct title `<Client> - <HubSpotID>.md`, each with its own market Ads ID). EDC is the exception: Erhverv + Projekt share a HubSpot company but live in SEPARATE subfolders, so each gets its own AI Context folder. Clients with no own folder get their file in the shared folder + a note.
 
-After each batch, run an **independent verification sweep** (don't trust subagent self-reports): `search_files` across all the batch's AI Context folder IDs and confirm exactly one correctly-typed Doc per folder.
+**Batch sizing (learned 2026-06-17):** keep concurrent subagents ≤6, and give a shared-group subagent at most ~4-6 files. The Drive connector drops the socket on long multi-create runs — a subagent that creates 6 files in one go often dies mid-run (it usually finishes the creates but the report is lost). When that happens, re-list the folder, find which files exist, and re-dispatch ONLY the missing ones with the existing folder ID supplied (skip folder creation).
+
+After each batch, run an **independent verification sweep** (don't trust subagent self-reports): `search_files` across all the batch's AI Context folder IDs and confirm exactly one correctly-typed `.md` per expected sibling, no duplicates.
 
 ### Part B — the master client-index
 
@@ -64,13 +70,15 @@ Include a `Sidst opdateret` line at top. Mark NEEDS-PICK HubSpot rows and skippe
 
 ## Hard rules recap
 
-- `create_file` ONCE per Doc; no delete/rename/update tool exists; never retry a create.
-- Google Doc, title without `.md`, via `text/plain` (auto-convert).
-- HubSpot ID matched by domain; flag (don't guess) on ambiguity.
-- ClickUp = client folder ID under Kundespace.
-- AI Context folder lives inside the ads subfolder, not the client root.
-- Klientoverblik carried verbatim; never re-add performance numbers.
-- Real Æ Ø Å. Budget references the shared pacing-ark.
+- `create_file` ONCE per file; no delete/rename/update tool exists. On a generic "Internal error", SEARCH the folder before retrying (don't blind-retry — risk of permanent duplicate).
+- True `.md`: title WITH `.md`, `contentMimeType: "text/markdown"` + `disableConversionToGoogleType: true`.
+- EXCLUDE from the published file: frontmatter, Reconcile-flag, embedded changelog entries, Drive-filer list. INCLUDE ClickUp ID + stage in the ID-block.
+- Ground truth = the `<Name> - [HubSpotID] (stage=)` Drive folder name; flag disagreements, never silently overwrite.
+- Reuse Ian's existing "AI Context" folder (watch for the "AI context" lowercase variant); it lives at the client-folder root.
+- HubSpot ID matched by domain; flag (don't guess) on ambiguity. ClickUp = client folder ID under Kundespace.
+- Klientoverblik carried verbatim; never re-add performance numbers. Real Æ Ø Å. Budget references the shared pacing-ark.
+- Batch ≤6 subagents, ≤~6 creates each (socket drops on long runs); re-list + re-dispatch only the missing files on failure.
+- Some Drive folders are not writable by the connector (e.g. Rikke's "AI - Google ads 🤖" returned a generic internal error on every create). If a target folder rejects writes, surface it and ask for an alternative — don't keep retrying.
 - Never call the Ads MCP. Never edit the vault note. Human-in-the-loop on Drive writes.
 
 ## After the run (Dual-Output)
