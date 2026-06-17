@@ -1,6 +1,6 @@
 """GAQL for the search-term diagnostic stage.
 
-Lifted verbatim from plugins/google-ads-optimization/skills/search-terms/SKILL.md
+Lifted verbatim from plugins/google-ads-optimization/_archive/search-terms/SKILL.md
 (Trin 2). Field shapes verified live against a real account. Three pulls:
   search_terms_query    - the search_term_view pull (cost-desc, ENABLED, spend floor)
   keyword_map_query     - the keyword_view map for structural placement detection

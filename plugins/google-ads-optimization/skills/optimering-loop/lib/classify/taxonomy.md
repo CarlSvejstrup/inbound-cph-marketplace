@@ -1,7 +1,7 @@
 # Classification taxonomy (shared reference for the loop's diagnostic agents)
 
 Single source of the classification rules the loop's agents apply. Lifted from the
-field-tested taxonomy in `plugins/google-ads-optimization/skills/search-terms/SKILL.md`
+field-tested taxonomy in `plugins/google-ads-optimization/_archive/search-terms/SKILL.md`
 (adopted from a real Inbound user template, Dansk Studie Center). The loop's search-term
 agent uses this; the asset-hygiene agent uses the angle taxonomy at the bottom.
 

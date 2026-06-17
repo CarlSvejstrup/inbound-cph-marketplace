@@ -152,7 +152,7 @@ Built fresh each run by an openpyxl script (`build-sheet.py`), uploaded via the 
 - openpyxl (Python) to build the workbook.
 - Drive connector to upload (optional - can save locally instead).
 
-**Destination:** client's Drive working folder if known (from `context/drive-map.md`), else ask for a folder, else local disk.
+**Destination:** client's Drive working folder if known (resolved via `search_files` under `${user_config.inbound_root_folder_id}`), else ask for a folder, else local disk.
 
 ### Sheet structure (tabs)
 
@@ -190,7 +190,7 @@ Because these live in the .xlsx layer (not in CSV values), they survive the Driv
 
 ## Skill flow (maps to SKILL.md steps)
 
-- **Trin 0 - Kontekst:** the plugin contract (write-gate + language) is auto-loaded. Read `../../context/drive-map.md` for the client folder.
+- **Trin 0 - Kontekst:** write-gate every external write, Danish copy by default (inlined in SKILL.md Trin 0). Resolve the client folder via `search_files` under `${user_config.inbound_root_folder_id}`.
 - **Trin 1 - Intake (one question at a time):**
   1. Client name -> match against `list_accessible_accounts`, confirm "Fandt [navn] (ID: X) - rigtig konto?".
   2. Date range (default LAST_30_DAYS; offer 90).
@@ -214,4 +214,4 @@ Because these live in the .xlsx layer (not in CSV values), they survive the Driv
 
 ## Open questions to confirm before build
 - Default thresholds (150 kr floor, 8 clicks, 80 kr LLM min) - sane starting points, tune after first real run with Rikke.
-- Whether the client Drive folder is reliably in `context/drive-map.md`; if not, sheets land in root and Carl moves them.
+- Whether the client Drive folder is reliably resolvable via `search_files` under the Inbound root; if not, sheets land in root and Carl moves them.
