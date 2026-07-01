@@ -4,7 +4,7 @@ description: >-
   Read-across-sources knowledge worker for Inbound CPH client context. Dispatch
   to it to gather what is new about a client from Drive reports, HubSpot mail and
   notes, and the Google Ads change history — filtered to what changed since a
-  given watermark. Read-only across every source. Used by inb-ads-context-update,
+  given watermark. Read-only across every source. Used by inb-ads-client-brief,
   inb-ads-context-publish to fan out one expert
   read per source and return a consolidated diff of new context.
 disallowedTools: Write, Edit, NotebookEdit

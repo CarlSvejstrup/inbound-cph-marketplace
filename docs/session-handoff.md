@@ -21,7 +21,7 @@
   - **Optimize** — `inb-ads-search-term-analyse`, `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`,
     `inb-ads-display-placement-audit`.
   - **Standalone** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export`,
-    `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
+    `inb-ads-context-publish`, `inb-ads-client-brief`, `inb-ads-onboarding-analysis`.
 - **Docs synced:** README, repo-root `CLAUDE.md`, `plugin.json` description, `docs/project-status.md`
   (new dated note), and this handoff. Bundled agents (`ads-analyst`/`ads-writer`/`drive-knowledge`) and the
   write-guardrail hook are unchanged; `ads-writer` is the write path `inb-ads-campaign-build` now uses.

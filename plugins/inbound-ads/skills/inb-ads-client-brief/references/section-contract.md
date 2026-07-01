@@ -63,4 +63,4 @@ When unsure whether a bullet is durable, fold it rather than drop it. These appe
 
 ## Migration mode (batches, not lazy)
 
-The pilot (Dantaxi) is migrated by hand to prove the layout. The remaining notes are migrated in **explicit batches** on request — not opportunistically inside a normal `inb-ads-context-update` run. A normal run edits only `## Klientoverblik` + `## Rapport` (its watermark sections) and does NOT silently refold the rest of a note. Folding the legacy H2s is a separate, deliberate migration pass so the diff stays reviewable.
+The pilot (Dantaxi) is migrated by hand to prove the layout. The remaining notes are migrated in **explicit batches** on request — not opportunistically inside a normal `inb-ads-client-brief` run. A normal run edits only `## Klientoverblik` + `## Rapport` (its watermark sections) and does NOT silently refold the rest of a note. Folding the legacy H2s is a separate, deliberate migration pass so the diff stays reviewable.

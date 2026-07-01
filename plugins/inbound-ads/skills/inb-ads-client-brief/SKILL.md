@@ -1,16 +1,16 @@
 ---
-name: inb-ads-context-update
-description: "Opdaterer en eksisterende klients AI-Context-fil on-demand ved at hente alt nyt siden sidste opdatering fra Drive, HubSpot og seneste statusrapport, og leverer samtidig et projektleder-overblik i chatten, mens ændringer foreslås som TILFØJ/ERSTAT/FJERN og kun skrives til Drive-filen efter eksplicit godkendelse. Makker til inb-ads-context-publish, som opretter en klients AI-Context-fil første gang, hvor dette skill vedligeholder den løbende."
+name: inb-ads-client-brief
+description: "Giver et projektleder-overblik over én Google Ads-klient: hvem de er, hvad der for nylig er lavet og aftalt, aktuel status og åbne tråde, hentet fra klientens AI-Context-fil på Drive plus alt nyt siden sidste opdatering (Drive-dokumenter, HubSpot, seneste statusrapport). I samme kørsel kan det on-demand opdatere selve AI-Context-filen: ændringer foreslås som TILFØJ/ERSTAT/FJERN og skrives kun til Drive efter eksplicit godkendelse. Brug når brugeren siger 'brief mig på [kunde]', 'klientoverblik på [kunde]', 'hvad er nyt på [kunde]', 'saml mig op på [kunde]', 'projektleder-overblik på [kunde]', 'opdatér kontekst på [kunde]' eller 'opdatér AI-konteksten'. Makker til inb-ads-context-publish, som opretter en klients AI-Context-fil første gang, hvor dette skill briefer på den og vedligeholder den løbende."
 ---
 
-# inb-ads-context-update
+# inb-ads-client-brief
 
-Opdatér én klients AI-kontekst on-demand, og lever et projektleder-overblik i samme kørsel:
+Lever et projektleder-overblik over én Google Ads-klient — og kan i samme kørsel opdatere klientens AI-kontekst on-demand. To outputs, ét smæk:
 
-1. **Projektleder-overblik** (chat): hvem klienten er, hvad der for nyligt er lavet/aftalt, aktuel status, åbne tråde.
-2. **Opdateret AI-kontekst** (klientens AI-Context-fil på Drive): træk alt nyt siden sidste opdatering ind, herunder hvad der skal **fjernes/erstattes** — ikke kun tilføjes.
+1. **Projektleder-overblik** (chat, hovedformålet): hvem klienten er, hvad der for nylig er lavet/aftalt, aktuel status, åbne tråde. Som en projektleder der lige er kommet op i fart på kunden.
+2. **Opdateret AI-kontekst** (on-demand, klientens AI-Context-fil på Drive): træk alt nyt siden sidste opdatering ind, herunder hvad der skal **fjernes/erstattes** — ikke kun tilføjes.
 
-Makker til `inb-ads-context-publish` (som publicerer en klients AI-Context-fil første gang). Dette skill vedligeholder den fil bagefter. Læs `references/` for de dybe kontrakter; denne fil er den kørbare overflade.
+Overblikket er altid gratis at levere; selve fil-opdateringen sker kun når der er noget nyt at flette ind, og altid efter godkendelse. Makker til `inb-ads-context-publish` (som publicerer en klients AI-Context-fil første gang). Dette skill briefer på filen bagefter og vedligeholder den. Læs `references/` for de dybe kontrakter; denne fil er den kørbare overflade.
 
 ## Kontekst
 

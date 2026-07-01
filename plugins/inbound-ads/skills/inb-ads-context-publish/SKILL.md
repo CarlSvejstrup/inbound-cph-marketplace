@@ -1,11 +1,11 @@
 ---
 name: inb-ads-context-publish
-description: Initial publish of per-client "AI Context" files (and the master client-index) to Google Drive for Inbound CPH's Google Ads clients, resolving each client's Google Ads/HubSpot/ClickUp IDs and writing one create-once Drive doc with timeless operational context per human-approved write, versus inb-ads-context-update which revises an already-published file.
+description: Initial publish of per-client "AI Context" files (and the master client-index) to Google Drive for Inbound CPH's Google Ads clients, resolving each client's Google Ads/HubSpot/ClickUp IDs and writing one create-once Drive doc with timeless operational context per human-approved write, versus inb-ads-client-brief which revises an already-published file.
 ---
 
 # inb-ads-context-publish
 
-Publish Inbound CPH's per-client operational context into Google Drive, so the Google Ads team and AI agents (e.g. in Cowork) can read a client's context where the work happens, and maintain one master index across all clients. This is the **initial creation** pass — for ongoing incremental updates to an already-published AI Context file, use `inb-ads-context-update` instead.
+Publish Inbound CPH's per-client operational context into Google Drive, so the Google Ads team and AI agents (e.g. in Cowork) can read a client's context where the work happens, and maintain one master index across all clients. This is the **initial creation** pass — for ongoing incremental updates to an already-published AI Context file, use `inb-ads-client-brief` instead.
 
 This skill does not analyse or optimise a Google Ads account and never calls the Ads MCP. It reads the canonical client notes in the vault and writes context documents to Drive. All client-facing content is Danish.
 
