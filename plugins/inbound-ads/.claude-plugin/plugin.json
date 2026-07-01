@@ -1,0 +1,14 @@
+{
+  "name": "inbound-ads",
+  "description": "Inbound CPH's Google Ads suite: one plugin covering the full client lifecycle, Danish-default, read-only against Google Ads except where a HITL-gated write is explicitly confirmed. BUILD a new campaign: campaign-build (orchestrator — runs the Phase 1->4 pipeline by dispatching a subagent per phase reference, ending in Ian's 10-tab Excel review workbook) plus the phase skills that also run standalone — research (landing-page + competitor + strategy, .docx solo), structuring (ad-groups + keywords + negatives, .xlsx solo), assets (sitelinks/callouts/snippets, .xlsx solo), and responsive-search-ads (the RSA copy engine reused per ad group). OPTIMIZE a live account: soegeterm-analyse (lean search-terms analysis to one colour-coded .xlsx), search-term (the conversational variant — talks findings through, then writes agreed negatives/keywords to Editor CSVs), annonce-optimering (post-launch RSA asset-hygiene, feeds a gap-brief back into responsive-search-ads), optimering-loop (the whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score -> one editable Excel workbook), and display-placement-audit (scores Display Network placements 0-100 for junk risk — gambling, MFA/clickbait, low-quality apps — via a bundled free blocklist + account signals, capped web lookups only on genuine toss-ups, ranked in-chat report, then writes confirmed negative placements directly via ads-writer). GENERAL deliverables: ads-audit-report (full paid-search audit to an HTML slide deck + PDF), ads-changelog (changelog entry from Google Ads' own change-history), editor-csv-export (convert a confirmed review workbook — from campaign-build OR optimering-loop — into per-entity Google Ads Editor import CSVs), ai-context-publish (publish per-client AI Context Docs to Drive + maintain the master client-index), kontekst-opdater (on-demand per-client AI-context update + PM overview, all on Drive, HITL-gated diff), and opstart-analyse (new-client onboarding: the 35-point ClickUp Analysearbejdet account review to a .docx checklist in the client's Drive folder). Human-in-the-loop on every external write (Drive, Editor CSVs, and any confirmed Google Ads write); no skill writes to an account autonomously.",
+  "version": "3.2.0",
+  "author": { "name": "Inbound CPH" },
+  "userConfig": {
+    "inbound_root_folder_id": {
+      "type": "string",
+      "title": "Inbound CPH Drive folder ID",
+      "description": "The Google Drive folder ID for the inbound-cph/ root folder where all client folders live. Defaults to the shared agency folder. Override only if you have a different mount.",
+      "default": "17JwnWKToZSJUSCURjS9PzzBeqe6_gPfi"
+    }
+  }
+}

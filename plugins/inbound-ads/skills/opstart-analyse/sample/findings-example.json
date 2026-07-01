@@ -1,0 +1,341 @@
+{
+  "client": "Dantaxi",
+  "customer_id": "4149791707",
+  "window": "Struktur- og hygiejne-gennemgang (eksisterende konto, live data hvor relevant)",
+  "generated": "2026-06-10",
+  "headline_findings": [
+    "Inbound har kun STANDARD-adgang, ikke ADMIN. Det blokerer for annoncørverificering og at tilføje verificeret firmanavn. De 3 ADMIN-konti er alle eksterne/klient (taxinord.dk, en privat gmail fra 2011, dantaxi.dk) , bør ryddes/afklares ved overdragelsen.",
+    "3 primære konverteringer har værdi 0,0 (bl.a. Android-installationer og en iOS in-app purchase). Med værdibaseret budgivning (Maximize Conversion Value) på de tunge kampagner forvrider nul-værdi-signalet budstyringen , ret værdisætning før ROAS-styring.",
+    "Ad strength: 131 af 335 RSA'er (39%) er POOR, og POOR+AVERAGE = 59%. Primær driver: ingen annoncer udnytter de fulde 15 headlines. Største enkelt-løftestang på kontoen.",
+    "To navngivne kernetemaer har nul keyword-dækning: el-taxa og store vogne (minibus/maxitaxi). Konkret søgeordsanalyse-behov.",
+    "Brand-ekskludering er strukturelt mangelfuld (IC | Brand-listen har kun 2 af ~5 varianter og er ikke koblet på nogen aktiv kampagne), men lækker ikke empirisk endnu."
+  ],
+  "modules": [
+    {
+      "key": "A",
+      "title": "Modul A — Annonceudvidelser (extensions)",
+      "items": [
+        {
+          "n": 1,
+          "punkt": "Sitelinks: min. 4 på hver kampagne",
+          "status": "ok",
+          "finding": "7 aktive sitelinks ligger på kontoniveau og serverer på alle 74 aktive kampagner , over minimumskravet på 4. 0 er kampagne-specifikke (se punkt 2).",
+          "kind": "lookup"
+        },
+        {
+          "n": 2,
+          "punkt": "Sitelinks: kampagne/keyword-specifikke",
+          "status": "warn",
+          "finding": "Ingen kampagne-/søgeordsspecifikke sitelinks (0 campaign_asset SITELINK). Samme 7 konto-niveau-links vises på hver kampagne uden tilpasning til tema/geo.",
+          "kind": "lookup"
+        },
+        {
+          "n": 3,
+          "punkt": "Callouts: min. 4 på hver kampagne",
+          "status": "warn",
+          "finding": "Kun 3 aktive callouts (kontoniveau, alle godkendte) , under minimumskravet på 4.",
+          "kind": "lookup"
+        },
+        {
+          "n": 4,
+          "punkt": "Callouts: kampagnespecifikke",
+          "status": "warn",
+          "finding": "Ingen kampagnespecifikke callouts (0 campaign_asset CALLOUT). De 3 callouts er identiske på tværs af alle kampagner.",
+          "kind": "lookup"
+        },
+        {
+          "n": 5,
+          "punkt": "Image extensions: aktiveret og godkendt",
+          "status": "critical",
+          "finding": "0 egentlige billedudvidelser (field_type IMAGE) , hverken konto- eller kampagneniveau. De mange AD_IMAGE-assets er PMax/asset-group-kreativer, ikke søgeannonce-billedudvidelser.",
+          "kind": "lookup"
+        },
+        {
+          "n": 6,
+          "punkt": "Business name extensions: tilføjet",
+          "status": "warn",
+          "finding": "BUSINESS_NAME findes kun auto-genereret på de 2 PMax-kampagner. Intet verificeret virksomhedsnavn på søgeannoncer og intet på kontoniveau , hænger sammen med manglende kontoverificering (punkt 11).",
+          "kind": "lookup"
+        },
+        {
+          "n": 7,
+          "punkt": "Business logo extensions: tilføjet",
+          "status": "ok",
+          "finding": "Logo til stede: 1 aktivt BUSINESS_LOGO på kontoniveau (serverer på søgning) plus flere LOGO/LANDSCAPE_LOGO på kampagneniveau.",
+          "kind": "lookup"
+        },
+        {
+          "n": 8,
+          "punkt": "Location extension: tilføjet (når relevant)",
+          "status": "no_data",
+          "finding": "Ingen LOCATION-asset. Ikke relevant: Dantaxi er en kør-til-kunden taxitjeneste uden butiksadresse, så lokationsudvidelse er ikke en mangel her.",
+          "kind": "lookup"
+        },
+        {
+          "n": 9,
+          "punkt": "Call extension: tilføjet (når relevant)",
+          "status": "ok",
+          "finding": "Opkaldsudvidelse til stede og godkendt: CALL på 63 aktive kampagner + 1 på kontoniveau (alle APPROVED). Relevant for taxi , direkte bestilling via opkald.",
+          "kind": "lookup"
+        },
+        {
+          "n": 10,
+          "punkt": "Structured snippet extensions: tilføjede og godkendte",
+          "status": "ok",
+          "finding": "1 struktureret uddrag (STRUCTURED_SNIPPET) på kontoniveau, aktivt og APPROVED, serverer på alle kampagner. Ikke kampagne-specifikt, men til stede og godkendt.",
+          "kind": "lookup"
+        }
+      ]
+    },
+    {
+      "key": "B",
+      "title": "Modul B — Kontoverificering & adgang",
+      "items": [
+        {
+          "n": 11,
+          "punkt": "Få kontoen verificeret, så firmanavn mv. kan tilføjes",
+          "status": "warn",
+          "finding": "Inbound (knc@inboundcph.dk) har kun STANDARD-adgang, ikke ADMIN , kan derfor ikke gennemføre annoncørverificering eller tilføje verificeret firmanavn (jf. punkt 6). De 3 ADMIN-konti er alle eksterne/klient: ms@taxinord.dk, krochin67@gmail.com (privat gmail, ADMIN siden 2011 , bør gennemgås) og nbn@dantaxi.dk. Anbefaling: Inbound bør have ADMIN.",
+          "kind": "lookup"
+        }
+      ]
+    },
+    {
+      "key": "C",
+      "title": "Modul C — Annoncetekster (ad copy)",
+      "items": [
+        {
+          "n": 12,
+          "punkt": "Ad copy: Er der annoncegrupper uden aktive annoncer?",
+          "status": "ok",
+          "finding": "Ingen tomme annoncegrupper. Alle 198 aktive annoncegrupper har mindst én aktiv annonce (diff mellem aktive ad groups og dem med ≥1 aktiv annonce = 0 huller).",
+          "kind": "lookup"
+        },
+        {
+          "n": 13,
+          "punkt": "Ad copy: Er den velskrevet (USP'er, ikke generisk, søgeord, specifik)?",
+          "status": "warn",
+          "finding": "Grundlæggende stærke, produktspecifikke tekster: tydelige USP'er, klar brand-CTA, dynamic keyword insertion og lokaliserede headlines pr. by. Trækkes ned af en konkret live stavefejl der bør rettes nu.",
+          "details": "Stærke elementer (eksempler set i annoncerne): 'Danmarks største taxaselskab', '1.900 taxier til rådighed', 'Få en fast pris i app'en', 'Ring 4x48 eller hent vores app', dynamic keyword insertion ('{Keyword:Bestil en taxa lige til døren}'). Engelsk-sporet er korrekt oversat ('Taxa to Kastrup airport', 'Accept all major creditcards'). Den eneste reelle fejl er stavefejlen nedenfor.",
+          "evidence": [
+            "Stavefejl: kampagne 'IC | GSN | Hele DK (Stednavne)' › ad group 'Aalborg' › headline 'Bestil taxi til Aaborg' → skal være 'Aalborg'."
+          ],
+          "kind": "judgment"
+        },
+        {
+          "n": 14,
+          "punkt": "Ad copy: Sammenhæng mellem annonce og landingsside?",
+          "status": "warn",
+          "finding": "Overordnet god sammenhæng: alle annoncer peger på dantaxi.dk (taxa-booking). Svaghed: by-annoncegrupperne peger på den generiske forside frem for en lokaliseret by-side, hvor en sådan findes.",
+          "details": "Korrekt matchede: engelsk-sporet → dantaxi.dk/english/; København-grupperne → den lokaliserede dantaxi.dk/by/taxa-kobenhavn/. Den lokaliserede by-skabelon findes altså, men er ikke rullet ud til de øvrige by-grupper. Ikke en fejl (forsiden er en gyldig booking-side), men en overset lokaliserings-mulighed der typisk løfter relevans + QS.",
+          "evidence": [
+            "By-grupper der peger på generisk forside i stedet for en /by/-side: Aalborg, Aarhus, Aabenraa, Albertslund, Allerød, Ballerup, Billund, Bornholm (m.fl.)."
+          ],
+          "kind": "judgment"
+        },
+        {
+          "n": 15,
+          "punkt": "Ad copy: Hvad er ad strength? Kan det optimeres?",
+          "status": "critical",
+          "finding": "Klart optimeringspotentiale (rapporteret som signal, ikke dom). POOR+AVERAGE udgør 59% af de aktive RSA'er. Primær driver: ingen annoncer udnytter de fulde 15 headlines (typisk 8-9).",
+          "details": "Fordeling over alle 335 aktive RSA'er: POOR 131 (39%), GOOD 114 (34%), AVERAGE 68 (20%), PENDING 21 (6%, nye annoncer endnu ikke bedømt), EXCELLENT 1. Største løftestang: udfyld op mod 15 unikke headlines + 4 beskrivelser pr. annonce. Dette er en kontodækkende mængde (131 POOR-annoncer) , en fuld per-annonce-prioritering hører hjemme i et dedikeret RSA-gennemløb, ikke i opstartsrapporten.",
+          "evidence": [
+            "De fleste POOR ligger i de store geo-kampagner (IC | GSN | København / Sjælland / Jylland / Hele DK). Eksempel: ad group 'København: Taxa + København' (RSA POOR), 'København: Taxa' (AVERAGE)."
+          ],
+          "pointer": "For en fuld per-annonce RSA-gennemgang (dødvægt-assets, vinkel-huller, challenger-tekster): kør optimering-loop / annonce-optimering. Bemærk: de skills giver mest når kontoen har kørt et stykke tid , på en helt ny konto er der endnu ikke nok serverings-data.",
+          "kind": "judgment"
+        }
+      ]
+    },
+    {
+      "key": "D",
+      "title": "Modul D — Konverteringer",
+      "items": [
+        {
+          "n": 16,
+          "punkt": "Conversions: Er de relevante konverteringer tracket?",
+          "status": "ok",
+          "finding": "Sporing aktiv (CONVERSION_TRACKING_MANAGED_BY_SELF). 38 aktive konverteringshandlinger dækker app-bookinger, online bookinger og opkald. Bemærk: et par Uber-handlinger står også som primære (partnerskabsspor) , værd at bekræfte med Rikke.",
+          "kind": "lookup"
+        },
+        {
+          "n": 17,
+          "punkt": "Conversions: Har konverteringerne tildelt en værdi?",
+          "status": "critical",
+          "finding": "Kernekonverteringer har værdier (Taxa Booking app=20, Bestilling-Web=1, Telefon=2). MEN 3 aktive handlinger markeret som PRIMÆRE har default_value 0,0: 'Android-installationer (alle andre apps)', en iOS in-app purchase og en Uber-install. Nul-værdi på primære handlinger forvrider Maximize Conversion Value. Anbefaling: tildel værdi eller fjern som primære.",
+          "kind": "lookup"
+        }
+      ]
+    },
+    {
+      "key": "E",
+      "title": "Modul E — Kampagneindstillinger",
+      "items": [
+        {
+          "n": 18,
+          "punkt": "Campaign settings: Optimerer mod alle aktuelle mål?",
+          "status": "warn",
+          "finding": "Sporing på plads, men kun 65 af 128 aktive kampagner (51%) bruger konverteringsbaseret budgivning. De øvrige 63 kører MANUAL_CPC/TARGET_SPEND/TARGET_IMPRESSION_SHARE , i høj grad korte festival-bursts (forsvarligt), men værd at gennemgå for de permanente kampagner.",
+          "kind": "judgment"
+        },
+        {
+          "n": 19,
+          "punkt": "Campaign settings: Er display select slået fra?",
+          "status": "ok",
+          "finding": "0 af 120 SEARCH-kampagner har Display slået til (target_content_network=false overalt). Kun de 3 dedikerede DISPLAY-kampagner har Display , korrekt. Ingen utilsigtet Display-spredning på Search.",
+          "kind": "lookup"
+        },
+        {
+          "n": 20,
+          "punkt": "Campaign settings: Er Google Search partners slået fra?",
+          "status": "warn",
+          "finding": "11 af 120 SEARCH-kampagner har Search Partners slået til (target_search_network=true), bl.a. Brand, English, et par geo-broad og 6 ældre 2023-events. De øvrige 109 har det fra. Overvej at slå fra på de aktive (især Brand og English).",
+          "kind": "lookup"
+        },
+        {
+          "n": 21,
+          "punkt": "Campaign settings: Er sprog og landemålretning sat korrekt?",
+          "status": "ok",
+          "finding": "Matcher DK/dansk-tilbuddet. Geo: eneste land-konstant er Danmark (2208); alt andet er danske underregioner/byer , ingen udlandsmålretning. Sprog: dansk (1009) overalt, engelsk (1000) altid parret med dansk (matcher det engelske ad-group-spor).",
+          "kind": "lookup"
+        },
+        {
+          "n": 22,
+          "punkt": "Campaign settings: Bruger kampagnerne individuelt budget?",
+          "status": "warn",
+          "finding": "123 distinkte budgetter på 128 kampagner , overvejende individuelt. 5 budgetter deles dog af 2 kampagner hver (Lufthavnen, København, Jylland, Brand, alle med deres split-test/budstrategi-skift-tvilling). Ser intentionelt ud, men de to i hvert par konkurrerer om samme pulje.",
+          "kind": "lookup"
+        }
+      ]
+    },
+    {
+      "key": "F",
+      "title": "Modul F — Struktur & navngivning",
+      "items": [
+        {
+          "n": 23,
+          "punkt": "Struktur: Følger strukturen konventioner / meningsfuldt op? (STAG/Hagakure/?)",
+          "status": "ok",
+          "finding": "Genkendeligt, meningsfuldt mønster: en konsolideret Hagakure-lignende kerne (få geo-kampagner: IC | GSN | København/Sjælland/Fyn/Jylland + Hele DK Stednavne med 101 annoncegrupper) på broad + smart bidding, bevidst konsolideret væk fra den gamle per-by SKAG-opsætning.",
+          "kind": "judgment"
+        },
+        {
+          "n": 24,
+          "punkt": "Struktur: Er der implementeret en brugbar navngivningskonvention?",
+          "status": "ok",
+          "finding": "Konsistent og brugbar: pipe-konventionen IC | <kanal> | <kampagne> går igen på de levende kampagner (IC | GSN | …, IC | GDN | …, IC | PMax | …) inkl. dato-/GEO-suffikser. Legacy- og paused-navne ekskluderet fra bedømmelsen.",
+          "kind": "judgment"
+        }
+      ]
+    },
+    {
+      "key": "G",
+      "title": "Modul G — Keywords & søgeord",
+      "items": [
+        {
+          "n": 25,
+          "punkt": "Keywords: Broad match - bruges den på en kontrolleret måde?",
+          "status": "ok",
+          "finding": "Kontrolleret. BROAD = 547 kriterier men ~78% af søgetrafikken , al ligger i Search-kampagner på Maximize Conversion Value (ikke manuel CPC), parret med 1.556 ad-group-negativer + 6 delte negative-lister. Broad + value-bidding + stærke negativer = styret.",
+          "kind": "judgment"
+        },
+        {
+          "n": 26,
+          "punkt": "Keywords: Match types - er der styr på brugen af matchtyper?",
+          "status": "ok",
+          "finding": "Bevidst fordeling: PHRASE 22.169 (92,8%), EXACT 1.176 (4,9%), BROAD 547 (2,3%) efter antal kriterier , omvendt på impressions (broad bærer trafikken). Negativer overvejende EXACT for præcis afskæring.",
+          "kind": "judgment"
+        },
+        {
+          "n": 27,
+          "punkt": "Keywords: Search terms - er hygiejnen på plads?",
+          "status": "ok",
+          "finding": "God hygiejne. I de 200 højest-eksponerede søgeord er der nul out-of-scope spild (ingen bus/9+ pax, biludlejning, tog, job-søgninger med forbrug). De to uber-termer ligger i de bevidste Uberficering-splittests. Caveat: vurderet på top-200, ikke en udtømmende long-tail-gennemgang.",
+          "kind": "judgment"
+        },
+        {
+          "n": 28,
+          "punkt": "Keywords: Rammer vi alle relevante keywords, eller kunne der trænges til en søgeordsanalyse?",
+          "status": "warn",
+          "finding": "Dækker taxa-per-by, lufthavn og festival/event godt. Men to navngivne kernetemaer har reelt nul dækning: el-taxa (0 ægte træffere) og store vogne (storvogn/maxitaxi/minibus/7-9 personers = 0). Konkret søgeordsanalyse-behov på de to.",
+          "kind": "judgment"
+        },
+        {
+          "n": 29,
+          "punkt": "Keywords: Er brand ekskluderet fra de generiske kampagner?",
+          "status": "warn",
+          "finding": "Strukturelt mangelfuldt, men uden observeret skade. Den delte IC | Brand-liste har kun 2 medlemmer (dan taxi, dantaxi) , dantaxa/dan taxa mangler, og listen er ikke koblet på nogen aktiv kampagne. De tunge geo-kampagner har ingen brand-negativer (verificeret 0). Empirisk lækker det ikke (brand-søgning fanges af Brand-kampagnen). Uber holdt udenfor som partner. Anbefaling: komplettér listen + kobl den på de generiske kampagner.",
+          "kind": "judgment"
+        },
+        {
+          "n": 30,
+          "punkt": "Keywords: Hvordan ser quality score ud?",
+          "status": "ok",
+          "finding": "Stærk QS. På servende søgeord (LAST_30): simpelt snit 9,14, impression-vægtet 8,95. QS 10 = 127 søgeord, kun 11 søgeord på QS ≤6. Tungt top-loaded mod 8-10.",
+          "kind": "judgment"
+        }
+      ]
+    },
+    {
+      "key": "H",
+      "title": "Modul H — Bidding",
+      "items": [
+        {
+          "n": 31,
+          "punkt": "Bidding: Bruger kampagnerne de optimale budstrategier?",
+          "status": "warn",
+          "finding": "Always-on-kernen kører korrekt smart bidding (værdibaserede geo-kampagner + Lufthavnen + PMax på Maximize Conversion Value; drift på Maximize Conversions). De ~42 MANUAL_CPC Festival-2025-kampagner serverer ikke længere (0 eksponeringer/30d) , forventet historik, ikke en fejl. Reel anmærkning: IC | GSN | Brand kører TARGET_SPEND uden konverteringsfokus parallelt med en konverteringsoptimeret brand-kampagne , bør skifte.",
+          "kind": "judgment"
+        },
+        {
+          "n": 32,
+          "punkt": "Tjek mål CPA",
+          "status": "warn",
+          "finding": "Sat på flere kampagner. App-installs plausible (5,00-6,50 DKK). Men ~30 event-kampagner bærer alle den HELT identiske mål-CPA 3,20 DKK , tyder på en template-default, ikke per-kampagne-tuning, og er urealistisk lavt for en reel booking-CPA. Kombineret med nul-værdi-konverteringen (punkt 17) svækkes værdi-signalet.",
+          "kind": "judgment"
+        },
+        {
+          "n": 33,
+          "punkt": "Tjek bud på devices - og tilpas evt.",
+          "status": "ok",
+          "finding": "Device-budjusteringer findes og er fornuftige (+50% mobil på 3 kampagner). Sparsomme fordi Smart Bidding automatiserer device-optimering på de værdibaserede kampagner. For en mobil-først taxi-app er mobil-præferencen på de manuelle kampagner logisk. Ingen problematiske device-bud.",
+          "kind": "lookup"
+        }
+      ]
+    },
+    {
+      "key": "I",
+      "title": "Modul I — Målgrupper & remarketing",
+      "items": [
+        {
+          "n": 34,
+          "punkt": "Remarketinglister (min: alle besøgende 7/14/30/90/180/360/540 dage + produktsider)",
+          "status": "warn",
+          "finding": "50+ åbne lister og en rig adfærdsbaseret struktur (ride-segmenter i 14/28/90/180/540 dage, MAIN-liste 540d, All Converters, app-brugere). Mod den rene stige er dækningen delvis: ingen 7-dages, ingen 360, 'alle besøgende' kun 30d, ingen produktside-lister. Mange konverter-lister ligger under Søgenetværkets 1.000-medlemmers serveringsgrænse. Værdifuld segmentering, men den korte ende + små lister begrænser anvendeligheden.",
+          "kind": "lookup"
+        },
+        {
+          "n": 35,
+          "punkt": "Audiences Observation-mode",
+          "status": "ok",
+          "finding": "Hvor målgrupper er tilknyttet Search, er de korrekt i Observation-mode (bid_only=true) , bekræftet på alle 6 Search-kampagner med tilknytning. Ingen Targeting-mode (godt). Nuance: kun de ældre kampagner (2.0 Geo, 3.0 Tema, Lufthavnen) bærer observation-laget; den nuværende værdibaserede geo-opsætning + PMax + Brand har nul tilknytning. Anbefaling: propagér observation-listerne til de aktive kampagner.",
+          "kind": "lookup"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    "run_custom_gaql (campaign_asset, customer_asset)",
+    "run_custom_gaql (customer_user_access)",
+    "get_account_details",
+    "run_custom_gaql (ad_group_ad: ad_strength, headlines, descriptions, final_urls)",
+    "run_custom_gaql (conversion_action + customer.conversion_tracking_setting)",
+    "run_custom_gaql (campaign network_settings + bidding_strategy_type)",
+    "run_custom_gaql (campaign_criterion: LOCATION/LANGUAGE, DEVICE)",
+    "run_custom_gaql (ad_group_criterion: KEYWORD match types + negatives, USER_LIST)",
+    "run_custom_gaql (shared_set negative lists)",
+    "run_custom_gaql (keyword_view historical_quality_score)",
+    "run_custom_gaql (user_list)",
+    "firecrawl-scrape (dantaxi.dk, dantaxi.dk/by/taxa-kobenhavn)"
+  ]
+}

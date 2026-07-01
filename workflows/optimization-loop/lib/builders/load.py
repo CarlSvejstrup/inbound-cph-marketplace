@@ -6,11 +6,10 @@ of truth. It does not copy or fork that code, and it does not modify the skills.
 Instead it loads each skill's real module from its file path (importlib) and calls
 the same callables the skill's own CLI calls.
 
-Why by-path and not a shared import package: Cowork plugins install as
-self-contained single-root directories, and the three skills span two plugin roots
-(google-ads-optimization, google-ads-setup). No shared import location exists for the
-shipped skills. This loader is repo-local and never ships, so it can point straight
-at the skill files. See ../../SPEC.md section 1.1 / 2.
+Why by-path and not a shared import package: the shipped skills all live under the
+single `inbound-ads` plugin root, but they still expose their builders as standalone
+files rather than an importable package. This loader is repo-local and never ships, so
+it points straight at the skill files. See ../../SPEC.md section 1.1 / 2.
 
 Wrinkle: the RSA builder (fill-sheet.py) imports a sibling module (sheet_layout.py),
 so we prepend its directory to sys.path before loading it. The other two builders are
@@ -36,9 +35,11 @@ from pathlib import Path
 # parents[0]=builders, [1]=lib, [2]=optimization-loop, [3]=workflows, [4]=repo root.
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
-_SEARCH_TERMS = _REPO_ROOT / "plugins/google-ads-optimization/skills/search-terms/build-sheet.py"
-_ASSET_HYGIENE = _REPO_ROOT / "plugins/google-ads-optimization/skills/annonce-optimering/build-sheet.py"
-_RSA_FILL = _REPO_ROOT / "plugins/google-ads-setup/skills/responsive-search-ads/fill-sheet.py"
+# NOTE: the original search-terms build-sheet.py was retired to _archive/ when the
+# shipped analysis moved to soegeterm-analyse; the loop's builder still uses the archived module.
+_SEARCH_TERMS = _REPO_ROOT / "plugins/inbound-ads/_archive/search-terms/build-sheet.py"
+_ASSET_HYGIENE = _REPO_ROOT / "plugins/inbound-ads/skills/annonce-optimering/build-sheet.py"
+_RSA_FILL = _REPO_ROOT / "plugins/inbound-ads/skills/responsive-search-ads/fill-sheet.py"
 
 
 class RsaValidationError(ValueError):

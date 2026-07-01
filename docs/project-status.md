@@ -2,7 +2,11 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-06-05, after adding `ads-aendringslog` (google-ads-optimization v1.1.0).
+Last updated: 2026-07-01, after adding bundled agents + the write guardrail hook.
+
+> **2026-07-01 — bundled agents + write guardrail (`inbound-ads` v3.1.0).** Added three subagents under `plugins/inbound-ads/agents/`: `ads-analyst` (read-only account analyst + web research, the reusable read worker), `ads-writer` (the sole HITL-gated account-write path; budget writes held until the guardrail ships, then second-confirm for any change), and `drive-knowledge` (read-across Drive/HubSpot/Ads-history worker). Each inherits the session's connectors and strips file-writing; read/write intent is by prompt. Hard write-safety is a PreToolUse hook (`hooks/google-ads-write-guardrail.sh`, wired in `.claude/settings.json`) that gates Google Ads writes by short tool name (install-portable, no UUID) — deny on budget until the guardrail ships, ask on other writes. Verified: frontmatter well-formed, hook decision paths smoke-tested (deny/ask/allow). NOT yet run in Cowork; skills not yet wired to dispatch to the agents (follow-up). Repo also moved to `~/code/work/inbound-cph-marketplace/`.
+
+> **2026-07-01 — plugin consolidation.** The three plugins (`google-ads-setup`, `google-ads-optimization`, `google-ads-general`) were merged into a single plugin, **`inbound-ads`** (now v3.1.0), on branch `feat/inbound-ads-merge`. All 15 skills now live under `plugins/inbound-ads/skills/` (git history preserved via `git mv`). Install is now `/plugin install inbound-ads@inbound-cph`. The two former cross-plugin dependencies (`editor-csv-export` ← `campaign-build`/`optimering-loop`, and `annonce-optimering` ↔ `responsive-search-ads`) are now intra-plugin. Milestone/version notes below that name the old plugins are historical and describe the pre-merge layout.
 
 ## Milestones
 
@@ -63,6 +67,7 @@ Last updated: 2026-06-05, after adding `ads-aendringslog` (google-ads-optimizati
 
 - **End-to-end test in Cowork against Nordkap folder.** Confirm: marketplace install, userConfig prompt, Drive read, source attribution appears, language defaults to Danish. Until this is done, M5 is theoretical.
 - **Decide versioning mode.** Explicit semver vs commit-SHA. Document choice in README.
+- **Pilot `kontekst-opdater` (google-ads-general) on Dantaxi + Capio.** New skill (added 2026-06-24): per-client AI-context update + PM-overview, all on Drive — start in the master index, open the client's AI-Context file, diff what's new since its `Sidst opdateret` (Drive docs / HubSpot / status decks) with TILFØJ/ERSTAT/FJERN HITL-gating, write the updated AI-Context file in place. Untested end-to-end. Verify: index entry-point read, parallel source subagents, report folder find-then-note-in-file, `Sidst opdateret` watermark read+bump, and the gws-or-fallback file write. Known blocker: the gws/Workspace MCP (`acc7a973-…`) needed for the in-place file write is currently `needs_reauth` + personal-auth (may 403 on Inbound files) — the skill degrades to a copy-paste block until that's resolved.
 
 ### Medium priority
 

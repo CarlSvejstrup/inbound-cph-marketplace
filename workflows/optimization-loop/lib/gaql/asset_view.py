@@ -1,6 +1,6 @@
 """GAQL for the asset-hygiene diagnostic stage.
 
-Lifted verbatim from plugins/google-ads-optimization/skills/annonce-optimering/SKILL.md
+Lifted verbatim from plugins/inbound-ads/skills/annonce-optimering/SKILL.md
 (Trin 2). Field shape verified live 2026-05-29. Two pulls:
   asset_view_query  - per-asset rows (headline/description) on ENABLED RSAs
   rsa_count_query   - distinct RSA ids per (campaign, ad_group) for champion-challenger

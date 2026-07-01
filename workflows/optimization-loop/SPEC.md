@@ -1,5 +1,11 @@
 # Optimization Loop — SPEC
 
+> **Historical design record (pre-merge).** This SPEC predates the 2026-07 consolidation of
+> the three Google Ads plugins into the single `inbound-ads` plugin. References below to
+> `google-ads-setup` / `-optimization` / `-general` describe the plugin layout at design time;
+> the shipped skills now all live under `plugins/inbound-ads/skills/`. Kept verbatim for the
+> design rationale (esp. the "no shared root across plugins" discussion, which the merge resolved).
+
 Single source of truth for the Google Ads optimization loop: a **local Claude Code
 Workflow** that diagnoses a live account across several dimensions in parallel, then
 chains the findings into a single editable Excel workbook for the expert to review, edit, and
@@ -506,8 +512,8 @@ workbook-and-converter only.
 
 ## 9. Cross-references
 - Critique that produced this design: `work/inbound-cph/operations/decks/2026-06-05-optimization-loop-critique.html` (vault).
-- Existing skills reused: `plugins/google-ads-optimization/skills/{search-terms,annonce-optimering}`,
-  `plugins/google-ads-setup/skills/responsive-search-ads`.
-- Measure-phase logic source: `plugins/google-ads-general/skills/ads-changelog`.
-- QS pull source: `plugins/google-ads-general/skills/ads-audit-report`.
+- Existing skills reused (post-merge paths): `plugins/inbound-ads/_archive/search-terms` (the retired search-terms builder), `plugins/inbound-ads/skills/annonce-optimering`,
+  `plugins/inbound-ads/skills/responsive-search-ads`.
+- Measure-phase logic source: `plugins/inbound-ads/skills/ads-changelog`.
+- QS pull source: `plugins/inbound-ads/skills/ads-audit-report`.
 - Operating contract (HITL, Kilder, language): the shared plugin `CLAUDE.md`.
