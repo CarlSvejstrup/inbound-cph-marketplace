@@ -73,6 +73,8 @@ Sample-floor (`MIN_IMPRESSIONS`): default **50**. Vises i Oversigt så brugeren 
 
 ## Trin 2 — Hent per-asset data (GAQL, kun ENABLED)
 
+Uddeleger konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet; den henter og vurderer kontodata og returnerer fund. Skillet forbruger fundene. Giv agenten det bekræftede `customer_id`, analysevinduet fra Trin 1 og AI Context'en fra Trin 0, og bed den køre de to GAQL-queries nedenfor (per-asset + RSA-tælling). (Agenten bruger selv `run_custom_gaql` mod de samme views; den hårde ENABLED-only-regel gælder uændret.)
+
 Brug `run_custom_gaql`. Hård regel: kun ENABLED kampagner OG annoncer (pausede er bevidste — ekskluderes, flages aldrig).
 
 ```sql

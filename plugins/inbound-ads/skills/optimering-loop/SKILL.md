@@ -151,6 +151,19 @@ tekst gives ind i hver af de tre diagnose-sub-agenters prompt nedenfor.
 Spawn **én sub-agent per diagnose** (kontekst-isolation: rå GAQL-svar fylder ikke main-loopet; hver
 sub-agent returnerer kun struktureret JSON). De tre er uafhængige — kør dem parallelt.
 
+**Deleger konto-læsningen til `ads-analyst`-agenten (Task-værktøjet).** Alle tre parallelle diagnoser
+(søgetermer + negatives, RSA-asset-hygiejne, Quality Score) er rene konto-læsninger, og `ads-analyst`
+er den genbrugelige read-worker: dispatch hver diagnose til `ads-analyst` via Task, giv den
+`customer_id`, vinduet, `lib/`-stien og hele `offering.md` som kontekst, og lad den køre GAQL-pullet +
+klassifikationen og returnere den strukturerede JSON. `ads-analyst` skriver aldrig til kontoen — det
+matcher dette skills read-/recommend-only-natur præcist. (Kører du sub-agenterne som generiske Task-
+agenter, gælder samme kontrakt; `ads-analyst` er den navngivne, genbrugelige indpakning af den.)
+
+**Fremadrettet (endnu ikke aktivt):** når det samtale-drevne re-spec med direkte HITL-gatede writes
+lander (backlog), routes de bekræftede konto-writes gennem `ads-writer`-agenten, som håndhæver
+per-action-bekræftelse + budget-guardrailen. I dag skriver dette skill ALDRIG til kontoen — det
+leverer stadig kun diagnose → workbook.
+
 Hver sub-agent får: `customer_id`, vinduet, stien til dette skills `lib/`, **hele `offering.md` som
 kontekst** (Phase 0-grundsandheden — det er den der gør relevans-kald rigtige), og besked om at
 (a) hente GAQL-strengen fra det rette `lib/gaql`-modul, (b) køre den via `run_custom_gaql` (kun

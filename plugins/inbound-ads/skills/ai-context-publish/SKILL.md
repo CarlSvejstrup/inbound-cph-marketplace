@@ -48,7 +48,11 @@ Keep the note's budget figure as "vejledende" + point to the ark as source of tr
 
 ### Part A — per-client AI Context Doc
 
-For a batch, **divide clients across subagents (one client per subagent)** using the exact contract in `references/publish-contract.md`. Hand each subagent the client's resolved IDs + Drive client-folder ID + note path. Each subagent:
+For a batch, **divide clients across subagents (one client per subagent)** using the exact contract in `references/publish-contract.md`. Hand each subagent the client's resolved IDs + Drive client-folder ID + note path.
+
+**When a client's context needs gathering across sources (Drive reports, HubSpot mail/notes, Google Ads change history) before publishing, delegate that source fan-out to the `drive-knowledge` agent (read-across-sources worker) via the Task tool;** it reads Drive/HubSpot/Ads change-history since the watermark and returns a consolidated, source-attributed summary. `drive-knowledge` is read-only across all sources and honours the timeless-only rule — it never writes. **This skill still owns the Drive write:** the create-once `.md` file build + the human-in-the-loop `create_file` publish stay here exactly as below. If `drive-knowledge` cannot be dispatched, gather inline as described.
+
+Each per-client subagent:
 
 1. **Find the canonical client folder.** Prefer the renamed `<Name> - [HubSpotID] (stage=)` folder in "A - Kunder" (resolve by `title contains '<name>'`); fall back to the old plain-named folder only if no renamed one exists. The note's `drive_folder` frontmatter is the fallback. If missing/ambiguous, STOP and ask.
 2. **Create/reuse the "AI Context" folder.** `search_files parentId='<CLIENT_FOLDER_ID>' and mimeType='application/vnd.google-apps.folder'`. **Ian already creates these folders himself and drops his own files in them** (e.g. DBI's holds his Projektoverblik + Optimeringslog + Demo-brief) — REUSE the existing one; our uniquely-named file sits alongside his. Watch for case variants: Ian used **"AI context"** (lowercase c) on InboundCPH — reuse it rather than spawn a near-duplicate. Note: Ian places the folder at the **client-folder root**, not inside Paid Search — follow that. Only create a new "AI Context" folder if none exists.

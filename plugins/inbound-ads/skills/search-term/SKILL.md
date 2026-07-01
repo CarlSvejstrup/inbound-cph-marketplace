@@ -100,6 +100,14 @@ group-navnene og sig det i samtalen.
 
 ## Trin 3 — Hent + slank (FØR kontekst)
 
+**Deleger konto-læsningen til `ads-analyst`-agenten (Task-værktøjet).** Søgeterm-rapport-pullet her
+og data-indsamlingen bag fundene i Trin 4 (n-gram, match-type/struktur, tracking-anomalier,
+konkurrent/off-offering) er rene konto-læsninger — dispatch dem til `ads-analyst`, den genbrugelige
+read-worker: giv den `customer_id`, vinduet, scope, tærsklen og `lib/`-stien, og lad den køre pullet
+(`get_search_terms_report` ≤30 dage / `run_custom_gaql` >30 dage) + slim/n-gram fil-side og returnere
+det slanke, aggregerede termsæt. `ads-analyst` skriver aldrig til kontoen. Selve samtalen (Trin 5) og
+CSV-skrivningen (Trin 6) bliver i dette skill.
+
 Identisk motor med soegeterm-analyse — `lib/slim.py` håndterer begge shapes (fladt rapport-felt OG
 nested `search_term_view.status`; cost i DKK ELLER micros).
 
@@ -193,6 +201,11 @@ I har været hele den interessante del igennem.
 
 Når I er enige, byg en `decisions.json` af det aftalte og kør writeren. INGEN .xlsx, INGEN FILTER —
 rene statiske rækker i Editor-import-format.
+
+**CSV-skrivning er fil-output, ikke en konto-write** — den går derfor IKKE gennem `ads-writer`-agenten.
+`ads-writer` er kun for writes til selve Google Ads-kontoen (negatives/keywords/status pushet via MCP).
+Her skriver vi lokale Editor-import-CSV'er som mennesket selv importerer og trykker Send på i Editor;
+kontoen røres aldrig af dette skill.
 
 ```bash
 python3 ${CLAUDE_SKILL_DIR}/lib/write_csv.py --in <decisions.json> \

@@ -113,6 +113,8 @@ outputtets kontekst-linje. Fabrikér aldrig et tilbud.
 
 ## Trin 3 — Hent + slank (FØR kontekst)
 
+Uddeleger konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet; den henter og vurderer kontodata og returnerer fund. Skillet forbruger fundene. Giv agenten det bekræftede `customer_id`, vindue/scope/tærskel fra Trin 1 og tilbudsforståelsen fra Trin 2, og bed den trække søgeterm-rapporten via den kilde vinduet dikterer nedenfor. (Agenten bruger selv de samme Google Ads MCP-værktøjer; slankningen via `slim.slim()` sker fil-side som beskrevet.)
+
 Vælg kilde efter vinduet (se Trin 1). `slim.slim()` håndterer BEGGE shapes (fladt rapport-felt OG
 nested `search_term_view.status`; cost i DKK ELLER micros), så resten er ens.
 

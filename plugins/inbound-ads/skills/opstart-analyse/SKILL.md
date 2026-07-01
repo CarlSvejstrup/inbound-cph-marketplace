@@ -138,6 +138,13 @@ returnerer kun struktureret JSON for sine punkter). Grupper gerne 2-3 små modul
 at holde antallet nede (fx A+B sammen, E alene, G alene), men hold tunge moduler (C annoncetekster,
 G keywords) hver for sig.
 
+Uddeleger konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet;
+det er den agent du dispatcher hvert modul til: den henter og vurderer kontodata og returnerer fund,
+og skillet forbruger fundene. Giv hver `ads-analyst`-instans de relevante punkter + GAQL fra
+`references/analysearbejdet.md`, `customer_id`, analysegrundlaget og virksomhedsprofilen (hvor
+relevant), præcis som beskrevet nedenfor. (Agenten er read-only og bruger selv `run_custom_gaql` +
+de nævnte MCP-værktøjer; den skriver aldrig til kontoen.)
+
 Hver sub-agent får: `customer_id`, analysegrundlaget, de relevante punkter + GAQL fra
 `references/analysearbejdet.md`, virksomhedsprofilen (hvor relevant), og besked om at:
 - (a) køre de oplyste GAQL-queries via `run_custom_gaql` + de nævnte MCP-værktøjer (`get_ad_extensions`,

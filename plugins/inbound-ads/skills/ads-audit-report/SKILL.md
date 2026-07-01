@@ -53,6 +53,8 @@ Naar alle svar er indsamlet: bekraeft scope og gaak i gang. "Godt — jeg henter
 
 ## Trin 2 — Dataindhentning
 
+Uddeleger konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet; den henter og vurderer kontodata og returnerer fund. Skillet forbruger fundene. Giv agenten det bekræftede `customer_id`, det valgte scope + datointerval, og AI Context'en fra Trin 0.5; brug de MCP-kald og GAQL-hjælpespørgsmål nedenfor som kontrakten for hvad den skal trække per modul. (Agenten bruger selv de samme Google Ads MCP-værktøjer.)
+
 Kald alle relevante MCP-vaerktoejer for det valgte scope. Kald dem parallelt hvor muligt.
 
 ### MCP-kald per modul

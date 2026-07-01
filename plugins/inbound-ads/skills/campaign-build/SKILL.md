@@ -62,6 +62,14 @@ artefakt-mappen, `mode=pipeline` og de kendte intake-felter):
 Kør `01` først (eller giv `02` klientens analyse når den er klar) — `02` læser gerne klientens egen
 positionering. De er ellers uafhængige. Saml de tre opsummeringer.
 
+**Deleger de læse-tunge research-fasers konto- og web-læsninger til `ads-analyst`-agenten.** Phase 1
+(landingsside-analyse, konkurrent-research, strategi) er ren læsning — konto-signaler via Google Ads
+MCP + web-kontekst — og `ads-analyst` er den genbrugelige read-worker med Google Ads-læsning +
+`WebSearch` og intet write-scope. Dispatch de tre research-subagenter via `ads-analyst` (giv hver
+reference-stien, artefakt-mappen, `mode=pipeline`, AI Context og intake-felterne); den henter dataen,
+ræsonnerer og returnerer fase-JSON'en. Structuring (Phase 2) og assembler/Excel-faserne (Phase 3-4) er
+rene build-trin og forbliver som de er — de dispatches ikke gennem `ads-analyst`.
+
 ## Trin 2 — Phase 2: structuring (gate)
 
 Dispatch én subagent på `references/04-structuring.md` (forbruger alle tre Phase-1-outputs). Den henter
@@ -107,6 +115,8 @@ Rapportér så:
 ## Safety
 
 - **Ingen API-push, nogensinde.** Hele pipelinen er recommend-/build-only. Read-only MCP-kald er fine.
+  (Fremadrettet, hvis den parkerede beslutning om at pushe campaign-build direkte til Google Ads nogensinde
+  omgøres, ville den write skulle routes gennem `ads-writer`-agenten — men det er IKKE nuværende adfærd.)
 - **Den endelige workbook → Drive er en gated write** — bekræft før upload (human-in-the-loop: vis
   sti + filnavn, vent på eksplicit `ja`, upload så).
 - **Stop ved Phase-2-gaten.** Kør aldrig creative før mennesket har godkendt structuring.

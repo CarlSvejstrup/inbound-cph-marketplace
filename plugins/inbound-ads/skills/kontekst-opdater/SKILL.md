@@ -75,7 +75,9 @@ Via Drive-connectoren:
 
 ## Trin 2 — Fan-out: én ekspert-subagent per kilde, parallelt
 
-Dispatch tre subagenter samtidigt (ét message, flere tool-kald), hver med de resolvede ID'er + siden-datoen + en struktureret-output-kontrakt (se `references/source-contracts.md`). Hver returnerer **kun fund** — rå læsninger bliver i subagentens kontekst, ikke hovedkonteksten.
+**Uddeleger kilde-fan-out'en til `drive-knowledge`-agenten (read-across-sources worker) via Task-værktøjet;** den læser Drive/HubSpot/Ads-historik siden watermark og returnerer en konsolideret, kilde-attribueret opsummering. Skillet laver TILFØJ/ERSTAT/FJERN-diffen (Trin 4) og den gated skrivning (Trin 6). Giv `drive-knowledge` de resolvede ID'er (`Google Ads ID`, `HubSpot ID`, Drive-mappe-ID), siden-datoen (watermark), en evt. allerede-noteret rapport-mappe + `Seneste rapport læst`-watermark, og struktureret-output-kontrakten (se `references/source-contracts.md`). `drive-knowledge` er read-only mod alle kilder og honorerer tidsløs-reglen; den fan-er de tre ekspert-læsninger nedenfor ud internt og returnerer **kun fund** (rå læsninger bliver i dens kontekst, ikke hovedkonteksten). Kan `drive-knowledge` ikke dispatches, så kør de tre ekspert-subagenter inline som beskrevet nedenfor.
+
+De tre kilde-læsninger `drive-knowledge` udfører (og som ellers køres inline) — dispatch samtidigt (ét message, flere tool-kald), hver med de resolvede ID'er + siden-datoen + struktureret-output-kontrakten. Hver returnerer **kun fund**.
 
 - **Drive-ekspert** (kun Drive-connectoren):
   - **(A) Nye/ændrede dokumenter:** `search_files parentId='<Drive-mappe-ID>'` + `get_file_metadata`, filtrér `modifiedTime > siden` (RFC-3339 UTC), rekursér undermapper, mærk per marked for delte mapper, `read_file_content` på dokumenter i vinduet.
