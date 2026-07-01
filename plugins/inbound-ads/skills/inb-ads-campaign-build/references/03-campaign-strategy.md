@@ -6,7 +6,7 @@ mål, geo/sprog/netværk, budstrategi, budget, conversion action og tracking-gat
 dataindtastning til et beslutnings-trin. Output forbruges af `04-structuring` (match-type-politik,
 kampagnenavn, mål) og `07-assembler` (fylder tab-01-rækken + seeder tab-08-launch-gates).
 
-Pipeline-mode-først; `inb-ads-campaign-research`-shell-skillet wrapper solo-mode.
+Køres som en fase-subagent i `inb-ads-campaign-build`-pipelinen (emitterer JSON til arbejdsmappen).
 
 ## Designprincip
 

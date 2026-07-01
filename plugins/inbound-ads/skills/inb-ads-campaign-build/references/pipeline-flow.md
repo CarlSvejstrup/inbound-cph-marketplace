@@ -8,14 +8,11 @@ data-kontrakt og dispatch-regel. Den vinder ved konflikt.
 
 Hver fase kan køre i to modes. Hvad fasen afleverer afhænger af **hvem der kaldte den**:
 
-| Mode | Hvem kalder | Hvad fasen gør |
-|---|---|---|
-| **pipeline-mode** | `inb-ads-campaign-build`-orkestratoren (denne fil) | Forbruger upstream-JSON fra artefakt-mappen, emitterer sit eget JSON til samme mappe, spørger IKKE om intake den allerede har fået, og stopper IKKE for menneske-godkendelse undervejs (gaten ligger samlet til sidst). |
-| **solo-mode** | Et selvstændigt skill (`inb-ads-campaign-research`/`inb-ads-campaign-structure`/`inb-ads-campaign-assets`) trigget direkte af brugeren | Samme kerne-logik, men samler minimal intake selv hvis nødvendigt, og pakker sit output i en `.xlsx`/`.docx`-rapport til mennesket. Defineret i shell-skillet, ikke her. |
-
-Phase-referencerne i denne mappe er skrevet **pipeline-mode-først**. Solo-mode-wrappen bor i
-shell-skillene. Den ENE undtagelse er Phase 4 (assembler): den afleverer altid review-workbooken,
-også i pipeline-mode — det ER dens leverance.
+Hver fase kører som en **subagent i pipelinen**, dispatchet af `inb-ads-campaign-build`-orkestratoren
+(denne fil): den forbruger upstream-JSON fra artefakt-mappen, emitterer sit eget JSON til samme mappe,
+spørger IKKE om intake den allerede har fået, og stopper IKKE for menneske-godkendelse undervejs
+(gates ligger samlet: structuring i Trin 2 og selve oprettelsen i Trin 5). Faserne har ikke længere
+separate standalone-skills — al fase-logik bor i denne mappe.
 
 ## Artefakt-mappe (den delte arbejdsmappe)
 

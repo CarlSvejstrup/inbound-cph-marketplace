@@ -2,10 +2,10 @@
 
 Operating rules for any Claude agent (Cowork, claude.ai Project, Claude Code, Agent SDK) running skills from this repo against Inbound CPH's Google Ads work.
 
-This repo is a **marketplace with one plugin, `inbound-ads` (15 skills)**, covering Inbound CPH's full Google Ads lifecycle. Its skills group into three jobs:
-- **Build a NEW campaign** — `inb-ads-campaign-build` (orchestrator) + `inb-ads-campaign-research`, `inb-ads-campaign-structure`, `inb-ads-campaign-assets`, `inb-ads-rsa-copy`. Ends in a polished, client-shareable review workbook (Excel-only).
+This repo is a **marketplace with one plugin, `inbound-ads` (12 skills)**, covering Inbound CPH's full Google Ads lifecycle. Its skills group into three jobs:
+- **Build a NEW campaign** — `inb-ads-campaign-build` (orchestrator) + `inb-ads-rsa-copy`. `inb-ads-campaign-build` runs the Phase 1→4 pipeline and by default **creates the campaign directly in the account** via the `ads-writer` agent (HITL-gated per action, started paused (recommended) or active per the user's choice); the 10-tab Excel review workbook is now **opt-in** (when the client must approve the setup first). The phases live only as references inside `inb-ads-campaign-build`.
 - **Optimize a LIVE account** — `inb-ads-search-term-analyse` (merged from the former soegeterm-analyse + search-term), `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`, `inb-ads-display-placement-audit` (RSA asset-hygiene, search-terms, the whole diagnose-to-workbook loop, GDN placement junk-audit).
-- **Standalone deliverables** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export` (the shared converter: a confirmed review workbook from EITHER `inb-ads-campaign-build`'s `assembler` OR `inb-ads-optimization-loop` → Editor import CSVs), `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
+- **Standalone deliverables** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export` (the shared converter: a confirmed review workbook from EITHER `inb-ads-campaign-build` OR `inb-ads-optimization-loop` → Editor import CSVs), `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
 
 This repo-root `CLAUDE.md` is the canonical operating contract, loaded via `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` when a skill runs. Skill-level `SKILL.md` files refine it, never override.
 
@@ -15,7 +15,7 @@ This repo-root `CLAUDE.md` is the canonical operating contract, loaded via `${CL
 
 **No external write happens without explicit user approval. No exceptions. This rule overrides skill convenience, demo polish, and "obvious next step" reasoning.**
 
-External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Most skills are read-only / recommend-only against Google Ads** — the campaign-build output (the `assembler` workbook, Excel-only) and the optimization-loop output (the `review_workbook`) are review Excels; after a human confirms one, the shared `inb-ads-editor-csv-export` converts it to the Editor CSVs a human imports into Google Ads Editor. **Direct Google Ads writes are allowed only through the `ads-writer` agent, and only per-action HITL-confirmed** (direction set 2026-06-19) — no skill calls a Google Ads write tool itself. `inb-ads-display-placement-audit` is the first skill that routes a confirmed change through `ads-writer` instead of ending in a workbook.
+External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects — **including any write to a Google Ads account**. **Direct Google Ads writes are allowed only through the `ads-writer` agent, and only per-action HITL-confirmed** (direction set 2026-06-19) — no skill calls a Google Ads write tool itself. **`inb-ads-campaign-build` now creates campaigns directly by default** (2026-07-01): it routes campaign creation through `ads-writer`, HITL-gated per action, started **paused** (safe, recommended) or **active** per the user's choice. Its 10-tab Excel review workbook is now **opt-in** — used only when the client must approve the setup first, after which the shared `inb-ads-editor-csv-export` converts a confirmed workbook to the Editor CSVs a human imports into Google Ads Editor. The optimization-loop output (the `review_workbook`) follows the same opt-in review path. **Budget writes stay gated behind the write-guardrail hook + `INBOUND_ADS_BUDGET_GUARDRAIL`, requiring explicit per-action confirmation.** `inb-ads-display-placement-audit` also routes its confirmed negative placements through `ads-writer`.
 
 Read operations are not writes. Drafting in chat is not a write. Producing a proposed change is not a write. The boundary is the moment bytes leave the agent and land somewhere persistent or visible to anyone other than the operator.
 
@@ -37,7 +37,7 @@ For every write, follow this four-step pattern:
 - **"The user just said do it"** — if "it" wasn't the specific write you're about to perform, re-confirm. Approval is scoped to the exact change shown, not to the session.
 - **"It's a re-run of a write the user approved earlier"** — re-confirm. State has changed; the new draft may differ.
 - **"It's idempotent / can be undone"** — irrelevant. Approval is required regardless of reversibility.
-- **"Push the campaign to the Ads account"** — never. There is no API-push path in this suite by design; the human imports the CSVs into Editor. (Verified constraint: Google Ads Editor imports CSV, not .xlsx; the workbook is the review layer, the CSVs are the import layer.)
+- **"Push the campaign to the Ads account"** — allowed, but ONLY through the `ads-writer` agent and ONLY per-action HITL-confirmed. `inb-ads-campaign-build` does this by default (started paused unless the user chooses active); each write is proposed and confirmed before it executes, and budget writes wait on the guardrail (`INBOUND_ADS_BUDGET_GUARDRAIL`). No skill writes autonomously or in bulk without per-action confirmation. The review-workbook → Editor-CSV path remains available for when a human prefers to import after client approval (Google Ads Editor imports CSV, not .xlsx; the workbook is the review layer, the CSVs the import layer).
 - **Scheduled tasks** — a scheduled run produces a draft and *notifies*; the write only happens after the user approves on review. Not standing approval.
 - **Demo / live walkthrough** — same rule. Demonstrating the human-in-the-loop pattern *is* a feature, not friction.
 
@@ -81,11 +81,8 @@ But every skill that produces an artifact or recommendation stops at "here's the
 
 | Skill | Purpose | Writes? |
 |---|---|---|
-| `inb-ads-campaign-build` | Orchestrator: runs the Phase 1→4 pipeline (a subagent per phase reference) → the 10-tab review workbook. The pipeline (landing-page + competitor + strategy + structuring + RSA + assets + assembler) lives inside as `references/` + `scripts/assemble.py` | Gated — file/Drive save |
-| `inb-ads-campaign-research` | Phase 1 standalone: landing-page positioning + competitor analysis + campaign strategy/settings → `.docx` | No — read-only |
-| `inb-ads-campaign-structure` | Phase-2 gate: ad groups + keywords (Exact/Phrase) + client-specific negatives → `.xlsx` | Gated — sheet save |
-| `inb-ads-campaign-assets` | Phase 3: sitelinks, callouts, structured snippets (lead forms = manual UI) → `.xlsx` | Gated — sheet save |
-| `inb-ads-rsa-copy` | RSA copy engine: one ad group → Editor-ready sheet with live `=LEN()`. Reused by `inb-ads-campaign-build` per group; consumes `inb-ads-rsa-hygiene`'s gap-brief | Gated — sheet save |
+| `inb-ads-campaign-build` | Orchestrator: runs the Phase 1→4 pipeline (a subagent per phase reference), then **by default creates the campaign directly in the account** via `ads-writer` (started paused (recommended) or active per the user's choice). The 10-tab Excel review workbook is **opt-in** (client-approval-first path). The pipeline (landing-page + competitor + strategy + structuring + RSA + assets + assembler) lives inside as `references/` + `scripts/assemble.py`; the former standalone phase skills were removed | Gated — direct Google Ads write via `ads-writer`, per-action HITL (budget writes behind the guardrail); OR gated file/Drive save in review-workbook mode |
+| `inb-ads-rsa-copy` | RSA copy engine: one ad group → Editor-ready sheet with live `=LEN()`. Reused by `inb-ads-campaign-build` per group; consumes `inb-ads-rsa-hygiene`'s gap-brief; runnable standalone | Gated — sheet save |
 
 ### Optimize a live account
 
@@ -121,12 +118,12 @@ All skills now live in one plugin (`inbound-ads`), so `${CLAUDE_PLUGIN_ROOT}` re
 Three bundled subagents live in `plugins/inbound-ads/agents/`. Each inherits the session's tools (so it can reach the user-connected Google Ads / Drive / HubSpot connectors) and strips file-writing tools; role and read/write intent are enforced by the system prompt, and Google Ads writes are enforced by a PreToolUse hook (below).
 
 - **`ads-analyst`** — read-only account analyst. Every diagnostic skill (`inb-ads-account-audit`, `inb-ads-search-term-analyse`, `inb-ads-rsa-hygiene`, `inb-ads-onboarding-analysis`, the diagnostic half of `inb-ads-optimization-loop`) dispatches account reading to it. Recommend-only; proposes changes for `ads-writer` to apply, never writes itself.
-- **`ads-writer`** — the ONLY agent that writes to a Google Ads account, under strict per-action human-in-the-loop. Budget writes are held until the budget-guardrail ships, then require a second confirm for any change. Skills route confirmed changes through it.
+- **`ads-writer`** — the ONLY agent that writes to a Google Ads account, under strict per-action human-in-the-loop. `inb-ads-campaign-build` routes its default direct campaign creation through it (started paused unless the user chooses active). Budget writes stay gated behind the write-guardrail hook + `INBOUND_ADS_BUDGET_GUARDRAIL`, requiring explicit per-action confirmation. Skills route confirmed changes through it.
 - **`drive-knowledge`** — read-across-sources knowledge worker (Drive + HubSpot + Ads change-history). Used by `inb-ads-context-update` / `inb-ads-context-publish`. Read-only; timeless-only.
 
 ### The write guardrail (hard safety)
 
-`plugins/inbound-ads/hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook **bundled in the plugin** (wired via `plugins/inbound-ads/hooks/hooks.json`), so it ships with the plugin and fires automatically on every install with no per-seat setup. It matches on the tool's SHORT name (suffix after the last `__`), so it is install-portable regardless of the per-install MCP connector UUID. Budget writes → **deny** until the guardrail ships (then **ask**, second confirm); other Google Ads writes → **ask** (mandatory confirmation); reads + `generate_campaign_build_csv` + non-Ads tools → allow. It fires for ANY caller, not just `ads-writer`, and reinforces (never replaces) the agent prompts. **Scope limit:** the hook covers Google Ads tool names only — the read-only-ness of `ads-analyst` (web) and `drive-knowledge` (Drive/HubSpot) rests on their prompts and the calling skills' own write gates, not this hook.
+`plugins/inbound-ads/hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook **bundled in the plugin** (wired via `plugins/inbound-ads/hooks/hooks.json`), so it ships with the plugin and fires automatically on every install with no per-seat setup. It matches on the tool's SHORT name (suffix after the last `__`), so it is install-portable regardless of the per-install MCP connector UUID. Budget writes → **deny** until `INBOUND_ADS_BUDGET_GUARDRAIL=1` (then **ask**, per-action confirm); other Google Ads writes (including `inb-ads-campaign-build`'s direct campaign creation) → **ask** (mandatory confirmation); reads + `generate_campaign_build_csv` + non-Ads tools → allow. It fires for ANY caller, not just `ads-writer`, and reinforces (never replaces) the agent prompts. **Scope limit:** the hook covers Google Ads tool names only — the read-only-ness of `ads-analyst` (web) and `drive-knowledge` (Drive/HubSpot) rests on their prompts and the calling skills' own write gates, not this hook.
 
 ---
 
@@ -140,4 +137,4 @@ Defaults to **Danish** for user interaction. English preserved for marketing/too
 
 - A read you weren't sure was needed → do it.
 - A write you weren't sure was approved → don't do it. Ask.
-- A push to a Google Ads account → never. Emit artifacts; the human imports.
+- A push to a Google Ads account → only through `ads-writer`, only per-action HITL-confirmed (budget writes behind the guardrail). If unsure whether a specific change is confirmed, don't write — re-confirm.

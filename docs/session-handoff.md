@@ -1,3 +1,37 @@
+# Session handoff — 2026-07-01 (campaign-build restructure: 3 shells removed → 12 skills + direct-to-Ads delivery)
+
+## Current state (2026-07-01)
+
+- **Plugin:** one plugin, `inbound-ads`, **v3.3.0**, **12 skills**. All skills carry `inb-ads-*` slugs.
+- **Two changes this session.**
+  - **(1) Removed 3 thin standalone shells** — `inb-ads-campaign-research`, `inb-ads-campaign-structure`,
+    `inb-ads-campaign-assets`. Their logic already lived inside `inb-ads-campaign-build` as `references/`
+    (the Phase 1→4 pipeline); the shells were just solo-mode wrappers, so they were deleted. The phases now
+    live ONLY as references inside `inb-ads-campaign-build`. Roster drops 15 → **12**. `inb-ads-campaign-build`
+    + `inb-ads-rsa-copy` remain the BUILD group.
+  - **(2) `inb-ads-campaign-build` delivery model reversed** (was: "never pushes to the Google Ads API",
+    the 2026-06-03 decision). **New default: it creates the campaign directly in the account** via the
+    `ads-writer` agent, HITL-gated per action, started **paused** (safe, recommended) or **active** per the
+    user's choice. The 10-tab Excel review workbook is now **opt-in** (client-approval-first path; then
+    `inb-ads-editor-csv-export` makes the Editor CSVs). Budget writes remain gated behind the write-guardrail
+    hook + `INBOUND_ADS_BUDGET_GUARDRAIL`, per-action confirm. Because it now writes to client accounts,
+    changes to `inb-ads-campaign-build` require Ian's CODEOWNERS review.
+- **Current roster (the source of truth for slugs):**
+  - **Build** — `inb-ads-campaign-build`, `inb-ads-rsa-copy`.
+  - **Optimize** — `inb-ads-search-term-analyse`, `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`,
+    `inb-ads-display-placement-audit`.
+  - **Standalone** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export`,
+    `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
+- **Docs synced:** README, repo-root `CLAUDE.md`, `plugin.json` description, `docs/project-status.md`
+  (new dated note), and this handoff. Bundled agents (`ads-analyst`/`ads-writer`/`drive-knowledge`) and the
+  write-guardrail hook are unchanged; `ads-writer` is the write path `inb-ads-campaign-build` now uses.
+- **Historical note:** every dated handoff entry BELOW this one predates these two changes — the entry
+  immediately below still names the 3 now-removed shells (`inb-ads-campaign-research`/`-structure`/`-assets`)
+  and a 15-skill count as *current at the time*, and older entries name the pre-rename slugs and the old
+  3-plugin layout. All are kept verbatim as the record of the past — do not retro-edit them.
+
+---
+
 # Session handoff — 2026-07-01 (skill-slug rename + search-skill merge → 15 skills)
 
 ## Current state (2026-07-01)

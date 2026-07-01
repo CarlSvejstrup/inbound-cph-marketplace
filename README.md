@@ -2,11 +2,11 @@
 
 Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **one plugin, `inbound-ads`**, installed per user and updated via `/plugin update`. Its skills cover the full lifecycle, grouped into three jobs:
 
-- **Build a NEW campaign** — `inb-ads-campaign-build` (orchestrator) + `inb-ads-campaign-research`, `inb-ads-campaign-structure`, `inb-ads-campaign-assets`, `inb-ads-rsa-copy`. Ends in a polished, client-shareable review workbook.
+- **Build a NEW campaign** — `inb-ads-campaign-build` (orchestrator) + `inb-ads-rsa-copy`. `inb-ads-campaign-build` runs the Phase 1→4 pipeline (a subagent per phase reference) and by default **creates the campaign directly in the account** via the `ads-writer` agent — HITL-gated per action, started paused (recommended) or active per the user's choice. The 10-tab Excel review workbook is now **opt-in** (when the client must approve the setup first). The phases live only as references inside `inb-ads-campaign-build`.
 - **Optimize a LIVE account** — `inb-ads-search-term-analyse` (merged from the former `soegeterm-analyse` + `search-term`), `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`, `inb-ads-display-placement-audit` (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining + the whole diagnose-to-workbook loop + GDN placement junk-audit).
-- **Standalone deliverables** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export` (the shared converter: a confirmed review workbook from EITHER `inb-ads-campaign-build`'s `assembler` OR `inb-ads-optimization-loop` → Google Ads Editor import CSVs), `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
+- **Standalone deliverables** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export` (the shared converter: a confirmed review workbook from EITHER `inb-ads-campaign-build` OR `inb-ads-optimization-loop` → Google Ads Editor import CSVs), `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
 
-All skills share one operating contract (`CLAUDE.md`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account autonomously; humans import the artifacts after approval, and any account write is gated per-action.
+All skills share one operating contract (`CLAUDE.md`). Every external write is **human-in-the-loop, confirmed per action** — no skill writes to a Google Ads account autonomously. Direct Google Ads writes are allowed only through the `ads-writer` agent behind the write-guardrail hook; `inb-ads-campaign-build` now creates campaigns directly this way, and the review-workbook + Editor-CSV path remains for when a human prefers to import after approval.
 
 ## Install
 
@@ -21,17 +21,14 @@ The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@in
 
 ## Skills shipped
 
-`inbound-ads` ships **15 skills** in one plugin, grouped by job.
+`inbound-ads` ships **12 skills** in one plugin, grouped by job.
 
 ### Build a new campaign
 
 | Skill | Purpose |
 |---|---|
-| `inb-ads-campaign-build` | Orchestrator — runs the Phase 1→4 pipeline (a subagent per phase reference) into Ian's polished 10-tab review workbook (Excel-only, the client-confirmation artifact; no CSV, no API push). The full pipeline (landing-page, competitor, strategy, structuring, RSA, assets, assembler) lives inside as `references/` + `scripts/assemble.py`. Editor CSVs are produced later by `inb-ads-editor-csv-export` |
-| `inb-ads-campaign-research` | Phase 1 standalone: landing-page positioning + competitor analysis + campaign strategy/settings → a `.docx` report |
-| `inb-ads-campaign-structure` | The Phase-2 gate: ad groups + keyword selection (Exact/Phrase) + client-specific negatives → an `.xlsx` |
-| `inb-ads-campaign-assets` | Phase 3: sitelinks, callouts, structured snippets (lead forms are a manual UI step) → an `.xlsx` |
-| `inb-ads-rsa-copy` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards. Reused by `inb-ads-campaign-build` per group |
+| `inb-ads-campaign-build` | Orchestrator — runs the Phase 1→4 pipeline (a subagent per phase reference), then **by default creates the campaign directly in the Google Ads account** via the `ads-writer` agent (HITL-gated per action, started paused (recommended) or active per the user's choice). Ian's polished 10-tab Excel review workbook is now **opt-in** — produced when the client must approve the setup first, after which `inb-ads-editor-csv-export` makes the Editor CSVs. The full pipeline (landing-page, competitor, strategy, structuring, RSA, assets, assembler) lives inside as `references/` + `scripts/assemble.py`; the former standalone phase skills were removed (their logic already lived here) |
+| `inb-ads-rsa-copy` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards. Reused by `inb-ads-campaign-build` per group; runnable standalone |
 
 ### Optimize a live account
 
@@ -55,14 +52,14 @@ The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@in
 
 ## Data integration
 
-- **Google Ads MCP** — read-only. Live account data (campaigns, keywords, search terms, RSA assets, the MCC shared negative list). No writes, no API push.
+- **Google Ads MCP** — reads are free (campaigns, keywords, search terms, RSA assets, the MCC shared negative list). Writes are allowed only through the `ads-writer` agent, HITL-gated per action behind the write-guardrail hook; no skill calls a Google Ads write tool itself.
 - **Firecrawl** — landing-page + competitor scraping.
 - **Drive connector** — Cowork's built-in `mcp__claude_ai_Google_Drive__*`; each user authorises once. Drive root via `userConfig.inbound_root_folder_id` in each `plugin.json`.
-- **Semrush MCP** — optional, plan-gated; the `inb-ads-campaign-research` skill uses it when available and degrades to theme-derived keywords otherwise.
+- **Semrush MCP** — optional, plan-gated; `inb-ads-campaign-build`'s research phase uses it when available and degrades to theme-derived keywords otherwise.
 
 ## Philosophy
 
-**Hard rule: human-in-the-loop on every write.** Every skill stops at "here's the draft/artifact, confirm to apply." No skill pushes to a Google Ads account; the `inb-ads-campaign-build` output is a workbook + CSVs a human imports into Google Ads Editor after approval. The operating contract is in each plugin's `CLAUDE.md`, loaded automatically when a skill runs.
+**Hard rule: human-in-the-loop on every write.** Every skill stops at "here's the change, confirm to apply" and executes only after explicit per-action approval. Direct Google Ads writes are allowed only through the `ads-writer` agent (behind the write-guardrail hook) — `inb-ads-campaign-build` now creates campaigns directly this way by default, started paused (recommended) or active per the user's choice, and can instead deliver a review workbook + CSVs for a human to import into Google Ads Editor when the client must approve first. Budget writes stay gated behind the guardrail hook + `INBOUND_ADS_BUDGET_GUARDRAIL`, requiring explicit per-action confirmation. The operating contract is in each plugin's `CLAUDE.md`, loaded automatically when a skill runs.
 
 **Reading is free, writing is gated.** Skills read aggressively (Drive, Google Ads MCP, the web) without asking. Approval is required only at the moment bytes leave the agent.
 
@@ -82,7 +79,7 @@ plugins/
       hooks.json                  # wires the guardrail; fires automatically on install
       google-ads-write-guardrail.sh
       README.md                   # hook policy
-    skills/                       # all 15 skills (see tables above)
+    skills/                       # all 12 skills (see tables above)
     _archive/                     # retired skills, kept for reference
 docs/
   project-status.md, session-handoff.md, ...
@@ -95,14 +92,14 @@ Three bundled subagents in `plugins/inbound-ads/agents/`, dispatched by the skil
 | Agent | Role |
 |---|---|
 | `ads-analyst` | Read-only account analyst + web research. The reusable read worker every diagnostic skill dispatches to. Recommend-only, never writes. |
-| `ads-writer` | The **only** agent that writes to a Google Ads account, under strict per-action human-in-the-loop. Budget writes held until the guardrail ships, then a second confirm for any change. |
+| `ads-writer` | The **only** agent that writes to a Google Ads account, under strict per-action human-in-the-loop. `inb-ads-campaign-build` routes its direct campaign creation through this agent. Budget writes stay gated behind the write-guardrail hook + `INBOUND_ADS_BUDGET_GUARDRAIL`, requiring explicit per-action confirmation. |
 | `drive-knowledge` | Read-across-sources worker (Drive + HubSpot + Ads change-history) for the client-context skills. Read-only, timeless-only. |
 
 Each inherits the session's tools (to reach the user-connected connectors) and strips file-writing; read/write intent is enforced by prompt, and Google Ads writes by the guardrail hook.
 
 ### Write guardrail (hard safety)
 
-`plugins/inbound-ads/hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook **bundled in the plugin** (wired via `plugins/inbound-ads/hooks/hooks.json`). It ships with the plugin and fires automatically on every install — no per-seat setup. It gates every Google Ads write by the tool's short name, install-portable regardless of the per-install connector UUID. Budget writes: **deny** until the guardrail ships, then **ask** (second confirm). Other writes: **ask**. Reads + CSV generation + non-Ads tools: allow. It fires for any caller. (Plugin-*root* hooks are supported; agent-frontmatter hooks are not, which is why the guardrail lives here rather than in an agent file.)
+`plugins/inbound-ads/hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook **bundled in the plugin** (wired via `plugins/inbound-ads/hooks/hooks.json`). It ships with the plugin and fires automatically on every install — no per-seat setup. It gates every Google Ads write by the tool's short name, install-portable regardless of the per-install connector UUID. Budget writes: **deny** until `INBOUND_ADS_BUDGET_GUARDRAIL=1`, then **ask** (per-action confirm). Other writes (including `inb-ads-campaign-build`'s direct campaign creation): **ask**. Reads + CSV generation + non-Ads tools: allow. It fires for any caller. (Plugin-*root* hooks are supported; agent-frontmatter hooks are not, which is why the guardrail lives here rather than in an agent file.)
 
 ## Versioning + update flow
 
@@ -137,7 +134,7 @@ Skill format follows Anthropic's universal SKILL.md spec; works across Cowork, C
 
 ## Skill coupling note
 
-All 15 skills live in one plugin, so `${CLAUDE_PLUGIN_ROOT}` resolves to a directory they all share — there's no cross-plugin file-reference limitation. `inb-ads-campaign-build` reuses the `inb-ads-rsa-copy` RSA engine directly (via its internal pipeline references), and both `inb-ads-campaign-build` and `inb-ads-optimization-loop` feed the shared `inb-ads-editor-csv-export` converter. The `inb-ads-rsa-hygiene` ↔ `inb-ads-rsa-copy` gap-brief loop is manual paste (no code coupling) between two sibling skills, so a single install closes the full build→operate→iterate loop.
+All 12 skills live in one plugin, so `${CLAUDE_PLUGIN_ROOT}` resolves to a directory they all share — there's no cross-plugin file-reference limitation. `inb-ads-campaign-build` reuses the `inb-ads-rsa-copy` RSA engine directly (via its internal pipeline references), and both `inb-ads-campaign-build` and `inb-ads-optimization-loop` feed the shared `inb-ads-editor-csv-export` converter. The `inb-ads-rsa-hygiene` ↔ `inb-ads-rsa-copy` gap-brief loop is manual paste (no code coupling) between two sibling skills, so a single install closes the full build→operate→iterate loop.
 
 ## Language and tone
 

@@ -6,8 +6,8 @@ structuring + RSA-copy faktisk har brug for: en **differentierings-liste** (hvad
 (white space). Output forbruges af `04-structuring` (Phase 2) og `05-rsa-copy` (Phase 3).
 
 Genbruger den delte page-extraction-kontrakt fra `01-landing-page` — det er landingsside-analysen peget
-mod konkurrenternes sider plus et synteselag ovenpå. Pipeline-mode-først; `inb-ads-campaign-research`-shell-skillet
-wrapper solo-mode.
+mod konkurrenternes sider plus et synteselag ovenpå. Køres som en fase-subagent i
+`inb-ads-campaign-build`-pipelinen (emitterer JSON til arbejdsmappen).
 
 ## Datakilde-virkelighed (læs først)
 
