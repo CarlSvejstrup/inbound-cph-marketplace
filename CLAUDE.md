@@ -15,7 +15,7 @@ This repo-root `CLAUDE.md` is the canonical operating contract, loaded via `${CL
 
 **No external write happens without explicit user approval. No exceptions. This rule overrides skill convenience, demo polish, and "obvious next step" reasoning.**
 
-External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Google Ads is never written to — every skill is read-only / recommend-only against the account.** Both the campaign-build output (the `assembler` workbook, Excel-only) and the optimization-loop output (the `review_workbook`) are review Excels; after a human confirms one, the shared `editor-csv-export` converts it to the Editor CSVs a human imports into Google Ads Editor; the optimization skills only diagnose and recommend.
+External write means: anything that mutates a file in Drive, sends an email, posts to Slack, modifies a Sheet/Doc, or calls a third-party API with side effects. **Most skills are read-only / recommend-only against Google Ads** — the campaign-build output (the `assembler` workbook, Excel-only) and the optimization-loop output (the `review_workbook`) are review Excels; after a human confirms one, the shared `editor-csv-export` converts it to the Editor CSVs a human imports into Google Ads Editor. **Direct Google Ads writes are allowed only through the `ads-writer` agent, and only per-action HITL-confirmed** (direction set 2026-06-19) — no skill calls a Google Ads write tool itself. `display-placement-audit` is the first skill that routes a confirmed change through `ads-writer` instead of ending in a workbook.
 
 Read operations are not writes. Drafting in chat is not a write. Producing a proposed change is not a write. The boundary is the moment bytes leave the agent and land somewhere persistent or visible to anyone other than the operator.
 
@@ -95,6 +95,7 @@ But every skill that produces an artifact or recommendation stops at "here's the
 | `search-term` | The conversational variant: talks findings through, then writes agreed negatives/keywords to Editor CSVs | Gated — CSV save |
 | `annonce-optimering` | Post-launch RSA asset-hygiene → gap-brief (fed back into `responsive-search-ads`) | Gated — sheet save |
 | `optimering-loop` | The whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score → one editable review workbook | Gated — file/Drive save |
+| `display-placement-audit` | Scores Display Network placements 0-100 for junk risk (gambling, MFA/clickbait, low-quality apps) via a bundled free blocklist + account signals; capped web lookups only for genuine toss-ups; ranked in-chat report (not .xlsx by default) | Gated — direct Google Ads write via `ads-writer` (PMax findings are suggestion-only, cannot write) |
 
 ### Standalone deliverables
 
