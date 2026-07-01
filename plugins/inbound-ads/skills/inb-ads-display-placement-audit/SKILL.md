@@ -1,132 +1,122 @@
 ---
 name: inb-ads-display-placement-audit
-description: Audit en kundes LIVE Google Ads Display-placeringer (websites, apps, YouTube-kanaler/videoer) for uønskede/junk-placeringer - gambling, MFA/clickbait, low-quality apps - og foreslå negative placeringer klar til at skrive direkte til kontoen. Scorer HVER placering 0-100 ud fra gratis lokale signaler (bundlet blocklist, risikable TLD'er, konto-performance, app-netværk), løser de fleste sager uden nettet, og bruger kun et loft-begrænset websøg på de reelt tvivlsomme (ikke alle). Leverer en rangeret markdown-rapport i chatten (IKKE .xlsx som default), lader eksperten redigere/fjerne rækker, og skriver FØRST til kontoen efter eksplicit bekræftelse - via ads-writer-agenten, MED et ærligt fald-tilbage til manuel Editor-liste hvis Google Ads MCP'en ikke har en write-vej for den konkrete placeringstype. Bygger INGEN permanent/delt negativliste - kun de bekræftede negativer for netop denne kørsel. PMax-fund er forslag-kun (API'en understøtter ikke direkte placement-exclusion på PMax). Brug når brugeren siger "display-placeringer", "GDN-audit", "hvor kører vores display-annoncer", "find gambling/betting placeringer", "uønskede sites", "placement-audit", "ekskluder junk-placeringer", "tjek Display Network", eller vil rydde op i hvor en klients bannerannoncer bliver vist. Svarer på dansk.
+description: Audit en kundes LIVE Google Ads Display-placeringer (websites, apps, YouTube) for junk som gambling, MFA/clickbait og low-quality apps, scorer hver placering 0-100 ud fra gratis lokale signaler og foreslår negative placeringer, med PMax-fund som forslag-kun og kontoskrivning udelukkende efter eksplicit bekræftelse via ads-writer-agenten.
 ---
 
 # inb-ads-display-placement-audit
 
 Find ud af **hvor** en klients Display-annoncer (og Performance Max, hvor synligt) rent faktisk
 bliver vist på tværs af Googles annoncenetværk, score hver placering for junk-risiko, og — efter
-eksplicit bekræftelse — ekskludér de bekræftede fra kontoen. Dette er skillets første version, der
-faktisk skriver til en Google Ads-konto (via `ads-writer`), ikke kun anbefaler.
+eksplicit bekræftelse — ekskludér de bekræftede fra kontoen via `ads-writer`.
 
-## Hvorfor skillet er formet sådan (læs dette først)
+## Baggrund
 
-Display Network-annoncer vises ikke på Googles søgeresultater — de vises på tredjeparts-websites,
-apps og YouTube, valgt af Googles algoritme ud fra targeting, ikke en søgning. Algoritmen har ikke
-altid god smag: en live-verificering mod en rigtig Inbound-konto (Dantaxi, 2026-07-01) viste
-Display-annoncer kørende på `euro-jackpot.net`, `danskelotto.com` (lotteri), `petsim99.co`
-(børne-spil-site) og en håndfuld content-farm-domæner — alt sammen reelt forbrug uden en eneste
-konvertering. Det er ikke en hypotetisk risiko, det sker lige nu på tværs af konti.
+Display-annoncer vises på tredjeparts-websites, apps og YouTube, valgt af Googles algoritme ud fra
+targeting, ikke en søgning. En live-verificering mod en rigtig Inbound-konto (Dantaxi, 2026-07-01)
+viste Display-annoncer kørende på `euro-jackpot.net`, `danskelotto.com` (lotteri), `petsim99.co`
+(børne-spil-site) og en håndfuld content-farm-domæner — alt sammen forbrug uden en eneste
+konvertering.
 
-**Scoring, ikke en binær dom — og bevidst forspændt mod at flage for meget frem for for lidt.**
-Hver placering får et 0-100 risiko-tal bygget additivt af billige lokale signaler
-(`scripts/score_placements.py` — se Trin 3). Banding-reglen er **eksplicit valgt af brugeren**
-(2026-07-01): hellere en stor "usikker"-bunke eksperten selv skimmer og afviser, end at én reel
-junk-placering forsvinder tavst fordi intet enkelt signal alene ramte en talgrænse.
+**Scoring, ikke en binær dom, bevidst forspændt mod at flage for meget frem for for lidt.** Hver
+placering får et 0-100 risiko-tal bygget additivt af billige lokale signaler
+(`scripts/score_placements.py`, se Trin 3). Banding-reglen er eksplicit valgt af brugeren
+(2026-07-01): hellere en stor "usikker"-bunke eksperten selv skimmer, end at én reel junk-placering
+forsvinder tavst fordi intet enkelt signal alene ramte en talgrænse.
 
-- **Høj (≥70 som standard):** afgøres af lokale data alene, intet opslag nødvendigt. Reserveret til
-  de tilfælde hvor flere stærke signaler lægger sammen (fx blocklist-match + risikabel TLD).
-- **Usikker (ALT med mindst ét signal, som ikke rammer høj-grænsen):** dette er IKKE kun
-  "grænsetilfælde" — en placering med et enkelt svagt signal (fx bare `zero_conv_at_spend`) lander
-  også her. Det er bevidst: scriptet er additivt og lokalt, det ser ikke mønstre på tværs af
-  rækker og har ingen komplet ordliste, så ét svagt signal skal nedgradere tilliden, ikke slette
-  placeringen. Kun de øverste ~15-20 (efter score, DERNÆST forbrug som tiebreaker — se Trin 4 for
-  hvorfor rækkefølgen ikke længere er ren forbrugs-sortering) får et websøg; resten markeres
-  "kræver manuel gennemgang" i stedet for at blive gættet på ELLER stille skjult.
-- **Lav (INGEN signaler overhovedet):** afgøres af lokale data alene. Der er reelt intet at
-  gennemgå her — ingen blocklist-match, ingen risikabel TLD, ingen forbrug-uden-konvertering,
-  ingen CTR-anomali, ingen app-netværk-flag.
+- **Høj (≥70 som standard):** afgøres af lokale data alene, intet opslag nødvendigt. Flere stærke
+  signaler lægger sammen (fx blocklist-match + risikabel TLD).
+- **Usikker (alt med mindst ét signal, der ikke rammer høj-grænsen):** også et enkelt svagt signal
+  (fx bare `zero_conv_at_spend`) lander her. Scriptet er additivt og lokalt uden mønster-genkendelse
+  på tværs af rækker, så ét svagt signal skal nedgradere tilliden, ikke slette placeringen. Kun de
+  øverste ~15-20 (efter score, forbrug som tiebreaker — se Trin 4) får et websøg; resten markeres
+  "kræver manuel gennemgang".
+- **Lav (ingen signaler overhovedet):** ingen blocklist-match, ingen risikabel TLD, ingen
+  forbrug-uden-konvertering, ingen CTR-anomali, intet app-netværk-flag. Intet at gennemgå.
 
-**Verificeret live (Dantaxi, re-test 2026-07-01):** den gamle banding (score < 30 → lav) lod
-`spil2vind.dk` (en reel dansk gambling-side) forsvinde tavst i lav-gruppen, fordi dens eneste
-signal (`gambling_keyword_in_domain`, vægt 15) ikke alene nåede 30. Med den nye regel lander den
-korrekt i usikker-gruppen i stedet — det er præcis den adfærd banding-reglen findes for at sikre.
+Verificeret live (Dantaxi, re-test 2026-07-01): den gamle banding (score < 30 → lav) lod
+`spil2vind.dk` (reel dansk gambling-side) forsvinde tavst, fordi dens eneste signal
+(`gambling_keyword_in_domain`, vægt 15) ikke alene nåede 30. Med den nye regel lander den korrekt i
+usikker-gruppen.
 
-Høj-grænsen (70) og loftet (15-20) er **parametre eksperten kan justere per kørsel** ("vær
-strengere denne gang"), ikke faste konstanter gemt i logik. Der er bevidst IKKE længere en
-separat "lav-grænse"-parameter — "lav" betyder nu udelukkende "nul signaler", ikke "under et tal".
+Høj-grænsen (70) og loftet (15-20) er parametre eksperten kan justere per kørsel ("vær strengere
+denne gang"), ikke faste konstanter. Der er bevidst intet separat "lav-grænse"-parameter — "lav"
+betyder nu udelukkende "nul signaler".
 
-**Ingen permanent negativliste bygges af dette skill.** Bruger har ikke pt. mandat til at
-etablere en organisation-bred standard-ekskluderingsliste — det er en større beslutning end dette
-skill tager for brugeren. Blocklisten, TLD-reglerne og scoringslogikken bor **bundlet inde i
-skillet** (`references/junk_domains.tsv`), ikke skrevet ud til en delt Google Ads shared_set
-automatisk. Hver kørsel er selvstændig: læser 90 dages data, scorer med skillets egne bundlede
-regler, viser rapporten, og skriver KUN de specifikke negativer eksperten bekræfter for netop den
-kørsel. Vil eksperten proppe de bekræftede negativer ind i en eksisterende delt liste på kontoen
-(fx "Web placeringer"), er det en bevidst beslutning taget i selve kørslen — ikke en automatik.
+**Ingen permanent negativliste bygges af dette skill.** Blocklisten, TLD-reglerne og
+scoringslogikken bor bundlet i skillet (`references/junk_domains.tsv`), ikke skrevet til en delt
+Google Ads shared_set automatisk. Hver kørsel er selvstændig: læser 90 dages data, scorer med
+skillets egne regler, viser rapporten, og skriver kun de negativer eksperten bekræfter for netop
+den kørsel. Vil eksperten proppe dem ind i en eksisterende delt liste, er det et bevidst valg taget
+i selve kørslen.
 
-**Ærlig hul: børneindhold har intet gratis signal.** Research forud for dette skill (2026-07-01)
-fandt ingen gratis, aktivt vedligeholdt liste over børne-content-domæner. Skillet fanger noget af
-det indirekte via app-netværk-flaget og Googles egne placement-kategori-ekskluderinger, men
-påstår IKKE at detektere børneindhold direkte. Sig det højt i outputtet — fabrikér aldrig et
-signal der ikke findes.
+**Kendt hul — børneindhold:** ingen gratis, aktivt vedligeholdt liste over børne-content-domæner
+findes. Skillet fanger noget af det indirekte via app-netværk-flaget, men detekterer ikke
+børneindhold direkte. Sig det højt i outputtet.
 
-**Ærlig hul: bundlet blocklist rammer ikke alt gambling.** Samme live-verificering viste at
-community-DNS-blocklister (Blocklist Project, Steven Black) er bygget til at fange
-casino/betting-**brands**, og typisk misser legitimt udseende lotteri-resultat-sites (en officiel
-lottos egen resultatside tælles ikke som "malicious" af en DNS-blocklist-vedligeholder).
-`euro-jackpot.net` og `danskelotto.com` scorede 0 på blocklist-match alene i testen. Scriptet har
-et navne-mønster-baseret backstop for dette (se `score_placements.py`), men det er lavpræcision —
-**læs altid domænenavnene i den lave/usikre gruppe med sund fornuft**, ikke kun tallet. Google
-Ads' egen intuition ("ligner det her et gambling-site?") slår stadig scriptet på grænsetilfælde.
+**Kendt hul — blocklisten rammer ikke alt gambling.** Community-DNS-blocklister (Blocklist Project,
+Steven Black) fanger casino/betting-brands, men misser typisk legitimt udseende
+lotteri-resultat-sider — `euro-jackpot.net` og `danskelotto.com` scorede 0 på blocklist-match alene
+i testen. Scriptet har et navnemønster-baseret backstop for dette, men det er lavpræcision — læs
+domænenavnene i den lave/usikre gruppe med sund fornuft, ikke kun tallet.
 
-## PMax-begrænsning (platform-fakta, ikke et design-valg)
+**PMax-begrænsning (platform-fakta):** Google Ads API'en understøtter ikke direkte
+placement-exclusion på Performance Max-kampagner. Skillet kan læse PMax-placeringsdata, men PMax-fund
+er forslag-kun og skrives aldrig til kontoen. Marker det per fund i rapporten: "PMax — kun forslag,
+kan ikke auto-skrives."
 
-Google Ads API'en understøtter **ikke** direkte placement-exclusion på Performance Max-kampagner.
-Skillet kan læse PMax-placeringsdata (hvor synlig den er — ofte mindre granulær end ren Display),
-men PMax-fund er **forslag-kun** og skrives ALDRIG til kontoen. Marker dette tydeligt i rapporten
-per fund: "PMax — kun forslag, kan ikke auto-skrives." Kun rene Display-kampagner kan faktisk få
-skrevet negativer af dette skill.
+**Skrevet til eksperten, ikke til en analytiker (gælder HELE skillet, ikke kun rapport-trinnet).**
+De der bruger dette skill kender Google Ads som fagområde, men ikke GAQL, "criterion_id", interne
+score-tal, eller signalnavne som `zero_conv_at_spend`. Det gælder alt brugervendt tekst — intake-
+spørgsmål, statusbeskeder undervejs, bekræftelses-prompten før en skrivning, og selve rapporten.
+Skriv som du ville forklare det til en kollega over kaffen: hvad der er fundet, hvorfor det er et
+problem, og hvad de kan gøre ved det. Interne detaljer (GAQL, score, criterion-ID'er) er
+implementeringsdetaljer der styrer HVORDAN skillet arbejder — de skal ALDRIG lække ud i noget
+brugeren læser.
 
 ## Forudsætning
 
 Google Ads MCP + et `customer_id`. Ingen MCP → sig det og stop. Svar på dansk (engelsk hvis
 brugeren skriver engelsk).
 
-## Trin 0 — Hent klient-kontekst (AI Context) FØRST
+## Trin 0 — Hent klient-kontekst (AI Context) først
 
-Før al anden handling på en navngiven klient — og FØR det første Google Ads MCP-kald — skal du
-hente klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated), men
-obligatorisk: sådan arver du alt Inbound ved om klienten (ID'er, hårde rammer, pausede-kampagner-
-intention, hvilke kampagnetyper klienten faktisk kører) i stedet for at audit'e blindt.
+Før al anden handling på en navngiven klient — og før det første Google Ads MCP-kald — hent
+klientens AI Context-fil ind i din kontekst. Læsning, aldrig gated, men obligatorisk.
 
-1. **Identificér klienten.** Er det uklart, spørg hvilken klient før du fortsætter.
-2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en
-   `Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`,
-   "A - Kunder"-mappen). Læs den (`read_file_content`). Den mapper klient → Google Ads ID, Stage,
-   Drive-mappe, AI Context-fil.
-3. **Find klientens række**, notér **Stage** — en ikke-`customer`-stage betyder ingen aktiv
-   retainer, vægt anbefalinger derefter.
-4. **Åbn klientens AI Context-`.md`** via Drive-linket og tag den ind i kontekst. Hårde rammer
-   (læs før du foreslår en eksklusion), pausede-kampagner-intention (pausede kampagner er bevidste
-   hos Inbound — ekskludér dem fra analysen, flag dem aldrig som fund), og om klienten faktisk
-   kører app-annoncer (relevant for app-netværk-signalet, se Trin 3).
-5. **Først derefter** går du videre til intake og Google Ads-læsning.
+1. Er klienten uklar, spørg før du fortsætter.
+2. Åbn master-klientindekset i Drive via Drive-connectoren: `search_files` efter Google Doc'en
+   `Inbound CPH — Google Ads klient-index (AI Context)` (id
+   `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, "A - Kunder"-mappen). Læs den
+   (`read_file_content`) — den mapper klient → Google Ads ID, Stage, Drive-mappe, AI Context-fil.
+3. Find klientens række, notér Stage — en ikke-`customer`-stage betyder ingen aktiv retainer, vægt
+   anbefalinger derefter.
+4. Åbn klientens AI Context-`.md` via Drive-linket. Hårde rammer (læs før du foreslår en
+   eksklusion), pausede-kampagner-intention (pausede kampagner er bevidste hos Inbound — ekskludér
+   dem fra analysen, flag dem aldrig som fund), og om klienten faktisk kører app-annoncer (relevant
+   for app-netværk-signalet, se Trin 3).
+5. Først derefter går du videre til intake og Google Ads-læsning.
 
-Har klienten ingen AI Context-fil endnu: sig det, fortsæt med hvad du kan samle (Ads MCP alene),
-men flag hullet. Spring aldrig opslaget stille over.
+Har klienten ingen AI Context-fil endnu: sig det, fortsæt med hvad du kan samle (Ads MCP alene), men
+flag hullet.
 
 ## Trin 1 — Intake (ét `AskUserQuestion`-kald)
 
-Udled så meget som muligt fra samtalen først. Saml i ét kald:
+Udled så meget som muligt fra samtalen først. Saml resten i ét kald:
 
 1. **Klient + `customer_id`** — bekræft hvis nævnt; ellers slå op i vault `clients/*.md`
    (`google_ads_id`-feltet) eller kør `list_accessible_accounts` og bekræft.
-2. **Analysevindue** — **default sidste 90 dage** (ikke 30 — Display-placeringer akkumulerer
-   langsomt, og en 90-dages rude er nødvendig for at fange lavvolumen-junk der ikke ville nå
-   signifikans på 30 dage). `run_custom_gaql` mod `detail_placement_view` accepterer
-   `BETWEEN '<start>' AND '<slut>'` — beregn datoerne, `LAST_90_DAYS` er ikke et gyldigt
-   GAQL-literal i en `WHERE`-clause på dette view (kun nogle få faste literals som `LAST_30_DAYS`
-   virker direkte).
-3. **Scope** — `Hele kontoen` eller `Specifik kampagne`.
-4. **Score-tærskler** (tilbyd default, lad brugeren justere): `Høj-grænse (default 70)`, `Loft for
-   websøg (default 15-20)`, `Nul-konv-forbrugsgulv (default 20 kr/valuta-ækvivalent)`. Der er
-   bevidst INGEN separat "lav-grænse" at stille — "lav risiko" betyder nul signaler, ikke et tal
-   under en grænse (se afsnittet "Hvorfor skillet er formet sådan"). Sig "brug default" er et
-   gyldigt svar — spørg ikke pedantisk hvis brugeren bare vil køre den.
-5. **Skriv-destination for bekræftede negativer** — `Direkte til kontoen via ads-writer (standard)`
-   eller `Kun rapportér, skriv intet` (fx hvis eksperten kun vil se billedet uden at handle endnu).
+2. **Analysevindue** — default sidste 90 dage (ikke 30 — Display-placeringer akkumulerer langsomt,
+   og en 90-dages rude er nødvendig for at fange lavvolumen-junk). `run_custom_gaql` mod
+   `detail_placement_view` accepterer `BETWEEN '<start>' AND '<slut>'` — `LAST_90_DAYS` er ikke et
+   gyldigt GAQL-literal i en `WHERE`-clause på dette view (kun nogle få faste literals som
+   `LAST_30_DAYS` virker direkte).
+3. **Scope** — hele kontoen eller specifik kampagne.
+4. **Score-tærskler** (tilbyd default, lad brugeren justere): høj-grænse (default 70), loft for
+   websøg (default 15-20), nul-konv-forbrugsgulv (default 20 kr/valuta-ækvivalent). Bevidst ingen
+   separat "lav-grænse" at stille — "lav risiko" betyder nul signaler, ikke et tal under en grænse.
+   "Brug default" er et gyldigt svar.
+5. **Skriv-destination for bekræftede negativer** — direkte til kontoen via ads-writer (standard)
+   eller kun rapportér, skriv intet.
 
 ## Trin 2 — Hent placeringsdata + eksisterende ekskluderinger
 
@@ -146,7 +136,7 @@ WHERE segments.date BETWEEN '<start>' AND '<slut>'
 ORDER BY metrics.cost_micros DESC
 ```
 (Pausede kampagner er bevidste hos Inbound — `campaign.status = 'ENABLED'` ekskluderer dem, flag
-dem aldrig som et fund.)
+dem aldrig som fund.)
 
 **Eksisterende negative placeringer** (så skillet aldrig genforeslår noget der allerede er
 ekskluderet):
@@ -161,12 +151,12 @@ SELECT shared_set.id, shared_set.name, shared_set.type, shared_set.status
 FROM shared_set
 WHERE shared_set.type = 'NEGATIVE_PLACEMENTS'
 ```
-For hver `NEGATIVE_PLACEMENTS`-shared_set fundet, hent dens medlemmer via `shared_criterion` for
-det fulde billede af hvad der allerede er blokeret. **Verificeret gotcha:** GAQL på denne MCP
-afviser `OR` i WHERE — brug `IN (...)` som ovenfor, ikke `type = 'X' OR type = 'Y'`.
+For hver `NEGATIVE_PLACEMENTS`-shared_set fundet, hent dens medlemmer via `shared_criterion` for det
+fulde billede af hvad der allerede er blokeret. Verificeret gotcha: GAQL på denne MCP afviser `OR` i
+WHERE — brug `IN (...)`, ikke `type = 'X' OR type = 'Y'`.
 
 Agenten returnerer strukturerede fund: rå placeringsliste + liste over allerede-ekskluderede
-domæner/apps/kanaler. `ads-analyst` er read-only og skriver aldrig — den henter kun.
+domæner/apps/kanaler. `ads-analyst` er read-only og skriver aldrig.
 
 ## Trin 3 — Score placeringerne (deterministisk, ingen model-dom endnu)
 
@@ -180,220 +170,243 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/score_placements.py \
   --tier3-cap <fra Trin 1, default 20> \
   --zero-conv-floor <fra Trin 1, default 20>
 ```
-(Der er bevidst intet `--low-threshold`-flag — se "Hvorfor skillet er formet sådan" for hvorfor.)
+(Bevidst intet `--low-threshold`-flag, jf. "Baggrund".)
 
-Scriptet gør PRÆCIS dette og intet mere (samme filosofi som `slim.py` i `inb-ads-search-term-analyse` — koden
-regner, modellen dømmer):
+Scriptet gør præcis dette og intet mere (samme filosofi som `slim.py` i
+`inb-ads-search-term-analyse` — koden regner, modellen dømmer):
 - Matcher hvert domæne mod det bundlede `references/junk_domains.tsv` (~9.834 domæner, gambling +
   MFA/clickbait-proxy + scam, kilder og licens i `references/junk_domains_SOURCES.md`).
 - Flager risikable TLD'er (`.top .xyz .icu .club .online .cfd .sbs .bond .win .rest .mom .cn`).
-- Flager et gambling/betting-nøgleord literal i domænenavnet (lavpræcision-backstop for et
-  verificeret hul — se afsnittet ovenfor).
-- Flager nul-konvertering-ved-forbrug (dit tunbare gulv) og CTR-anomalier (for lav ELLER
+- Flager et gambling/betting-nøgleord literal i domænenavnet (lavpræcision-backstop, se Baggrund).
+- Flager nul-konvertering-ved-forbrug (dit tunbare gulv) og CTR-anomalier (for lav eller
   mistænkeligt høj ved reelt volumen).
 - Flager al app-netværk-trafik som strukturelt risikabel (uanset det enkelte site/apps kvalitet —
-  små skærme + spil-UI'er giver ved-et-uheld-klik, en egenskab ved inventar-typen).
+  små skærme + spil-UI'er giver ved-et-uheld-klik).
 - Krydstjekker mod de allerede-ekskluderede fra Trin 2 (sætter `already_excluded: true` — foreslå
-  ALDRIG noget der allerede er blokeret).
+  aldrig noget der allerede er blokeret).
 - Sorterer den usikre gruppe efter forbrug og markerer hvilke der er inden for tier-3-loftet.
 
-Læs `scored.json`. Fordel dig selv: høj-bånd behøver intet websøg (allerede afgjort af stærke
-signaler). Lav-bånd betyder nu **udelukkende** "nul signaler ramte" — intet at gennemgå, intet
-websøg, ingen ekstra skim nødvendig. Al reel tvivl, selv fra ét enkelt svagt signal, lander i den
-usikre gruppe (se ovenfor for hvorfor) — det er DÉR arbejdet foregår, ikke i lav-båndet.
+Læs `scored.json`. Høj-bånd behøver intet websøg (allerede afgjort af stærke signaler). Lav-bånd
+betyder nu udelukkende "nul signaler ramte" — intet at gennemgå, intet websøg. Al reel tvivl, selv
+fra ét enkelt svagt signal, lander i den usikre gruppe — det er dér arbejdet foregår.
 
 **Sidste sikkerhedsnet, billigt og uden opslag:** før du skriver rapporten, kast et hurtigt blik
-over lav-bånd-listen (den skal jo alligevel vises kort i rapporten). Skulle et domænenavn trods alt
-springe i øjnene som gambling/spil/voksenindhold på trods af nul scriptsignaler (fx et sprog eller
-mønster scriptets bundlede lister/nøgleord ikke dækker endnu), nævn det som en fodnote — men forvent
-at dette sjældent sker nu, fordi selve banding-reglen er designet til at fange den slags allerede.
+over lav-bånd-listen (den skal jo vises kort i rapporten alligevel). Springer et domænenavn i
+øjnene som gambling/spil/voksenindhold på trods af nul scriptsignaler, nævn det som en fodnote —
+forvent at dette sjældent sker, fordi banding-reglen er designet til at fange den slags allerede.
 
-## Trin 4 — Websøg KUN på den usikre gruppe (tier 3, loft-begrænset)
+## Trin 4 — Websøg kun på den usikre gruppe (tier 3, loft-begrænset)
 
 For hver placering med `tier3_eligible: true` i `scored.json` (de øverste ~15-20 i den usikre
-gruppe, sorteret efter score FØRST og forbrug som tiebreaker — IKKE ren forbrugs-sortering
-længere, se hvorfor nedenfor):
+gruppe, sorteret efter score først og forbrug som tiebreaker):
 
-1. **Foretræk et websøg** ("hvad er [domæne] for et site") frem for et rå side-fetch. Det er
-   billigere, hurtigere, og mere robust mod cloaking/bot-blokering — gambling- og MFA-sites bruger
-   ofte netop dét til at undgå scrapere. Et fetch der bliver blokeret er i sig selv et svagt
-   "måske junk"-signal, ikke en fejl at ignorere.
-2. **Fald kun tilbage til et direkte fetch** hvis søgningen ikke giver noget brugbart.
-3. Ud fra resultatet, giv placeringen en kort dansk vurdering: "gambling-site", "content-farm/
-   clickbait", "legitimt nyhedssite, sandsynligvis fejlplaceret targeting", osv. Dette ER
+1. Foretræk et websøg ("hvad er [domæne] for et site") frem for et rå side-fetch. Billigere,
+   hurtigere, og mere robust mod cloaking/bot-blokering — gambling- og MFA-sites bruger ofte netop
+   dét til at undgå scrapere. Et fetch der bliver blokeret er i sig selv et svagt "måske
+   junk"-signal.
+2. Fald kun tilbage til et direkte fetch hvis søgningen ikke giver noget brugbart.
+3. Giv placeringen en kort dansk vurdering ud fra resultatet: "gambling-site", "content-farm/
+   clickbait", "legitimt nyhedssite, sandsynligvis fejlplaceret targeting", osv. Dette er
    model-dømmekraft — brug sund fornuft, ikke kun et keyword-match.
 
-**Loftet er bevidst, ikke en fejl.** Et websøg koster mere end et lokalt scoretjek. At begrænse
-det holder omkostningen nede på en konto med hundredvis af usikre placeringer. Sig altid i
-rapporten hvor mange der blev slået op vs. hvor mange der ligger som "kræver manuel gennemgang".
+Loftet er bevidst — et websøg koster mere end et lokalt scoretjek, og det holder omkostningen nede
+på en konto med hundredvis af usikre placeringer. Sig altid i rapporten hvor mange der blev slået
+op vs. hvor mange der ligger som "kræver manuel gennemgang".
 
 **Undtagelse — blocklist- og gambling-nøgleord-hits springer altid køen, uanset loft.** Live-test
 (Dantaxi, 2026-07-01) viste en reel fejl i den gamle ren-forbrugs-sortering: `euro-jackpot.net` og
-`spil2vind.dk` (begge reelt gambling, begge lavt forbrug) endte UNDER loftet — bag store,
-sandsynligvis-uskyldige nyhedssider med højere forbrug men kun ét svagt "ingen konvertering"-signal.
-En placering der scorer via `blocklist:*` eller `gambling_keyword_in_domain` skal ALTID med i
-websøgs-runden, uanset dens `tier3_rank` — disse signaler peger specifikt på gambling/junk-kategori,
-mens et rent `zero_conv_at_spend`- eller `ctr_too_low`-signal er langt mere tvetydigt (kan sagtens
-være en legitim side der bare ikke konverterer på Display). Læs `scored.json` selv for at finde
-disse (filtrér på `"blocklist:"` eller `"gambling_keyword_in_domain"` i `signals`), tilføj dem til
+`spil2vind.dk` (begge reelt gambling, begge lavt forbrug) endte under loftet — bag store,
+sandsynligvis-uskyldige nyhedssider med højere forbrug men kun ét svagt "ingen
+konvertering"-signal. En placering der scorer via `blocklist:*` eller `gambling_keyword_in_domain`
+skal altid med i websøgs-runden, uanset dens `tier3_rank` — disse signaler peger specifikt på
+gambling/junk-kategori, mens et rent `zero_conv_at_spend`- eller `ctr_too_low`-signal er langt mere
+tvetydigt (kan sagtens være en legitim side der bare ikke konverterer på Display). Filtrér
+`scored.json` på `"blocklist:"` eller `"gambling_keyword_in_domain"` i `signals`, tilføj dem til
 websøgs-runden selvom `tier3_eligible` er `false`, og nævn eksplicit i rapporten at de blev
 prioriteret ud over loftet.
 
-## Trin 5 — Byg den rangerede rapport (i chatten, IKKE .xlsx som default)
+## Trin 5 — Byg den rangerede rapport (i chatten, ikke .xlsx som default)
 
-**Output er en markdown-tabel i selve chat-svaret, ikke en fil.** Kun byg en `.xlsx` hvis brugeren
-eksplicit beder om det (typisk fordi de vil sende den til en kunde til godkendelse — det er en
-anden brugssituation end den interne ekspert-gennemgang dette skill primært er til).
+**Output er en markdown-tabel i selve chat-svaret, ikke en fil.** Byg kun en `.xlsx` hvis brugeren
+eksplicit beder om det (typisk fordi de vil sende den til en kunde til godkendelse — en anden
+brugssituation end den interne ekspert-gennemgang dette skill primært er til).
 
-Rapportens form, sorteret efter score (højeste først), grupperet i sektioner:
+**Målgruppen er en ikke-teknisk Google Ads-ekspert, ikke en analytiker.** De kender ikke GAQL,
+"criterion_id", "score" som begreb, eller navne som `zero_conv_at_spend`. De ved hvad en placering
+er, hvad gambling/klikfarme er, og hvad de vil gøre ved dem: ekskludere eller lade være. Rapporten
+skal læses som en kollegas anbefaling, ikke som et system-output — **ingen interne signalnavne,
+ingen "Score"-tal som selvstændig kolonne, ingen "unikke placering×kampagne-kombinationer"-sprog.**
+Hvis du skriver en sætning en marketingmedarbejder ville spørge "hvad betyder det?" til, omskriv den.
+
+Grupér efter **hvorfor** en placering er et problem, ikke efter det interne score-bånd. Brug almindeligt
+sprog for kategorien (gambling/spil, mistænkelige småsider, pakke-sporing/støj, osv.) og lad
+score/signaler blive til den bagvedliggende BEGRUNDELSE i prosa — aldrig en synlig kolonne.
 
 ```markdown
 ## Display-placement-audit — <klient> — <vindue>
 
-### 🔴 Høj risiko (score ≥ <tærskel>) — <N> placeringer, <total forbrug> kr
-| Placering | Type | Kampagne | Score | Signaler | Forbrug | Konv | Handling |
-|---|---|---|---|---|---|---|---|
-| euro-jackpot.net | Website | IC \| GDN \| Reach | 85 | blocklist:gambling, gambling_keyword_in_domain | 13 kr | 0 | Ekskludér |
+**Kort sagt:** annoncerne har vist sig på <N> steder i perioden. <M> af dem bør I overveje at
+fjerne — <kort hvorfor, fx "gambling-sider og useriøse klikfarme">. Resten er enten fint, eller I
+har allerede blokeret det.
 
-### 🟡 Usikker — <N total>, heraf <M> slået op via websøg (inkl. evt. blocklist/gambling-hits
-### der sprang loftet, se Trin 4), resten "kræver manuel gennemgang" nedenfor
-| Placering | Type | Kampagne | Score | Signaler / websøg-vurdering | Forbrug | Konv | Handling |
-|---|---|---|---|---|---|---|---|
-| spil2vind.dk | Website | IC \| GDN \| Reach | 15 | gambling_keyword_in_domain — websøg: "dansk gambling/spil-side" | 13 kr | 0 | Anbefal ekskluder |
-| bt.dk | Website | IC \| GDN \| Reach | 25 | zero_conv_at_spend (ingen websøg — under loft) | 69 kr | 0 | Anbefal IKKE ekskluder — legitimt medie, sandsynligvis attributions-mønster |
+### 🚫 Anbefales fjernet — <N> steder, <samlet forbrug> kr spildt
+Gambling og spil
+- **euro-jackpot.net** (og 1 side til på samme site) — dansk lotteri-side. 23 kr brugt, ingen der har
+  konverteret. Klart ikke jeres målgruppe.
+- **spil2vind.dk** — dansk gambling-side. 13 kr brugt, ingen konvertering.
 
-**Vigtigt om denne sektions størrelse:** "usikker" er nu bevidst bredt defineret (se afsnittet
-ovenfor) — selv et enkelt svagt signal som "intet konverteret" lander her, ikke i lav-bånd. På en
-konto med mange lavvolumen-placeringer kan denne tabel derfor være lang. Det er en FEATURE, ikke
-støj — hvert svagt signal fortjener et menneskeligt blik, men langt fra alle fortjener et websøg
-(deraf loftet) eller en eksklusion (de fleste "usikre" ender med "anbefal IKKE ekskluder", som
-`bt.dk`-rækken ovenfor). Sorter denne tabel så blocklist/gambling-signaler og websøgte rækker
-topper — det er der handlingen faktisk er.
+Useriøse/lav-kvalitets sider
+- **mydating.online** — datingside, helt uden for jeres branche. 20 kr brugt, ingen konvertering.
+- (Yderligere N sider i samme kategori — se den fulde liste hvis I vil have alle med i skrivningen.)
 
-### ⚪ Lav risiko (INGEN signaler) — <N> placeringer, samlet <total forbrug> kr
-(Kort opsummeret, ikke radvist — reelt intet at gennemgå her.)
+### 🤔 Værd at kigge på, men ikke et klart problem — <N> steder
+Disse har ikke konverteret, men er ikke nødvendigvis skadelige — mange er legitime sider (store
+medier, pakke-sporing) hvor Display bare sjældent konverterer. Vi anbefaler IKKE at fjerne dem
+medmindre I selv genkender et mønster:
+- **bt.dk**, **berlingske.dk** — store danske medier, 69 kr / 38 kr brugt, ingen konvertering. Helt
+  normalt for Display-annoncer på nyhedssider; ingen handling anbefalet.
+- **parcelsapp.com** (flere undersider) — pakke-sporing, sandsynligvis irrelevant trafik men ikke
+  decideret skadeligt. Jeres kald om det er værd at ekskludere.
 
-### ⚠️ PMax-fund (forslag-kun — kan ikke auto-skrives)
-| Placering | Kampagne | Score | Anbefaling |
-|---|---|---|---|
+### ✅ Ingen problemer fundet
+<N> steder havde intet mistænkeligt at bemærke — normal Display-trafik, ingen handling.
 
-### Allerede ekskluderet (<N> placeringer) — vist for gennemsigtighed, foreslås ikke igen
+### ⚠️ Kan ikke fjernes automatisk (Performance Max)
+Performance Max-annoncer viser desværre ikke hvilke sider de kører på med samme detalje, og
+Google tillader ikke at blokere specifikke sider på PMax-kampagner. Vi kan ikke gøre noget ved
+dette teknisk — kun nævne det hvis noget virker påfaldende.
+
+### Allerede håndteret
+I har allerede blokeret <N> steder på denne konto tidligere (fx en liste kaldet "Web
+placeringer"). De optræder ikke igen her.
 ```
 
-Under tabellerne: en kort dansk konklusion (2-4 linjer — de vigtigste mønstre, samlet spildt
-forbrug i høj-gruppen, det ærlige forbehold om børneindhold fra ovenfor, og en kort note om at
-usikker-gruppens størrelse er forventet, ikke et tegn på en dårlig kørsel).
+**Grupperingen "Anbefales fjernet" er bevidst bredere end kun de sikre høj-score-fund** — den
+inkluderer også de svagere "usikker"-fund hvor et websøg eller et klart mønster (fx et
+gambling-nøgleord i navnet) gjorde konklusionen tydelig nok til at anbefale en handling.
+"Værd at kigge på" er resten af den usikre gruppe: reelt tvetydige tilfælde hvor et menneske
+med kendskab til kontoen bør tage stilling, ikke skillet. Denne skelnen — handling vs. ikke-handling
+— er den, den ikke-tekniske ekspert rent faktisk skal bruge; det interne score-tal er kun et
+mellemregnestykke og hører ALDRIG hjemme i selve rapporten.
 
-**Eksperten redigerer HER, i chatten** — fjern rækker, flyt en "usikker" til "ekskludér", ret en
-"høj" til "behold" hvis de kender konteksten bedre end scoren. Skillet foreslår; mennesket dømmer
-den endelige liste.
+Under grupperne: en kort dansk konklusion i 2-4 sætninger, almindeligt sprog — de vigtigste mønstre,
+hvor meget der er spildt i alt, og at børneindhold er et kendt blindt punkt vi ikke kan opdage
+automatisk endnu (skriv DET som "vi kan endnu ikke opdage børneindhold automatisk", ikke som en
+teknisk fodnote om manglende datasæt).
+
+**Eksperten redigerer her, i chatten** — fjern rækker, flyt noget fra "værd at kigge på" til
+"fjern det", eller omvendt. Skillet foreslår; mennesket dømmer den endelige liste.
 
 ## Trin 6 — Bekræft, så skriv (human-in-the-loop, ingen undtagelse)
 
 Når eksperten har sagt hvilke rækker der skal ekskluderes (implicit "kør med rapporten som den
-står" tæller også, hvis intet blev ændret), byg den ENDELIGE liste og vis den én gang mere som et
+står" tæller også, hvis intet blev ændret), byg den endelige liste og vis den én gang mere som et
 eksplicit forslag før noget rammer kontoen:
 
-> **Foreslået skrivning til `<customer_id>`:**
-> - Ekskludér `<domæne/app/kanal>` som negativ placering på `<kampagne>` (type: PLACEMENT /
->   MOBILE_APPLICATION / YOUTUBE_CHANNEL)
-> - [gentag for hver bekræftet række]
+> **Foreslået ændring på `<klientens navn>`:**
+> - Bloker **euro-jackpot.net** (website) på kampagnen "<kampagne>"
+> - Bloker **spil2vind.dk** (website) på kampagnen "<kampagne>"
+> - [gentag for hver bekræftet placering — brug altid "bloker X (website/app/YouTube-kanal) på
+>   kampagnen Y", aldrig de tekniske typenavne PLACEMENT/MOBILE_APPLICATION/YOUTUBE_CHANNEL]
 >
 > Bekræft for at skrive, ret for at revidere, eller sig skip.
 
 Kun et klart "ja"/"bekræft"/"skriv" udløser skrivningen. Tavshed, en emoji, eller "ok fortsæt" på
-noget andet tæller IKKE som bekræftelse — spørg igen.
+noget andet tæller ikke som bekræftelse — spørg igen.
 
-**Dispatchér den bekræftede liste til `ads-writer`-agenten** (den eneste agent der må skrive til en
+Dispatchér den bekræftede liste til `ads-writer`-agenten (den eneste agent der må skrive til en
 Google Ads-konto i denne plugin). Giv den `customer_id` + den præcise, bekræftede ændring per
 placering.
 
-### Kendt platform-hul: der findes IKKE en dedikeret "tilføj negativ placering"-værktøj i denne
-### Google Ads MCP (verificeret 2026-07-01)
-
-Denne MCP-server har `add_negative_keywords` (kun keyword-tekst) men **ingen tilsvarende værktøj
-for placeringer, apps eller YouTube-kanaler/videoer**. `run_custom_gaql` er en GAQL-læsevej, ikke
-en mutate-mekanisme — Google Ads-writes går gennem separate mutate-RPC'er, ikke GAQL. Hvis
-`ads-writer` afprøver værktøjssættet og finder samme hul (ingen write-vej for `campaign_criterion`
-negative placements), SKAL skillet degradere ærligt frem for at foregive en skrivning skete:
+**Kendt platform-hul (verificeret 2026-07-01):** denne Google Ads MCP har `add_negative_keywords`
+(kun keyword-tekst) men ingen tilsvarende værktøj for placeringer, apps eller
+YouTube-kanaler/videoer. `run_custom_gaql` er en GAQL-læsevej, ikke en mutate-mekanisme. Hvis
+`ads-writer` afprøver værktøjssættet og finder samme hul, degradér ærligt frem for at foregive en
+skrivning skete:
 
 1. Sig det tydeligt: "Google Ads MCP'en har ingen skrive-vej for negative placeringer endnu — jeg
    kan ikke skrive dette direkte til kontoen."
-2. Aflever i stedet den bekræftede liste som en **kopiér-klar manuel liste** klar til Google Ads
-   Editor eller UI'et: domæne/app/kanal + type + anbefalet niveau (kampagne vs. delt liste — se
-   nedenfor) + match/eksklusionstype.
-3. Nævn at dette er en midlertidig begrænsning i værktøjssættet, ikke en permanent skilebegrænsning
-   — når/hvis MCP'en får en `add_negative_placement`-lignende funktion, opdatér dette trin til at
-   bruge den direkte.
+2. Aflever i stedet den bekræftede liste som en kopiér-klar manuel liste til Google Ads Editor eller
+   UI'et: domæne/app/kanal + type + anbefalet niveau (kampagne vs. delt liste, se nedenfor) +
+   match/eksklusionstype.
+3. Nævn at dette er en midlertidig begrænsning i værktøjssættet — når/hvis MCP'en får en
+   `add_negative_placement`-lignende funktion, opdatér dette trin til at bruge den direkte.
 
-Hvis `ads-writer` FAKTISK finder en fungerende write-vej (fx et generisk mutate-værktøj der ikke
-var synligt i research forud for dette skill), brug den — dette afsnit er en dokumenteret
-antagelse pr. build-tidspunkt, ikke en hård regel om at aldrig prøve.
+Finder `ads-writer` faktisk en fungerende write-vej (fx et generisk mutate-værktøj), brug den —
+ovenstående er en dokumenteret antagelse pr. build-tidspunkt, ikke en hård regel om aldrig at prøve.
 
-### Kampagne vs. delt liste — spørg, gæt aldrig
-
-For hver bekræftet ekskludering: spørg eksperten om den skal gå på **den specifikke kampagne**
-eller ind i en **eksisterende delt negativliste** på kontoen (vis hvilke delte
-`NEGATIVE_PLACEMENTS`-lister der allerede findes fra Trin 2, fx "Web placeringer",
-"Børneplaceringer"). Gæt aldrig standardvalget — det er en klient- og situationsafhængig
-beslutning som eksperten selv skal tage i øjeblikket, ikke noget skillet forudbestemmer.
+**Kampagne vs. delt liste — spørg, gæt aldrig.** For hver bekræftet ekskludering: spørg eksperten
+om den skal gå på den specifikke kampagne eller ind i en eksisterende delt negativliste på kontoen
+(vis hvilke delte `NEGATIVE_PLACEMENTS`-lister der allerede findes fra Trin 2, fx "Web
+placeringer", "Børneplaceringer"). Det er en klient- og situationsafhængig beslutning eksperten
+selv skal tage i øjeblikket.
 
 ## Trin 7 — Output
 
-Lever:
+Lever, i almindeligt sprog (samme regel som Trin 5 — ingen interne termer):
 1. **Rapporten** (Trin 5) — allerede vist i chatten.
-2. **Skrive-resultatet** — hvad blev faktisk ekskluderet, hvor (kampagne/delt liste), og eventuelt
-   det manuelle Editor-fald-tilbage hvis write-vejen manglede.
-3. **Det ærlige forbehold** gentaget kort: børneindhold uden signal, blocklist-blind-spot på
-   lotteri/betting-resultatsider, PMax er forslag-kun.
-4. **Kilder** — MCP-værktøjer brugt, `references/junk_domains_SOURCES.md` for blocklist-licenser.
+2. **Hvad der faktisk skete ved skrivningen** — hvilke sider/apps/kanaler blev rent faktisk
+   blokeret, om det landede på selve kampagnen eller en delt liste, og — hvis Google Ads-værktøjet
+   ikke understøttede det endnu — at I i stedet får en færdig liste til at indsætte manuelt i
+   Google Ads Editor.
+3. **De to ærlige forbehold, skrevet så alle forstår dem:** "vi kan endnu ikke opdage
+   børneindhold automatisk" og "nogle rigtige gambling-/lotteri-sider bliver muligvis ikke fanget
+   automatisk — hold øje med mistænkelige navne i den brede liste, ikke kun i 'anbefales fjernet'."
+   PMax nævnes kort: "Performance Max viser desværre ikke placeringer detaljeret nok til at vi kan
+   foreslå noget der."
+4. **Hvor tallene kommer fra** — én kort sætning, ikke en teknisk logliste: "Data er hentet direkte
+   fra jeres Google Ads-konto (placeringsrapporten for perioden) og krydstjekket mod jeres
+   eksisterende blokeringer, så I ikke får de samme forslag to gange."
 
 ## Eksempel-output (fra live-verificering, Dantaxi 2026-07-01)
 
 ```
-Display-placement-audit klar: Dantaxi (4149791707), sidste 90 dage.
+Display-placement-audit klar — Dantaxi, sidste 90 dage.
 
-🔴 Høj risiko (2 placeringer, 13 kr forbrugt, 0 konv):
-- petsim99.co (Roblox-lignende børnespil-community) — anbefalet ekskluderet
-- [content-farm-domæne] — anbefalet ekskluderet
+Kort sagt: annoncerne har vist sig 60 forskellige steder. 3 af dem bør I overveje at fjerne —
+gambling-sider og en datingside, ingen af dem relevante for en taxi-kunde.
 
-🟡 Usikker, slået op (3 af 3 — under loftet):
-- euro-jackpot.net — websøg: "Officiel dansk lotteri-resultatside" → gambling-adjacent,
-  anbefalet ekskluderet på trods af lav blocklist-score (kendt blind spot, se ovenfor)
-- danskelotto.com — samme mønster, anbefalet ekskluderet
-- wrestlezone.com — websøg: "legitimt sports-nyhedssite" → anbefalet IKKE ekskluderet, sandsynligvis
-  bare bred targeting-fejlplacering, ikke junk i sig selv
+🚫 Anbefales fjernet (3 steder, 46 kr brugt, ingen konverteringer):
+- euro-jackpot.net — dansk lotteri-side
+- spil2vind.dk — dansk gambling-side
+- mydating.online — datingside, uden for jeres branche
 
-⚪ Lav risiko: 24 placeringer, 380 kr samlet — ingen handling anbefalet.
+🤔 Værd at kigge på, men ikke et klart problem (5 steder):
+- bt.dk, berlingske.dk — store danske medier uden konvertering på Display. Helt normalt, ingen
+  handling anbefalet medmindre I selv ser et mønster.
+- (3 sider til i samme kategori — pakke-sporing/tracking-sider, sandsynligvis bare irrelevant
+  trafik, jeres kald)
 
-Bekræft ovenstående 4 ekskluderinger for at skrive til kontoen, eller ret listen.
+✅ Ingen problemer fundet: 52 steder — normal trafik, ingen handling.
+
+Bekræft de 3 anbefalede fjernelser for at skrive dem til kontoen, eller sig til hvis I vil justere
+listen først.
 ```
 
-## Hård sandheds-grænse
+## Hårde grænser
 
-- **Skriv kun til kontoen efter eksplicit bekræftelse — ingen undtagelse, ingen "brugeren sagde
-  vist ja tidligere".**
-- **Foreslå aldrig noget der allerede er ekskluderet.** Krydstjek er obligatorisk (Trin 2 + 3).
-- **Byg aldrig en permanent/delt liste automatisk.** Kun de bekræftede negativer for netop denne
+- Skriv kun til kontoen efter eksplicit bekræftelse — ingen undtagelse.
+- Foreslå aldrig noget der allerede er ekskluderet — krydstjek er obligatorisk (Trin 2 + 3).
+- Byg aldrig en permanent/delt liste automatisk — kun de bekræftede negativer for netop denne
   kørsel skrives; hvilken delt liste (hvis nogen) er et eksplicit valg eksperten tager per kørsel.
-- **Pausede kampagner flages aldrig som et fund** — de er bevidste hos Inbound.
-- **PMax-fund skrives aldrig** — kun forslag, platform-begrænsning, ikke skillets valg.
-- **Børneindhold-dækning er ikke påstået** — intet gratis signal findes, sig det højt.
-- **Æ Ø Å altid** i alt dansk output — aldrig ASCII-translitteration.
-- **Lyv aldrig om en skrivning der ikke skete.** Hvis write-vejen mangler i MCP'en, sig det og
-  lever det manuelle fald-tilbage — påstå aldrig kontoen blev opdateret.
+- Pausede kampagner flages aldrig som et fund — de er bevidste hos Inbound.
+- PMax-fund skrives aldrig — kun forslag, platform-begrænsning.
+- Børneindhold-dækning er ikke påstået — intet gratis signal findes, sig det højt.
+- Æ Ø Å altid i alt dansk output — aldrig ASCII-translitteration.
+- Lyv aldrig om en skrivning der ikke skete — mangler write-vejen i MCP'en, sig det og lever det
+  manuelle fald-tilbage.
 
 ## Maintenance
 
-- `scripts/score_placements.py` — den ENESTE deterministiske del. Matcher blocklist, TLD, nøgleord-
-  mønster, forbrug/CTR-signaler, app-flag, allerede-ekskluderet-tjek. Ingen model-dømmekraft heri;
-  ret aldrig scoringen til at "dømme" i stedet for at signalere.
-- `references/junk_domains.tsv` — 9.834 domæner (gambling + MFA-proxy + scam), bygget fra
-  Blocklist Project + Steven Black's hosts, begge fri licens. Se `junk_domains_SOURCES.md` for
-  fuld proveniens, licenser, og genopfrisknings-kommando. Dette er en statisk snapshot, ikke en
-  live feed — genopfrisk den med jævne mellemrum (kommandoen står i SOURCES-filen).
-- Hvis Google Ads MCP'en får en dedikeret negative-placement write-værktøj: opdatér Trin 6's
-  "kendt platform-hul"-sektion til at bruge den direkte i stedet for det manuelle fald-tilbage.
-- Bevidst INGEN: automatisk delt-liste-bygning, xlsx som default-output, gæt på kampagne-vs-delt-
-  liste-niveau. Hvis du fristes til at automatisere en af disse: lad være, det var et eksplicit
-  valg fra brugeren om at bevare menneskelig kontrol her.
+- `scripts/score_placements.py` — den eneste deterministiske del. Matcher blocklist, TLD,
+  nøgleord-mønster, forbrug/CTR-signaler, app-flag, allerede-ekskluderet-tjek. Ingen model-dømmekraft
+  heri; ret aldrig scoringen til at "dømme" i stedet for at signalere.
+- `references/junk_domains.tsv` — 9.834 domæner (gambling + MFA-proxy + scam), bygget fra Blocklist
+  Project + Steven Black's hosts, begge fri licens. Se `junk_domains_SOURCES.md` for fuld
+  proveniens, licenser, og genopfrisknings-kommando. Statisk snapshot, ikke en live feed —
+  genopfrisk med jævne mellemrum.
+- Får Google Ads MCP'en en dedikeret negative-placement write-værktøj: opdatér Trin 6's
+  platform-hul-sektion til at bruge den direkte i stedet for det manuelle fald-tilbage.
+- Bevidst ingen: automatisk delt-liste-bygning, xlsx som default-output, gæt på
+  kampagne-vs-delt-liste-niveau. Det er eksplicitte valg fra brugeren om at bevare menneskelig
+  kontrol her — automatisér dem ikke.

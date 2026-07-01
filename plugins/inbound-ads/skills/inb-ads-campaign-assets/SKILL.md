@@ -1,14 +1,13 @@
 ---
 name: inb-ads-campaign-assets
-description: Generér Google Ads kampagne-assets (sitelinks, callouts, structured snippets) som selvstændigt trin og aflever dem som regneark (.xlsx), grounded i en klients landingsside + intake. Tynd indgang til assets-referencen i inb-ads-campaign-build, kørt i solo-mode. To hårde firewalls, hvor den første er at opfinde ALDRIG asset-tekst (kun grounded i analyse/intake), og den anden at sitelink-URL'er IKKE er udledelige fra den skrabne side (operator-leveret eller Firecrawl-map). Pusher ALDRIG til kontoen. Brug når brugeren siger "lav assets", "sitelinks + callouts", "extensions til kampagnen", "structured snippets", eller vil have assets som et selvstændigt stykke (ikke en fuld build). Svarer på dansk.
+description: Genererer Google Ads-kampagneassets (sitelinks, callouts, structured snippets) som et selvstændigt trin uden for den fulde campaign-build og afleverer dem som en .xlsx, hvor hver tekst er grounded i klientens landingsside/intake og sitelink-URL'er aldrig gættes uden bekræftet kilde.
 ---
 
 # inb-ads-campaign-assets
 
-Selvstændig indgang til **Phase 3 — assets** i kampagne-builden. Genererer sitelinks, callouts og
-structured snippets og afleverer dem som et **`.xlsx`-regneark** (tabulært per asset-type). Al logikken
-bor i inb-ads-campaign-build's reference — dette skill er en tynd shell der kører den i **solo-mode** (producerer
-en regnearks-rapport i stedet for kun JSON til en pipeline).
+Selvstændig indgang til **Phase 3 — assets** i kampagne-builden, kørt i **solo-mode**: samme logik som i
+inb-ads-campaign-build, men afleverer en `.xlsx`-regnearks-rapport (tabulært per asset-type) i stedet for
+kun JSON til en pipeline.
 
 Kilden til sandhed: `${CLAUDE_SKILL_DIR}/../inb-ads-campaign-build/references/06-assets.md` (+ dens kontrakt
 `asset-rules.md` i samme references-mappe).
@@ -36,11 +35,15 @@ læs den fra arbejdsmappen i stedet. Default attachment level = campaign.
 
 ## Trin 2 — Kør referencen
 
-Følg `06-assets.md` præcist — den vinder ved konflikt. De to firewalls er korrekthed, ikke pynt:
-1. **Opfind ALDRIG asset-tekst** — hver callout/snippet-værdi grounded i et analyzer-felt (`grounded_in`).
-   Ingen grounding → emit ikke.
-2. **Sitelink-URL'er er ikke udledelige fra den skrabne side** — operator-leveret (default) eller
-   `firecrawl map` hvis CLI'en findes. Kan en URL ikke bekræftes: udelad sitelinket.
+Følg `06-assets.md` præcist — den vinder ved konflikt. Logikken bor i referencen, ikke her; ret `06-assets.md`
+hvis reglerne ændrer sig. To hårde firewalls:
+1. **Grounding.** Opfind aldrig asset-tekst — hver callout/snippet-værdi skal have et `grounded_in`-felt
+   der peger på analyzer-output. Ingen grounding → emit ikke raden. Dette er den hyppigste drift, så tjek
+   det eksplicit per asset.
+2. **Sitelink-URL'er.** Ikke udledelige fra den skrabne side alene — brug operator-leveret URL (default)
+   eller `firecrawl map` hvis CLI'en findes. Kan en URL ikke bekræftes: udelad sitelinket, gæt aldrig en sti.
+
+**Lead forms er manuelle** — ikke CSV-importerbare; emit ingen række, henvis til Google Ads UI'et i stedet.
 
 Referencen skriver `assets.json` til arbejdsmappen.
 
@@ -51,13 +54,5 @@ Pak resultatet i én `.xlsx` (brug `xlsx`-skillet) med en fane per asset-type:
 - **Callouts:** tekst | grounded_in.
 - **Structured snippets:** header | værdier | grounded_in.
 
-Bekræft firewall'en i en note ("Alle assets grounded i landingssiden/intake; intet opfundet"), og flag den
-UNVERIFIED snippet-header-kolonne. At gemme til Drive er en gated write (bekræft før upload). Lokalt er fint.
-
-## Safety
-
-- **Firewall A (grounding)** er den hyppigste drift — hver asset SKAL have `grounded_in`; tom = drop.
-- **Firewall B (sitelink-URL'er)** — gæt aldrig en sti fra én skrabet side. Operator eller firecrawl map.
-- **Lead forms er manuelle** — ikke CSV-importerbare; emit ingen række, henvis til Google Ads UI'et.
-- **Read-only; gem til Drive = gated write.** **Logikken bor i referencen, ikke her** — ret `06-assets.md`
-  hvis reglerne ændrer sig.
+Bekræft firewall'en i en note ("Alle assets grounded i landingssiden/intake; intet opfundet"), og flag
+snippet-header-kolonnen som UNVERIFIED. At gemme til Drive er en gated write (bekræft før upload) — lokalt er fint.

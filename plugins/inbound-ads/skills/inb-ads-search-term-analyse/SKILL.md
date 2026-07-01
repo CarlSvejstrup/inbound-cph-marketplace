@@ -1,6 +1,6 @@
 ---
 name: inb-ads-search-term-analyse
-description: Skarp, samtale-drevet søgeterm-analyse af én LIVE Google Ads-konto, der leverer INTERESSANTE indsigter — ikke bare den flade liste Google Ads giver. Filtrerer data server-side i GAQL så selv 1000+ termer aldrig læsses rå ind i kontekst, kører et let script (digest.py) der ruller rækkerne til en kompakt indsigts-brief (systemiske spild-temaer via n-gram, vinder-temaer, intent-linser, match-type-lækage, struktur-smell, udækkede vindere), og FØRER så en samtale om fundene — I beslutter SAMMEN hvad der skal blokeres og promoveres. Efter en EKSPLICIT bekræftelse af hele listen tilføjer den negatives og keywords direkte i kontoen via MCP (dry-run så commit), eller laver Editor-CSV som fallback. Read-only indtil du siger ja. VIGTIGT — 0 konverteringer er IKKE bevis for spild når folk ringer. Brug når brugeren siger "search term", "søgeterm-analyse", "analysér søgetermerne", "gå søgetermerne igennem", "find negatives og keywords", eller vil tale sig frem til beslutningerne og tilføje dem. Svarer på dansk.
+description: Analyserer søgetermerne i én live Google Ads-konto ved at filtrere data server-side i GAQL og rulle dem til en kompakt indsigts-brief (spild-temaer, vinder-temaer, intent, match-type-lækage), og fører derefter en samtale om fundene før den, kun efter eksplicit bekræftelse, tilføjer negatives og keywords via MCP eller Editor-CSV. Svarer på dansk.
 ---
 
 # search-term-analyse
