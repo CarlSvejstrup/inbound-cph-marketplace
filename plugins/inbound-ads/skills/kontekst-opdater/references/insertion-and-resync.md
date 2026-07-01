@@ -4,7 +4,7 @@ The mechanics for writing approved changes into the client's AI-Context file on 
 
 ## The AI-Context file shape (what you are editing)
 
-`ai-context-publish` created the file. It starts with a `Sidst opdateret:` line, then an H1, an intro, an ID-block, durable sections, and the `## Klientoverblik` (with its ### subsections). Schematically:
+`ai-context-publish` created the file. It starts with a `Sidst opdateret:` line, then an H1, an intro, an ID-block, durable sections, and the `## Klientoverblik` (with its ### subsections). The canonical section set + order is defined in `references/section-contract.md` (the source of truth for the layout, shared with the local `clients/*.md` mirror). Schematically:
 
 ```
 Sidst opdateret: 2026-06-17
@@ -20,17 +20,21 @@ ID / felt | Værdi
 - Changelog / optimeringslog: <link>
 - Rapporter: <link>            # may be absent — this skill can add it
 
-## Om virksomheden            # (only if present)
+## Konti & links              # durable account facts (only if present)
 ## Kontaktpersoner            # (only if present)
+## Kunderelation & noter      # soft relationship context (only if present)
 ## Klientoverblik             # <-- the block this skill replaces
 ### Overblik
-### Hårde rammer
+### Hårde rammer (læs før du handler)
 ### Mål & konverteringer
 ### Sådan kører vi den
 ### Aktuel status & åbne håndtag
 ## Rapport                    # <-- own section; replaced when a NEW report is ingested (kept SEPARATE from Klientoverblik)
-## Drive-filer                # (do not touch)
+## Aftaleark & kundebrief     # (only if present, do not touch)
+## Drive files                # (do not touch)
 ```
+
+A normal run edits ONLY `## Klientoverblik` + `## Rapport` (+ the watermark/ID-block lines). It does NOT refold the other sections — retiring legacy scattered H2s (`## Om virksomheden`, `## Budget`, `## KPIer og mål`, ...) is a deliberate batch migration per `section-contract.md`, never a silent side-effect of a sync run.
 
 ## What this skill writes (and only this)
 
