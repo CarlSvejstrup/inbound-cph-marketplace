@@ -116,6 +116,20 @@ All skills now live in one plugin (`inbound-ads`), so `${CLAUDE_PLUGIN_ROOT}` re
 
 ---
 
+## Agents
+
+Three bundled subagents live in `plugins/inbound-ads/agents/`. Each inherits the session's tools (so it can reach the user-connected Google Ads / Drive / HubSpot connectors) and strips file-writing tools; role and read/write intent are enforced by the system prompt, and Google Ads writes are enforced by a PreToolUse hook (below).
+
+- **`ads-analyst`** — read-only account analyst. Every diagnostic skill (`ads-audit-report`, `soegeterm-analyse`, `annonce-optimering`, `opstart-analyse`, the diagnostic half of `optimering-loop`) dispatches account reading to it. Recommend-only; proposes changes for `ads-writer` to apply, never writes itself.
+- **`ads-writer`** — the ONLY agent that writes to a Google Ads account, under strict per-action human-in-the-loop. Budget writes are held until the budget-guardrail ships, then require a second confirm for any change. Skills route confirmed changes through it.
+- **`drive-knowledge`** — read-across-sources knowledge worker (Drive + HubSpot + Ads change-history). Used by `kontekst-opdater` / `ai-context-publish` / the future `context-update`. Read-only; timeless-only.
+
+### The write guardrail (hard safety)
+
+`hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook wired in `.claude/settings.json`. It matches on the tool's SHORT name (suffix after the last `__`), so it is install-portable regardless of the per-install MCP connector UUID. Budget writes → **deny** until the guardrail ships (then **ask**, second confirm); other Google Ads writes → **ask** (mandatory confirmation); reads + `generate_campaign_build_csv` + non-Ads tools → allow. It fires for ANY caller, not just `ads-writer`, and reinforces (never replaces) the agent prompts. **Scope limit:** the hook covers Google Ads tool names only — the read-only-ness of `ads-analyst` (web) and `drive-knowledge` (Drive/HubSpot) rests on their prompts and the calling skills' own write gates, not this hook.
+
+---
+
 ## Voice and tone
 
 Defaults to **Danish** for user interaction. English preserved for marketing/tool vocabulary (SEO, ROAS, GA4, RSA, etc.). Avoid AI/ML jargon when explaining the system — users are marketers, not engineers. Client-facing ad copy follows the client's own voice, never invented.

@@ -2,9 +2,11 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-07-01, after merging the three Google Ads plugins into one.
+Last updated: 2026-07-01, after adding bundled agents + the write guardrail hook.
 
-> **2026-07-01 — plugin consolidation.** The three plugins (`google-ads-setup`, `google-ads-optimization`, `google-ads-general`) were merged into a single plugin, **`inbound-ads` v3.0.0**, on branch `feat/inbound-ads-merge`. All 15 skills now live under `plugins/inbound-ads/skills/` (git history preserved via `git mv`). Install is now `/plugin install inbound-ads@inbound-cph`. The two former cross-plugin dependencies (`editor-csv-export` ← `campaign-build`/`optimering-loop`, and `annonce-optimering` ↔ `responsive-search-ads`) are now intra-plugin. Milestone/version notes below that name the old plugins are historical and describe the pre-merge layout. Next: agents (bundled subagents) come after this merge is verified in Cowork.
+> **2026-07-01 — bundled agents + write guardrail (`inbound-ads` v3.1.0).** Added three subagents under `plugins/inbound-ads/agents/`: `ads-analyst` (read-only account analyst + web research, the reusable read worker), `ads-writer` (the sole HITL-gated account-write path; budget writes held until the guardrail ships, then second-confirm for any change), and `drive-knowledge` (read-across Drive/HubSpot/Ads-history worker). Each inherits the session's connectors and strips file-writing; read/write intent is by prompt. Hard write-safety is a PreToolUse hook (`hooks/google-ads-write-guardrail.sh`, wired in `.claude/settings.json`) that gates Google Ads writes by short tool name (install-portable, no UUID) — deny on budget until the guardrail ships, ask on other writes. Verified: frontmatter well-formed, hook decision paths smoke-tested (deny/ask/allow). NOT yet run in Cowork; skills not yet wired to dispatch to the agents (follow-up). Repo also moved to `~/code/work/inbound-cph-marketplace/`.
+
+> **2026-07-01 — plugin consolidation.** The three plugins (`google-ads-setup`, `google-ads-optimization`, `google-ads-general`) were merged into a single plugin, **`inbound-ads`** (now v3.1.0), on branch `feat/inbound-ads-merge`. All 15 skills now live under `plugins/inbound-ads/skills/` (git history preserved via `git mv`). Install is now `/plugin install inbound-ads@inbound-cph`. The two former cross-plugin dependencies (`editor-csv-export` ← `campaign-build`/`optimering-loop`, and `annonce-optimering` ↔ `responsive-search-ads`) are now intra-plugin. Milestone/version notes below that name the old plugins are historical and describe the pre-merge layout.
 
 ## Milestones
 

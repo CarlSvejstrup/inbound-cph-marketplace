@@ -74,14 +74,35 @@ The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@in
 .claude-plugin/
   marketplace.json                # marketplace "inbound-cph", lists the one plugin
 CLAUDE.md                         # the shared operating contract (repo root)
+.claude/settings.json             # wires the PreToolUse write guardrail hook
+hooks/
+  google-ads-write-guardrail.sh   # PreToolUse hard gate on Google Ads writes
+  README.md                       # hook policy + how to enable on other seats
 plugins/
   inbound-ads/
     .claude-plugin/plugin.json    # name "inbound-ads", version, userConfig
+    agents/                       # ads-analyst, ads-writer, drive-knowledge
     skills/                       # all 15 skills (see tables above)
     _archive/                     # retired skills, kept for reference
 docs/
   project-status.md, session-handoff.md, ...
 ```
+
+## Agents
+
+Three bundled subagents in `plugins/inbound-ads/agents/`, dispatched by the skills:
+
+| Agent | Role |
+|---|---|
+| `ads-analyst` | Read-only account analyst + web research. The reusable read worker every diagnostic skill dispatches to. Recommend-only, never writes. |
+| `ads-writer` | The **only** agent that writes to a Google Ads account, under strict per-action human-in-the-loop. Budget writes held until the guardrail ships, then a second confirm for any change. |
+| `drive-knowledge` | Read-across-sources worker (Drive + HubSpot + Ads change-history) for the client-context skills. Read-only, timeless-only. |
+
+Each inherits the session's tools (to reach the user-connected connectors) and strips file-writing; read/write intent is enforced by prompt, and Google Ads writes by the guardrail hook.
+
+### Write guardrail (hard safety)
+
+`hooks/google-ads-write-guardrail.sh` is a **PreToolUse** hook (wired in `.claude/settings.json`) that gates every Google Ads write by the tool's short name — install-portable regardless of the per-install connector UUID. Budget writes: **deny** until the guardrail ships, then **ask** (second confirm). Other writes: **ask**. Reads + CSV generation + non-Ads tools: allow. It fires for any caller. See `hooks/README.md` for enabling it on distributed seats (plugin agents can't bundle hooks, so write-performing seats add it to their own settings).
 
 ## Versioning + update flow
 
