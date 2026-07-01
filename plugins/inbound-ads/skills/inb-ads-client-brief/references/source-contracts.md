@@ -8,27 +8,27 @@ Shared inputs handed to every subagent: client display name, the since-date (`YY
 
 ## Drive-expert
 
-**Tools:** ONLY the Drive connector (`mcp__10f9f31f-…`): `search_files`, `get_file_metadata`, `read_file_content`. Never the gws/Workspace MCP. Never create/copy.
+**Tools:** ONLY the Inbound Google Drive MCP (`mcp__acc7a973-…`): `search` (rawQuery for date/mime filters), `listFolder`, `readGoogleDoc`, and the deck readers (`getGoogleSlidesContent`; PDF via `convertPdfToGoogleDoc` → `readGoogleDoc` → `deleteItem`). This is the ONE Drive MCP for everything — reads here, and the single inline write (`findAndReplaceInDoc`) in the main skill's Trin 6. Never create a duplicate file.
 
 **Inputs:** the client's Drive-folder ID (from the index row's "Drive-mappe" link), the since-date, and any report-folder link already noted in the AI-Context file (may be absent).
 
 ### A. New/changed documents
-1. `search_files` with `parentId = '<Drive-folder ID>'`. Recurse into subfolders (a folder result → `search_files parentId='<subfolder id>'` again). For shared-folder clients (Lime/Retriever/GSGroup/Nemco/Julemærket/PhoneAlone/DI/EDC — see the index "Noter" + "Delte mapper" section) note which market each doc belongs to.
-2. Filter to `modifiedTime > '<since>T00:00:00Z'` (RFC-3339 UTC). `get_file_metadata` returns `modifiedTime` + `createdTime` if the search payload lacks them.
-3. `read_file_content` the in-window docs. Skip files older than the window.
+1. `listFolder(folderId='<Drive-folder ID>')`, or `search(rawQuery=true, query="'<Drive-folder ID>' in parents and trashed=false")`. Recurse into subfolders (a folder result → list/search that subfolder id again). For shared-folder clients (Lime/Retriever/GSGroup/Nemco/Julemærket/PhoneAlone/DI/EDC — see the index "Noter" + "Delte mapper" section) note which market each doc belongs to.
+2. Filter to `modifiedTime > '<since>T00:00:00Z'` (RFC-3339 UTC) — pass it directly in the rawQuery. The listing returns `modifiedTime` + `createdTime`.
+3. `readGoogleDoc` the in-window docs. Skip files older than the window.
 
-Drive query syntax reminder (single-quote string values; combine with `and`/`or`):
+Drive rawQuery reminder (single-quote string values; combine with `and`/`or`):
 ```
-parentId = '<id>' and modifiedTime > '2026-06-17T00:00:00Z'
+'<folder id>' in parents and modifiedTime > '2026-06-17T00:00:00Z' and trashed=false
 ```
 
 ### C. Reports (HIGH PRIORITY — status/statusmøde decks)
 Reports are monthly status decks. **The folder is the reliable anchor, not the file type** — verified across clients, the report folder is the client-folder subfolder named `#1 - Præsentationer og statusmøder` / `#1 - Statusmøder og -rapporter` / `#1 - Præsentationer & statusmøder` (a `#1 -` prefix + "sentation"/"statusm"). It sits in the MAIN client folder, NOT in Paid Search. Inside it, a given month's deck may exist as a **native Google Slide** (`application/vnd.google-apps.presentation`), an **uploaded PowerPoint** (`application/vnd.openxmlformats-officedocument.presentationml.presentation`, often with no file extension), and/or a **PDF export** — all three coexist. Decks are titled `YYYY-MM - <Klient> ...`, so **pick the newest by the `YYYY-MM` in the title** (more reliable than `modifiedTime`, which re-exports muddy). Prefer a readable form in this order for the newest month: native Slide → PPTX → PDF.
 
-- **If a report folder is already noted in the AI-Context file:** go straight to it — `search_files parentId='<report-folder id>'` (no mime filter; list everything). Pick the newest deck by title-date. `read_file_content` it (works for Slides, PPTX, and PDF). For the diff, only decks newer than the since-date count; for the overview, always summarize the latest deck.
-- **If no report folder is noted yet (find, then let the main skill propose persisting it):** list the client folder's subfolders and pick the report folder by name:
+- **If a report folder is already noted in the AI-Context file:** go straight to it — `listFolder(folderId='<report-folder id>')` (list everything, no mime filter). Pick the newest deck by title-date. Read it via the deck readers (Slides direct; PPTX/PDF via convert — see `report-ingestion.md`). For the diff, only decks newer than the since-date count; for the overview, always summarize the latest deck.
+- **If no report folder is noted yet (find, then let the main skill propose persisting it):** list the client folder's subfolders and pick the report folder by name (`search rawQuery`):
   ```
-  parentId = '<Drive-folder id>' and mimeType = 'application/vnd.google-apps.folder' and (title contains 'sentation' or title contains 'statusm' or title contains 'Møder' or title contains 'statusrapport')
+  '<Drive-folder id>' in parents and mimeType = 'application/vnd.google-apps.folder' and (name contains 'sentation' or name contains 'statusm' or name contains 'Møder' or name contains 'statusrapport')
   ```
   (`title contains 'sentation'` catches "Præsentation" + ASCII "Praesentation"; `statusm` catches "statusmøder"/"statusmoeder"; "Møder" is a real variant — Julemærket, Novo Nordisk.) If several match, take the `#1` one (hyphen OR en-dash `#1 –`); **ignore any titled `OLD - ...`** (legacy). **Fallback:** if no `#1` folder exists, look for year-based `<Klient> møder 20XX` folders and take the newest year (EDC Erhverv). Some clients genuinely have no status-deck folder (DI, CBCIT, HRS, Kirkens Korshær, Kbh Listefabrik, Ramboll) → return `status: none` gracefully. Return the folder (id + exact title + path + the newest deck found inside) for the main skill to confirm and write into the AI-Context file (Trin 5/6). Do NOT write anything from inside the subagent.
 - **Extraction is delegated to `report-ingestion.md`** and runs ONLY when the newest deck is newer than the AI-Context file's `Seneste rapport læst` watermark (conversion is expensive — never re-ingest an already-loaded deck). That file owns the *how* (PDF → `convertPdfToGoogleDoc` → `readGoogleDoc` → `deleteItem` the temp Doc; native Slides → `getGoogleSlidesContent`; the split-sandbox `downloadFile` caveat) and the skip-gate. The Drive-expert's job here is only to locate the folder + identify the newest deck (title + id + yyyymm + mime) and report whether it beats the watermark.
@@ -59,14 +59,15 @@ The Drive connector drops the socket on long multi-read runs. On a drop: return 
 **Inputs:** the client's HubSpot ID (from the index row), the since-date.
 
 1. Optionally confirm the company with `crm_get_company(<HubSpot ID>)` (name + domain — sanity-check it's the right org; the index "Noter" flags clients with HubSpot duplicates).
-2. For each engagement type, search with the company-association filter + a recency filter. The documented workaround is an `associations.company` EQ filter (NOT `engagement_details`). Pattern:
+2. For each engagement type, search with the company-association filter + a recency filter. The documented workaround is an `associations.company` EQ filter (NOT `engagement_details`). **The recency filter MUST be `hs_createdate`, not `hs_lastmodifieddate`.** Pattern:
    ```
    filterGroups: [{ filters: [
      { propertyName: "associations.company", operator: "EQ", value: "<HubSpot ID>" },
-     { propertyName: "hs_lastmodifieddate", operator: "GT", value: "<since epoch ms or ISO>" }
+     { propertyName: "hs_createdate", operator: "GT", value: "<since epoch ms or ISO>" }
    ]}]
    ```
-   Run it for `notes_search`, `emails_search`, `calls_search`, `meetings_search`, `tasks_search`. Some object types use `createdAt`/`hs_createdate` instead of `hs_lastmodifieddate` — if the recency filter errors on a type, drop to the type's own date field, or fetch + filter client-side.
+   Run it for `notes_search`, `emails_search`, `calls_search`, `meetings_search`, `tasks_search`.
+   **Why `hs_createdate` and not `hs_lastmodifieddate` (hard lesson):** HubSpot bulk-touches `hs_lastmodifieddate` on re-index. On 2026-06-30 that produced **141 false positives** — months-old mail returned as "new" — and only date-spot-checking caught it; `hs_createdate` gave the real 3 new mails. `hs_createdate` = when the object was actually created = the true "new since" signal. Use `hs_lastmodifieddate` ONLY as secondary confirmation, never as the sole/primary "new" filter. If a type errors on `hs_createdate`, drop to that type's own creation field (`createdAt`), never to a modified field; or fetch + filter client-side on the creation timestamp.
 3. **Decode IDs to labels:** lifecycle-stage and deal-stage come back as numeric ids — map them to human labels (don't surface raw ids). Validate by object COUNT, not aggregate counters (e.g. `num_contacted_notes` can inflate vs readable note objects).
 4. Collapse to human-readable activity: "3 mails med Natasha (seneste 2026-06-19, om Tinderbox-budget)", "1 note: statusmøde booket".
 
@@ -110,14 +111,12 @@ Only durable facts for the overview's "what changed on the account" line — no 
 
 ---
 
-## gws probe + capability matrix (for the Trin 6 write)
+## The Trin 6 write (single MCP, findAndReplaceInDoc only)
 
-Before the AI-Context-file WRITE, probe: `mcp__acc7a973-…__authGetStatus`.
+There is ONE Drive MCP (`mcp__acc7a973-…`) and the AI-Context file is a Google **Doc**, so the write is a gated **`findAndReplaceInDoc`** — no auth probe, no second connector, no copy-paste-first default. Full mechanics live in `insertion-and-resync.md`. In short:
 
-| authGetStatus result | Trin 6 — write the updated AI-Context file |
-|---|---|
-| authed, scopes granted, file writable | gated surgical `findAndReplaceInDoc` / `updateTextFile` replacing the old `## Klientoverblik` block (+ `Sidst opdateret` line, + any new `Rapporter:` line) |
-| `needs_reauth` / 0 scopes | emit copy-paste block; tell the human to paste it into the AI-Context file |
-| authed but 403 on the file (personal-not-Inbound) | emit copy-paste block |
-
-Never fall back to `create_file` on the Drive connector to "fix" a failed gws write — that makes an uncleanable duplicate. The AI-Context file is updated in place or by human paste, never re-created.
+- Show the target Doc + exact new blocks, wait for `ja`.
+- Replace surgically, one `findAndReplaceInDoc` per block: (a) old `## Klientoverblik` → new; (b) old `## Rapport` → new (only if a new report was ingested); (c) `Sidst opdateret:` / `Rapporter:` / `Seneste rapport læst:` lines. Optionally `dryRun=true` first to confirm each `findText` matches exactly once.
+- Inserting a section that doesn't exist yet: `findAndReplaceInDoc` can't insert, so fold the new section INTO a replacement of a unique adjacent anchor (e.g. replace the end of the Klientoverblik block with "that text + the new `## Rapport`").
+- A `findText` that won't match → STOP, show the human the copy-paste block for that piece; never write a guess.
+- Never create a duplicate file to "fix" a failed write (a duplicate can't be removed cleanly).

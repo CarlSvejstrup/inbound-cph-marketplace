@@ -1,6 +1,6 @@
 # Report ingestion (called only when a NEW report exists)
 
-The skill invokes this sub-routine **only** when the newest deck in the client's report folder is newer than what's already been ingested. Ingesting a status deck is the richest "what was recently done/agreed" input, but it is expensive (download/convert/read a big file), so it must never run when the latest report was already absorbed. Everything here uses the Workspace MCP (`mcp__acc7a973-…`) — the connector with in-place read/convert/delete.
+The skill invokes this sub-routine **only** when the newest deck in the client's report folder is newer than what's already been ingested. Ingesting a status deck is the richest "what was recently done/agreed" input, but it is expensive (download/convert/read a big file), so it must never run when the latest report was already absorbed. Everything here uses the ONE Inbound Google Drive MCP (`mcp__acc7a973-…`) — the same connector used for all reads and the Trin 6 write; it has the read/convert/delete tools.
 
 ## The watermark: `Seneste rapport læst`
 
