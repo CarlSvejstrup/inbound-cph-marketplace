@@ -27,6 +27,7 @@ INPUT: a findings JSON (--in) with this shape (see SKILL.md Trin 4 for how it's 
       "items": [
         {"n": 1, "punkt": "Sitelinks: min. 4 på hver kampagne",
          "status": "ok|warn|critical|no_data",
+         "kind": "lookup|judgment",   # lookup = factual read (no Ekspert checkbox); judgment = agent's opinion (Ekspert ticks to confirm). Defaults to judgment if absent.
          "finding": "3 af 7 kampagner har <4 sitelinks: Brand, Generisk-DK, Lufthavn",
          # OPTIONAL depth fields — fill ONLY where they add value (concise points stay 1 line):
          "details": "Longer prose for modules that need depth (e.g. per-ad-group breakdown).",
@@ -322,8 +323,9 @@ def build(findings: dict, out_path: str) -> str:
     rc = cov.add_run(
         f"Agenten har behandlet {handled} af {total} punkter. "
         "Kolonnen Agent (✓ = gennemgået · ☐ = kunne ikke vurderes) er agentens egen registrering. "
-        "Kolonnen Ekspert er tom til at sætte flueben i hånden, når du har gennemgået fundet. "
-        "Selve vurderingen står i modul-sektionerne nedenfor."
+        "Kolonnen Ekspert er til at sætte flueben i hånden, når du har gennemgået et vurderings-"
+        "punkt; rene opslags-punkter (faktuelle tjek, fx om en udvidelse findes) har ingen "
+        "Ekspert-boks, da der ikke er noget at efterse. Selve vurderingen står i modul-sektionerne nedenfor."
     )
     rc.font.size = Pt(9)
     rc.font.italic = True
@@ -363,8 +365,13 @@ def build(findings: dict, out_path: str) -> str:
             _set_cell_text(row.cells[3], "✓" if done else "☐",
                            color=(STATUS["ok"][2] if done else MUTED),
                            bold=True, size=10.5, align=WD_ALIGN_PARAGRAPH.CENTER)
-            # expert box (always empty)
-            _set_cell_text(row.cells[4], "☐", color=MUTED, bold=False, size=10.5,
+            # expert box: empty ☐ for judgment points, BLANK for lookup points.
+            # A lookup point is a factual read (does an extension exist? is display select
+            # off?) — there's nothing for the expert to re-verify, so no box. A judgment point
+            # (is the copy good? is broad controlled?) is the agent's opinion → expert confirms.
+            is_lookup = it.get("kind") == "lookup"
+            _set_cell_text(row.cells[4], "" if is_lookup else "☐",
+                           color=MUTED, bold=False, size=10.5,
                            align=WD_ALIGN_PARAGRAPH.CENTER)
             _tight_row(row, height_pt=14)
     _set_col_widths(ct, [0.55, 0.35, 4.75, 0.58, 0.62])

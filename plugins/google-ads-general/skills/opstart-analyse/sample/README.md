@@ -12,10 +12,14 @@ flow produced them.
   from that JSON. Two layers:
   - **Checklist / indholdsfortegnelse** up top: all 35 points with **two checkboxes per point** ,
     an **Agent** column the skill fills (✓ = agent reached a verdict / ☐ = couldn't assess) and an
-    **Ekspert** column left empty for the specialist to tick by hand after review.
+    **Ekspert** column for the specialist to tick by hand after review.
   - **Detail tables per module**: the status (OK/warn/critical) + the concrete finding per point.
   The agent checkbox means "did the agent walk the point", NOT "is it OK" , a critical finding
   shows ✓ in the Agent column and red Kritisk in the detail. The agent proposes, the expert disposes.
+  Note: only **judgment** points (the agent's opinion , is the copy good? is broad controlled?) get
+  an Ekspert checkbox. **Lookup** points (factual reads , does an extension exist? is display select
+  off?) have a blank Ekspert cell, because there's nothing to re-verify. Each point's `kind`
+  (`lookup`/`judgment`) is set in `references/analysearbejdet.md`.
 
 This run's tally: 3 critical / 15 warn / 16 OK / 1 no_data; agent checklist 34 ✓ / 1 ☐ (point 8
 Location extension = N/A for a taxi service, correctly no_data).

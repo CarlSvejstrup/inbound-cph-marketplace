@@ -44,7 +44,7 @@ søgetermerne igennem blindt.
    `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med
    `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, **Stage**,
    Drive-mappe og **AI Context-fil**.
-3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér **Stage** (customer / lead /
+3. **Find klientens række** (matchpå navn/domæne/Ads-ID). Notér **Stage** (customer / lead /
    opportunity / "ikke tagget") — en ikke-`customer`-stage betyder en ikke-lukket konto; vægt
    anbefalinger derefter og antag aldrig en aktiv retainer. For delte mapper (Lime, Retriever/Infomedia,
    GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.

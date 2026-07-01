@@ -60,7 +60,7 @@ samme writers. Mindst ÉN genkendt entitet-fane kræves (campaign-settings er IK
 
 Denne skill rører ALDRIG Google Ads-kontoen. Den laver CSV-filer; et menneske importerer dem i
 Editor og kører **Check Changes** før **Post Changes**. Human-in-the-loop på hver ekstern write
-er ikke til forhandling (repo-CLAUDE.md).
+er ikke til forhandling.
 
 ## Hvornår
 

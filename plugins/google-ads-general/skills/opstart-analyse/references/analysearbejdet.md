@@ -18,6 +18,22 @@ til de fleste punkter , brug dem. For tunge moduler (C, G) brug også `details` 
 til at henvise videre til `optimering-loop` når en fuld gennemgang sprænger opstartsrapporten
 (se SKILL.md Trin 3 c2/c3 for den fulde kontrakt).
 
+**`kind` pr. punkt , lookup vs. judgment (autoritativ liste , kopiér herfra).** Hvert punkt er enten
+et **opslag** (agenten læser et faktum , intet for eksperten at efterse → INGEN Ekspert-boks i
+tjeklisten) eller en **vurdering** (agentens skøn → eksperten bekræfter → Ekspert-boks). Sæt `kind`
+på hvert punkt efter denne liste:
+- **`lookup`** (kun Agent-boks): **1-12, 16, 17, 19, 20, 21, 22, 33, 34, 35** , eksistens/optælling
+  af udvidelser (1-10), kontoverificering/adgangsroller (11), tomme ad groups (12), konvertering
+  tracket/værdisat (16-17), display select / search partners fra (19-20), geo+sprog korrekt (21),
+  delt budget (22), device-bud findes (33), hvilke remarketing-lister findes (34), observation-mode
+  (35).
+- **`judgment`** (begge bokse): **13, 14, 15, 18, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32** , annonce-
+  kvalitet/relevans/ad strength (13-15), optimerer mod mål (18), struktur+navngivning (23-24),
+  broad-styring/matchtyper/search-term-hygiejne/keyword-dækning/brand-ekskludering/QS-billede
+  (25-30), budstrategier+mål-CPA fornuft (31-32).
+(Besluttet med Carl 2026-06-10. Grænsen: kan svaret aflæses direkte fra en GAQL-værdi = lookup;
+kræver det et fagligt skøn = judgment.)
+
 **Significance-disciplin (samme som optimering-loop):** Inbounds konti er små danske annoncører. På
 en frisk opstart er der ofte SLET ingen historik (kontoen er lige overdraget). Døm aldrig en asset
 på CTR/CVR ved opstart — opstartsanalysen er en **struktur- og hygiejne-gennemgang**, ikke en

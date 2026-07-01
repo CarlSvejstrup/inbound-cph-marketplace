@@ -29,7 +29,7 @@ The Google Drive connector exposes `create_file` (new file only - no `fileId` to
 
 Even if a write-back existed, `read_file_content` returns "a natural language representation" whose format is explicitly not stable, so you can't safely round-trip a formatted Doc through read → reconstruct → overwrite without flattening it. Draft-to-paste sidesteps both problems and is fully human-in-the-loop compliant: the heavy lifting is automated, the human pastes.
 
-If the connector ever gains an append/update tool, Trin 6 upgrades to the gated four-step write from CLAUDE.md (show target doc + block, wait for explicit approval, write, confirm). The contract is written so that's a localized change.
+If the connector ever gains an append/update tool, Trin 6 upgrades to the gated four-step write (show target doc + block, wait for explicit approval, write, confirm). The contract is written so that's a localized change.
 
 ## Why format-match instead of a clean template
 

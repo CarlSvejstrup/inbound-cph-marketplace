@@ -104,6 +104,8 @@ But every skill that produces an artifact or recommendation stops at "here's the
 |---|---|---|
 | `ads-audit-report` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
 | `ads-changelog` | Change-history → format-matched changelog draft | Gated — Drive paste |
+| `ai-context-publish` | Publish per-client AI Context Docs to Drive + master client-index (vault→Drive, no Ads MCP) | Gated — Drive create (create-once) |
+| `kontekst-opdater` | Per-client AI-context UPDATE + PM-overview (all on Drive): start in the master index, open the client's AI-Context file, pull what's new since its `Sidst opdateret` (Drive docs, HubSpot, status decks), critical TILFØJ/ERSTAT/FJERN diff into the Klientoverblik, write the updated AI-Context file in place (gws) or hand back a copy-paste block | Gated — Drive file write (diff-approved, gws-or-fallback) |
 | `editor-csv-export` | Shared converter: a confirmed review workbook from setup's `assembler` OR the optimization-loop → per-entity Editor import CSVs (pure transform, re-runs no-Broad + length guards) | Gated — file/Drive save |
 
 Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. They are reinforcing, not redundant. All Google Ads MCP use is read-only.
