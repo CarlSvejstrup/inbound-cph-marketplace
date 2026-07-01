@@ -120,7 +120,7 @@ recognized entity tab is required — campaign settings is NOT mandatory (the lo
 | Dialect | Source | Tabs | What converts |
 |---|---|---|---|
 | **assembler** | `inb-ads-campaign-build` assembler | `01 Campaign settings`, `02 Ad groups`, `03 Keywords`, `04 Negative keywords`, `06 RSAs`, `07 Assets` | all 6 CSVs (full new campaign, net-new) |
-| **optimization-loop** | `workflows/optimization-loop` review workbook | `Negative keywords`, `Nye keywords (vindere)`, `RSA challengers` | negatives + keywords + ads only |
+| **optimization-loop** | `inb-ads-optimization-loop` review workbook | `Negative keywords`, `Nye keywords (vindere)`, `RSA challengers` | negatives + keywords + ads only |
 
 Tab-name aliases the converter accepts for the loop dialect: `Nye keywords (vindere)` → keywords,
 `RSA challengers` → ads, `Negative keywords` → negatives (matches both dialects already).

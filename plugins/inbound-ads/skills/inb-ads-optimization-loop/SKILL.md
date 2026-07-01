@@ -332,5 +332,3 @@ faner = Editor-felter (konverteren beholder); lyseblå = metadata (droppes, inkl
   tab-04-vokabular; de nye kolonner — Konfidens/Klik/Tynd data/Agent-note — er alle metadata som
   konverteren dropper; `Alle søgetermer` + `Sprunget over` er alias-usynlige). Retter du
   workbook-kolonnerne, så opdatér også `inb-ads-editor-csv-export`-kontrakten — de er tæt koblede.
-- Den lokale dev-harness (`workflows/optimization-loop/`, en Claude Code Workflow) var prototypen;
-  DETTE skill er nu den kanoniske vej. Vedligehold ikke begge — workflow'en er kasserbar.

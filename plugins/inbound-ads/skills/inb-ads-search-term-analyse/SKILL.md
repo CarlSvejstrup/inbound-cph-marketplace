@@ -5,91 +5,46 @@ description: Skarp, samtale-drevet søgeterm-analyse af én LIVE Google Ads-kont
 
 # search-term-analyse
 
-Én konto. Målet er indsigt, ikke en tabel — og derefter en samtale, ikke en aflevering. Du graver
-mønstrene frem, I beslutter sammen, og først efter en eksplicit bekræftelse tilføjer du de aftalte
-negatives/keywords (live via MCP, CSV, eller Excel). Read-only indtil da. Svar på dansk.
+Én konto. Målet er indsigt, ikke en tabel — og derefter en samtale, ikke en aflevering. Grav mønstrene
+frem, beslut sammen med brugeren, og tilføj kun de aftalte negatives/keywords efter eksplicit
+bekræftelse. Read-only indtil da. Svar på dansk. Sæt `LIB=${CLAUDE_SKILL_DIR}/lib`.
 
-## Ufravigelige tjek — kør HVER gang (skim ikke forbi)
+## 0. Hent klientkontekst først
 
-Resten af dokumentet er *hvordan*. Disse fem er *hvad der aldrig må svigte* — også på en travl dag
-eller en svag model:
+Identificér klienten (uklart → spørg). Åbn master-klientindekset i Drive — Google Doc'en
+`Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`,
+i "A - Kunder") — og find klientens række for Google Ads-ID og link til AI Context. Åbn AI Context
+(`read_file_content`): ID'er, kontakter, mål/KPI'er, navngivningskonvention, budstrategi-norm. Delte
+mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) → vælg rækken for det
+specifikke marked.
 
-1. **AI Context FØRST** (Trin 0). Ingen analyse på en navngiven klient uden at have læst klientens
-   AI Context — det er ground truth for ID'er, rammer og hvad de tilbyder.
-2. **Gem pullet ordret som JSON** (Trin 3). Tool-svaret skrives 1:1 til en `.json`-fil. Gen-tast,
-   rens eller opfind ALDRIG rækker; skriv aldrig et Python-script med en `data = [...]`-liste.
-3. **Læs aldrig de rå rækker.** Kør `digest.py` på filen og læs den lille brief (Trin 4).
-4. **Web-validér HVER kandidat — negatives OG nye keywords — FØR du viser udkastet** (Trin 5). Intet
-   forslag når skærmen uvalideret. For hver kandidat: tjek aktive keywords (`keyword_view`) + AI
-   Context + en web-søgning på `"<brand> <term>"` der leder efter en landingsside/et tilbud.
-   Web-søgningen er ALTID, ikke kun ved tvivl — spring den aldrig over.
-   - **Negativ:** findes der et aktivt keyword, et tilbud eller en landingsside → den er IKKE en
-     negativ (kernetrafik/dæknings-hul; en negativ må aldrig overlappe et aktivt keyword). Kun
-     bekræftet off-offering blokeres.
-   - **Nyt keyword:** der SKAL findes en relevant landingsside/et tilbud at sende trafikken til.
-     Gør der ikke det, tilføj den ikke — flag i stedet at siden mangler. Et keyword uden relevant
-     landingsside er spildte klik.
-5. **Read-only indtil eksplicit bekræftelse** (Trin 6). Mutér kun det der er godkendt; dry-run før
-   commit. Og 0 konverteringer er IKKE bevis for spild på en konto hvor folk ringer.
+Hvis den linkede `.md`-fil ikke kan læses ("ineligible to be used in generative AI contexts"), søg i
+klientens AI Context-mappe efter Google Doc-versionen (fx `<Klient> - Projektoverblik`) — Google Docs er
+læsbare hvor rå `.md`-uploads ikke er. Kan intet læses: sig det og fortsæt med det du har (Drive-mappe,
+Ads MCP), men flag hullet.
 
-## Forudsætning
+## 1. Intake (ét `AskUserQuestion`-kald)
 
-Google Ads MCP + et `customer_id`. Ingen MCP → sig det og stop. Sæt `LIB=${CLAUDE_SKILL_DIR}/lib`.
-MCP'en kan skrive til kontoen (`add_negative_keywords`, `add_keywords`) — men kun i Trin 7, og kun
-efter bekræftelsen i Trin 6.
+Udled så meget som muligt selv; saml resten i ét kald:
 
-## Trin 0 — Hent klient-kontekst (AI Context) FØRST
+1. **Klient + `customer_id`** — normalt kendt fra trin 0; bekræft bare.
+2. **Analysevindue** — default `Sidste 90 dage`, ellers `Sidste 30 dage` / `Andet`. ≤30 dage bruger
+   `get_search_terms_report` (kun Googles literaler: `LAST_30_DAYS` osv. — `BETWEEN` afvises); >30 dage
+   eller custom bruger `run_custom_gaql`.
+3. **Scope** — hele kontoen eller én kampagne (→ `campaign_id`).
+4. **Filter-tærskel** (styrer payload-størrelsen): `Forbrug ≥ 50 kr (anbefalet)`, `Forbrug ≥ andet`,
+   `Impressions ≥ N`, eller `Alt` (advar: tungt på en stor konto). Byg WHERE med
+   `slim.where_predicate(dim, value)`. Rapportér altid "trak X termer (tærskel: …)".
+5. **Hvilken konvertering tæller** — alle, eller kun primære (leads/opkald)? Ved tvivl: antag alle, men
+   skriv forbeholdet.
 
-Før alt andet på en navngiven klient — og før du henter søgeterm-rapporten:
+## 2. Forstå tilbuddet billigt
 
-1. **Identificér klienten.** Uklart → spørg hvilken klient før du fortsætter.
-2. **Åbn master-klientindekset i Drive:** `search_files` efter Google Doc'en
-   `Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`,
-   i "A - Kunder"), læs med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID,
-   ClickUp-mappe, Stage, Drive-mappe og AI Context-fil.
-3. **Find klientens række** (navn/domæne/Ads-ID). Notér **Stage** — en ikke-`customer`-stage betyder en
-   ikke-lukket konto; vægt anbefalinger derefter. Delte mapper (Lime, Retriever/Infomedia, GSGroup,
-   Nemco, Julemærket, PhoneAlone, DI): vælg rækken for det specifikke marked/konto.
-4. **Åbn klientens AI Context** via Drive-linket (`read_file_content`) og tag den ind: ID'er,
-   kontakter, hårde rammer, mål/KPI'er, navngivningskonvention og budstrategi-norm — så
-   negatives/keywords flugter med klientens faktiske opsætning frem for et gæt.
-   - **Fald tilbage hvis den linkede fil ikke kan læses.** Uploadede `.md`-filer er ofte blokeret for
-     AI-adgang i Drive ("...ineligible to be used in generative AI contexts"). Sker det: `search_files`
-     i klientens AI Context-mappe (parentId-søgning) efter **Google Doc-versionen** — typisk
-     `<Klient> - Projektoverblik` eller en doc med "AI Context" i navnet — og læs den. Google Docs er
-     læsbare hvor rå `.md`-uploads ikke er. Forsøg ALTID dette fallback før du erklærer konteksten utilgængelig.
+Ét `firecrawl-scrape` af forsiden + ad group-navnene (de staver geografi + ydelses-opdeling). Skriv 3-5
+linjers forståelse til dig selv, så du kan kende "vores tilbud" fra "ikke vores tilbud". Fejler scrape:
+brug ad group-navnene og sig det.
 
-Ingen række, og hverken `.md` eller Google Doc kan læses: sig det, fortsæt med den kontekst du kan samle
-(Drive-mappe, Ads MCP) — men flag hullet. Spring aldrig opslaget stille over. (Tip til mennesket: hvis
-`.md`-filen skal kunne læses fremover, konvertér den til et Google Doc eller slå AI-adgang til på filen.)
-
-## Trin 1 — Intake (ét `AskUserQuestion`-kald)
-
-Udled så meget som muligt først; saml resten i ét kald:
-
-1. **Klient + `customer_id`** — normalt fra Trin 0; bekræft bare. Mangler det → `list_accessible_accounts`.
-2. **Analysevindue** — default sidste 90 dage (`Sidste 90 dage (Anbefalet)`, `Sidste 30 dage`, `Andet`).
-   Vinduet bestemmer kilden (Trin 3): `get_search_terms_report`s `date_range` accepterer KUN Googles
-   literaler (`LAST_30_DAYS`, `LAST_14_DAYS`, `LAST_7_DAYS`, `THIS_MONTH`, `LAST_MONTH`) — `BETWEEN`
-   OG `LAST_90_DAYS` afvises. Så ≤30 dage → rapporten; >30 dage / custom → `run_custom_gaql`.
-3. **Scope** — hele kontoen eller specifik kampagne (→ `campaign_id`).
-4. **Filter-tærskel** (lethedsgrebet — styrer payloadets størrelse). Byg WHERE med
-   `slim.where_predicate(dim, value)`: `Forbrug ≥ 50 kr (anbefalet)` (`cost`/50) · `Forbrug ≥ andet` ·
-   `Impressions ≥ N` (kan tabe høj-forbrugs/lav-visnings-term) · `Alt` (advar: tungt på stor konto).
-   Rapportér altid "trak X termer (tærskel: …)".
-5. **Hvilken konvertering tæller** — alle, eller kun primære (leads/opkald)? Ændrer hvad der er vinder
-   vs. spild. Vil brugeren skille dem ad → segmentér på `segments.conversion_action`. Ved tvivl: antag
-   alle, men skriv forbeholdet.
-
-## Trin 2 — Forstå tilbuddet billigt (forside + ad groups)
-
-Du skal kunne kende "vores by/ydelse" fra "ikke vores tilbud". Ét `firecrawl-scrape` af forsiden +
-ad group-navnene (de staver geografien + ydelses-opdelingen). Skriv 3-5 linjers forståelse til dig
-selv. Fejler scrape: brug ad group-navnene og sig det.
-
-## Trin 3 — Hent LET (server-side filter FØR kontekst)
-
-Filtrér ALTID server-side — det er der letheden kommer fra.
+## 3. Hent data server-side filtreret
 
 **≤30 dage:** `get_search_terms_report(customer_id, date_range=LAST_30_DAYS, campaign_id?, limit)`.
 
@@ -108,78 +63,60 @@ LIMIT 1000
 ```
 `cost`/50 → `metrics.cost_micros >= 50000000`. Rammer `LIMIT` → sig det ("trak de 1000 dyreste").
 
-**Gem svaret (jf. Ufravigeligt tjek #2):** skriv tool-svaret ordret til en `.json`-fil (fx
-`~/Downloads/_st_raw.json`) med fil-værktøjet — hele `{"results": [...]}`, præcis som returneret. Aldrig
-et Python-script, aldrig håndtastede/opfundne rækker. Data skal være data. Du behøver ikke læse filen.
+Skriv tool-svaret ordret til en `.json`-fil (fx `~/Downloads/_st_raw.json`) — hele `{"results": [...]}`,
+præcis som returneret. Skriv aldrig et Python-script med håndtastede rækker; data skal være data.
 
-## Trin 4 — Byg indsigts-briefen (`digest.py`)
+## 4. Byg indsigts-briefen
 
 ```bash
 python3 $LIB/digest.py --in ~/Downloads/_st_raw.json --out ~/Downloads/_st_digest.json --top 20
 ```
-Læs den printede brief — ikke de rå rækker. Den slanker (dropper skrald, aggregerer samme term på
-tværs af ad groups), kører n-gram, og ruller op til: overblik (forbrug, konv, blended CPA, 0-konv-andel),
+Læs den printede brief, ikke de rå rækker. Den slanker (dropper skrald, aggregerer samme term på tværs
+af ad groups), kører n-gram, og ruller op til: overblik (forbrug, konv, blended CPA, 0-konv-andel),
 top-forbrug, systemiske spild-temaer, vinder-temaer (udækkede), intent-linser, match-type-lækage,
-struktur-smell, udækkede vindere. `--top` er kun rækker pr. tabel — hele datasættet analyseres. Læg
-gerne egne observationer oveni (sært cost/konv, stavevariant, geo udenfor dækning, brand I ikke ejer).
+struktur-smell, udækkede vindere. `--top` er kun rækker pr. tabel — hele datasættet analyseres. Læg egne
+observationer oveni (sært cost/konv, stavevariant, geo udenfor dækning, brand I ikke ejer).
 
-## Trin 5 — Verificér, præsentér ét udkast, før så en samtale
+## 5. Web-validér hver kandidat, så ét udkast
 
-Rytmen: **verificér negativ-kandidater → ét samlet udkast → almindelig samtale → enighed.** Du forhører
-ikke brugeren term for term — du har lavet analysen, så kom med ét bud.
+For hver kandidat — negativ eller nyt keyword — tjek tre ting før den kommer med i udkastet: aktive
+keywords (`keyword_view`), AI Context, og en websøgning på `"<brand> <term>"` der leder efter en
+landingsside eller et tilbud. Gør dette for alle kandidater, ikke kun de tvivlsomme — det er nemt at
+gætte forkert på ydelses-termer (`mommy makeover`, `maveplastik`).
 
-**Først: web-validér hver kandidat — BÅDE negatives og nye keywords (Ufravigeligt tjek #4) — FØR
-udkastet vises.** For hver: aktive keywords (`keyword_view`) → AI Context → **en web-søgning på
-`"<brand> <term>"` (altid, ikke kun ved tvivl) der leder efter en landingsside/et tilbud.** En negativ
-droppes hvis siden/tilbuddet findes (så tilbyder de det); et nyt keyword tilføjes kun hvis en relevant
-landingsside findes (ellers er det spildte klik — flag at siden mangler). Det er gjort FÆRDIGT inden du
-åbner munden; udkastet indeholder kun validerede forslag, og du viser kort hvad du tjekkede ud for hver.
-(Især ydelses-termer som `mommy makeover`, `maveplastik` — nemme at antage forkert.)
+- **Negativ:** findes der et aktivt keyword, et tilbud eller en landingsside, er det ikke en negativ —
+  det er kernetrafik eller et dæknings-hul. En negativ kræver et positivt tegn på irrelevans
+  (off-offering, forkert intent, konkurrent), aldrig bare 0 konverteringer.
+- **Nyt keyword:** kun med en relevant landingsside at sende trafikken til. Findes den ikke, flag i
+  stedet at siden mangler, i stedet for at tilføje keywordet.
 
-Så samtalen:
-1. **Læg ét konkret udkast på bordet, i prosa:** de negatives og nye keywords du foreslår (hver med
-   keyword, match-type, hvor) + 2-4 interessante ting værd at tale om. Med tallet bag hvert punkt.
-2. **Derefter normal dialog.** Gem `AskUserQuestion` til de få ægte skarpe valg og til godkendelsen
-   (Trin 6) — ikke ét pr. punkt.
-3. Foreslå bredere keywords/negatives hvor det giver mening (`helkropsscanning pris` → `helkropsscanning`).
-4. Hold en løbende beslutnings-liste (keyword, match-type, level, kampagne, ad group) → `decisions.json`.
-5. Brug for mere viden? `firecrawl-map`/`-scrape` en underside eller en web-søgning — målrettet, ikke
-   en blind crawl. Bedre end at gætte eller spørge om noget der står på klientens egen side.
+Læg så ét samlet udkast på bordet i prosa: de foreslåede negatives og nye keywords (keyword, match-type,
+hvor) plus 2-4 interessante fund værd at tale om, med tallet bag hvert punkt. Foreslå bredere varianter
+hvor det giver mening (`helkropsscanning pris` → `helkropsscanning`). Herefter almindelig dialog — gem
+`AskUserQuestion` til de få reelt skarpe valg og til godkendelsen i trin 6, ikke ét spørgsmål per punkt.
+Hold en løbende beslutningsliste (keyword, match-type, level, kampagne, ad group).
 
-Husk dommereglerne: on-offering lokal geo bliver aldrig en negativ; en negativ kræver et positivt tegn
-på irrelevans (off-offering/forkert intent/konkurrent), ikke bare 0 konv; en vinder kræver reelt
-udækket + fornuftig signifikans (små tal er støj). Ved tvivl → tag den op, ikke et forkert kald.
+## 6. Bekræft hele listen, vælg leverings-vej
 
-## Trin 6 — Bekræft HELE listen eksplicit, og vælg leverings-vej
+Før noget skrives: vis hele den endelige liste (negatives og nye keywords, hver med keyword · match-type
+· level · kampagne/ad group) og få et eksplicit ja — dette kan ændre en LIVE konto. Sig hvad et ja
+betyder: keywords serve straks (ingen paused-tilstand via MCP); MCP virker kun på campaign/ad_group-
+niveau (account-scope fanner ud pr. kampagne; delt liste kræver CSV).
 
-Inden du tilføjer eller skriver én linje: præsentér hele den endelige liste og få et eksplicit ja —
-obligatorisk, fordi næste skridt kan ændre en LIVE konto. Vis BÅDE negatives og positives, alt konkret:
-keyword · match-type · level · præcis kampagne (+ ad group) eller delt liste; for keywords: kampagne +
-ad group. Hver kandidat — både negatives og nye keywords — skal være web-valideret (Trin 5).
+Spørg med ét `AskUserQuestion`:
+- `Tilføj live i kontoen nu (Anbefalet)` → gå til trin 7, spor A.
+- `Lav Editor-CSV i stedet` → spor B.
+- `Excel-overblik` → spor C (kan laves oveni A/B).
+- `Ret noget først` → tilbage i samtalen, opdatér, bekræft igen.
 
-Sig hvad et ja betyder: negatives/keywords tilføjes LIVE (keywords serve straks; ingen paused via MCP);
-MCP kan kun campaign/ad_group-niveau (account → fan-out pr. kampagne; delt liste → kun CSV).
+## 7. Udfør
 
-Spørg så med ÉT `AskUserQuestion`:
-- `Tilføj live i kontoen nu (Anbefalet)` → Trin 7A.
-- `Lav Editor-CSV i stedet` → Trin 7B.
-- `Excel-overblik` → Trin 7C (kan også laves oveni live/CSV).
-- `Ret noget først` → tilbage i samtalen; opdatér og bekræft igen.
+Læs `references/apply.md` for mekanikken bag spor A (live MCP), B (CSV) og C (Excel), og for
+`decisions.json`-formatet. Skriv kun det der stod på den godkendte liste. Afslut med en kort
+opsummering og `## Kilder`.
 
-Tilføj/skriv først når brugeren har valgt. Aldrig en mutation uden grønt lys på den fulde liste, og
-aldrig noget der ikke stod på den.
+## lib/
 
-## Trin 7 — Udfør (læs `references/apply.md`)
-
-Når brugeren har valgt, **læs `references/apply.md`** for den præcise mekanik: byg `decisions.json`, og
-følg 7A (live MCP: ID-opslag → grupper → dry-run → commit), 7B (CSV via `write_csv.py`) eller 7C (Excel
-via `build_xlsx.py`). Afslut med en kort opsummering + `## Kilder`.
-
-## lib/ (selvstændig)
-
-- `slim.py` — slanker rapporten + `where_predicate()` (server-side-filter) + `aggregate_terms()` (én
-  vejet række pr. term). `ngram.py` — systemiske temaer pr. 1/2/3-gram. `digest.py` — komponerer dem
-  til den kompakte brief. Ingen vurdering i nogen af dem.
-- `write_csv.py` (Trin 7B) + `build_xlsx.py` (Trin 7C) — render de aftalte beslutninger til CSV/Excel
-  med hårde guards. Live-tilføjelsen (7A) er direkte MCP-kald, ikke et script. Ingen vurdering rører
-  output — al klassifikation hører til i samtalen.
+`slim.py` (slanker rapporten, `where_predicate()`, `aggregate_terms()`) og `ngram.py` (temaer per
+1/2/3-gram) fodrer `digest.py`. `write_csv.py` og `build_xlsx.py` gør beslutningerne til CSV/Excel med
+hårde guards. Ingen af scripterne vurderer noget — al klassifikation sker i samtalen.
