@@ -181,8 +181,19 @@ regner, modellen dømmer):
   ALDRIG noget der allerede er blokeret).
 - Sorterer den usikre gruppe efter forbrug og markerer hvilke der er inden for tier-3-loftet.
 
-Læs `scored.json`. Fordel dig selv: høj-bånd og lav-bånd er **afgjort** — ingen grund til at
-genoverveje dem. Kun den usikre gruppe (inden for loftet) skal videre til Trin 4.
+Læs `scored.json`. Fordel dig selv: høj-bånd og lav-bånd behøver **intet websøg** — kun den usikre
+gruppe (inden for loftet) skal videre til Trin 4, det er dét loftet er der for at spare.
+
+**Men "intet websøg" betyder ikke "ingen læsning".** Live-test (Dantaxi, 2026-07-01) viste at
+selv efter TLD- og nøgleords-signalerne kan et reelt gambling-site (`spil2vind.dk`) lande i
+lav-båndet, fordi dets forbrug var spredt over flere rækker og ingen enkelt række krydsede
+nul-konv-gulvet. Scriptet er additivt og lokalt — det ser IKKE mønstre på tværs af rækker, og det
+har ingen fuldstændig ordliste. Så: **skim domænenavnene i lav-båndet med sund fornuft, gratis,
+uden opslag**, før du skriver rapporten. Et domænenavn der åbenlyst betyder gambling/spil/casino på
+dansk ELLER engelsk, men som scoren satte lavt, skal stadig nævnes i rapporten (fx som en note under
+lav-bånd-tabellen: "bemærk: X ligner et gambleside på trods af lav score, tjek"), ikke bare forsvinde
+tavst. Det er billigt (et blik, ikke et opslag) og det er præcis den slags fejl der reelt sker på
+skæve, spredte konti.
 
 ## Trin 4 — Websøg KUN på den usikre gruppe (tier 3, loft-begrænset)
 
