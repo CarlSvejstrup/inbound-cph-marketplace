@@ -3,7 +3,7 @@
 
 ARCHITECTURE (locked 2026-06-05): the loop does NOT emit Editor CSVs. It returns ONE
 Excel workbook that the ads expert edits, can send to the client, and then hands to a
-separate converter skill (in google-ads-general) that does workbook -> Editor CSV. This
+separate converter skill (the editor-csv-export skill) that does workbook -> Editor CSV. This
 mirrors the assembler, which was already made Excel-only (commit eb4ebd9): "the workbook
 is a lossless superset; the converter produces the CSVs." Editor imports CSV, not .xlsx
 (Google Ads Editor answer 30564) - which is exactly why the converter exists.

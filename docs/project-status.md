@@ -2,7 +2,9 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-06-05, after adding `ads-aendringslog` (google-ads-optimization v1.1.0).
+Last updated: 2026-07-01, after merging the three Google Ads plugins into one.
+
+> **2026-07-01 — plugin consolidation.** The three plugins (`google-ads-setup`, `google-ads-optimization`, `google-ads-general`) were merged into a single plugin, **`inbound-ads` v3.0.0**, on branch `feat/inbound-ads-merge`. All 15 skills now live under `plugins/inbound-ads/skills/` (git history preserved via `git mv`). Install is now `/plugin install inbound-ads@inbound-cph`. The two former cross-plugin dependencies (`editor-csv-export` ← `campaign-build`/`optimering-loop`, and `annonce-optimering` ↔ `responsive-search-ads`) are now intra-plugin. Milestone/version notes below that name the old plugins are historical and describe the pre-merge layout. Next: agents (bundled subagents) come after this merge is verified in Cowork.
 
 ## Milestones
 

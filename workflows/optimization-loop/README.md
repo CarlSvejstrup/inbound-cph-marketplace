@@ -2,7 +2,7 @@
 
 > **SUPERSEDED (2026-06-09) — this is the kept-for-history dev prototype, not the canonical
 > path.** The loop now ships as a Cowork plugin skill:
-> `plugins/google-ads-optimization/skills/optimering-loop/`. That skill is canonical and bundles
+> `plugins/inbound-ads/skills/optimering-loop/`. That skill is canonical and bundles
 > its own copies of `lib/` (gaql + review_workbook + taxonomy); its Python pipeline was verified
 > end-to-end against live DSC (diagnostics → workbook → CSV). **Do not maintain both** — make
 > changes in the skill. This Workflow remains only as the throwaway harness that proved the
@@ -38,8 +38,8 @@ agent → returns a CSV bundle + a Danish executive summary.
   -build assembler's — one shared per-entity CSV target.
 
 **Recommend-only, Excel-first.** No Google Ads API writes, no Drive writes. The expert **edits
-the workbook** (and can send it to the client), then runs a separate converter skill (in
-`google-ads-general`) that turns the confirmed workbook into Editor CSVs, then imports those in
+the workbook** (and can send it to the client), then runs the `editor-csv-export` skill that
+turns the confirmed workbook into Editor CSVs, then imports those in
 Editor, reviews the green/yellow diff, and hits Post. Editor imports CSV not `.xlsx` (answer
 30564) — which is why the converter exists. The workbook-edit + the Post are the human gates.
 

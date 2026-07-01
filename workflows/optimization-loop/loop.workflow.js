@@ -347,7 +347,7 @@ STEP 1 - assemble the findings object for review_workbook.build():
              Paused; skip already_exact),
   "rsa_rows": for each ad group with challenger_flag or missing_angles, ONE rsa_row:
      - headlines[] (<=15) + descriptions[] (<=4) + paths[2] + final_url, grounded in
-       assetHygiene.gap_brief + ${repoRoot}/plugins/google-ads-setup/skills/responsive-search-ads/references/headline-craft.md.
+       assetHygiene.gap_brief + ${repoRoot}/plugins/inbound-ads/skills/responsive-search-ads/references/headline-craft.md.
        Apply headline-craft as VARIATION + tiebreakers (NOT hard <20-char ceilings); keep the
        validated "ignore Ad Strength" stance. RESPECT the hard Editor limits: headline <=30,
        description <=90, path <=15 chars. Drop/triM any over-length line before writing.

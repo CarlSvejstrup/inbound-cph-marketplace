@@ -3,19 +3,9 @@
   "owner": { "name": "Carl Svejstrup" },
   "plugins": [
     {
-      "name": "google-ads-setup",
-      "source": "./plugins/google-ads-setup",
-      "description": "Build a new Google Ads campaign end-to-end: research, structure, creative, and a polished assembled review workbook (and the RSA copy engine). Editor CSVs are produced from the confirmed workbook by google-ads-general's editor-csv-export."
-    },
-    {
-      "name": "google-ads-optimization",
-      "source": "./plugins/google-ads-optimization",
-      "description": "Optimize live Google Ads accounts: post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining, plus optimering-loop (the whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score → one editable Excel workbook)."
-    },
-    {
-      "name": "google-ads-general",
-      "source": "./plugins/google-ads-general",
-      "description": "General Google Ads deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, editor-csv-export (confirmed review workbook -> Google Ads Editor import CSVs; reads both the campaign-build assembler and optimization-loop workbooks), and opstart-analyse (new-client onboarding: the 35-point ClickUp Analysearbejdet account review to a .docx checklist report in the client's Drive folder). All read-only against Ads."
+      "name": "inbound-ads",
+      "source": "./plugins/inbound-ads",
+      "description": "Inbound CPH's full Google Ads suite in one plugin: build a new campaign (campaign-build + research/structuring/assets/responsive-search-ads), optimize a live account (soegeterm-analyse, search-term, annonce-optimering, optimering-loop), and standalone deliverables (ads-audit-report, ads-changelog, editor-csv-export, ai-context-publish, kontekst-opdater, opstart-analyse). Danish-default, read-only against Google Ads except HITL-gated confirmed writes."
     }
   ]
 }

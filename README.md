@@ -1,63 +1,64 @@
 # inbound-cph-marketplace
 
-Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **three plugins**, installed per user and updated via `/plugin update`:
+Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **one plugin, `inbound-ads`**, installed per user and updated via `/plugin update`. Its skills cover the full lifecycle, grouped into three jobs:
 
-- **`google-ads-setup`** — build a NEW Google Ads campaign end-to-end (research → structure → creative → a polished, client-shareable review workbook). Editor CSVs come from `google-ads-general`'s `editor-csv-export`.
-- **`google-ads-optimization`** — optimize a LIVE Google Ads account (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining).
-- **`google-ads-general`** — standalone deliverables: full audit reports (slide deck + PDF), change-log generation from Ads change-history, and `editor-csv-export` (the shared converter: a confirmed review workbook from EITHER setup's `assembler` OR the optimization-loop → Google Ads Editor import CSVs).
+- **Build a NEW campaign** — `campaign-build` (orchestrator) + `research`, `structuring`, `assets`, `responsive-search-ads`. Ends in a polished, client-shareable review workbook.
+- **Optimize a LIVE account** — `soegeterm-analyse`, `search-term`, `annonce-optimering`, `optimering-loop` (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining + the whole diagnose-to-workbook loop).
+- **Standalone deliverables** — `ads-audit-report`, `ads-changelog`, `editor-csv-export` (the shared converter: a confirmed review workbook from EITHER `campaign-build`'s `assembler` OR `optimering-loop` → Google Ads Editor import CSVs), `ai-context-publish`, `kontekst-opdater`, `opstart-analyse`.
 
-All share one operating contract (`CLAUDE.md`) and company context (`context/`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account; humans import the artifacts after approval.
+All skills share one operating contract (`CLAUDE.md`). Everything is **read-only / recommend-only against Google Ads** — no skill writes to an account autonomously; humans import the artifacts after approval, and any account write is gated per-action.
 
 ## Install
 
-In Cowork (or any Claude Code surface), add the marketplace once, then install whichever plugin(s) you need:
+In Cowork (or any Claude Code surface), add the marketplace once, then install the plugin:
 
 ```
 /plugin marketplace add CarlSvejstrup/inbound-cph-marketplace
-/plugin install google-ads-setup@inbound-cph
-/plugin install google-ads-optimization@inbound-cph
-/plugin install google-ads-general@inbound-cph
+/plugin install inbound-ads@inbound-cph
 ```
 
-The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbound-cph`. The `annonce-optimering` (optimization) → `responsive-search-ads` (setup) gap-brief loop spans plugins via manual paste, so install both setup + optimization to close the full build→operate→iterate loop.
+The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@inbound-cph`. Because every skill now lives in one plugin, the full build→operate→iterate loop (including the `annonce-optimering` → `responsive-search-ads` gap-brief manual paste) closes with a single install.
 
 ## Skills shipped
 
-### google-ads-setup (9 skills) — build a new campaign
+`inbound-ads` ships **15 skills** in one plugin, grouped by job.
+
+### Build a new campaign
 
 | Skill | Purpose |
 |---|---|
-| `landing-page-analyzer` | Scrape a landing page → structured positioning JSON (USPs, tone, CTAs, trust, offer) |
-| `competitor-research` | Competitor positioning from their own pages → differentiator list + "sea of sameness" map |
-| `campaign-strategy` | Campaign settings (type, geo, networks, bidding, budget, tracking gate) as a decision object |
-| `semrush-research` | **Gated** — keyword volume/difficulty/CPC + organic rankings + trends from Semrush MCP; degrades to theme-derived when no Semrush plan is connected |
-| `structuring` | The Phase-2 gate: ad groups + keyword selection (Exact/Phrase) + client-specific negatives |
-| `rsa-copywriter` | Writes RSAs for every ad group by reusing `responsive-search-ads` per group |
-| `assets` | Sitelinks, callouts, structured snippets (lead forms are a manual UI step) |
-| `assembler` | Merges all the above into Ian's polished 10-tab review workbook — Excel-only, the client-confirmation artifact (no CSV, no API push). Editor CSVs are produced later by `editor-csv-export` |
-| `responsive-search-ads` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards |
+| `campaign-build` | Orchestrator — runs the Phase 1→4 pipeline (a subagent per phase reference) into Ian's polished 10-tab review workbook (Excel-only, the client-confirmation artifact; no CSV, no API push). The full pipeline (landing-page, competitor, strategy, structuring, RSA, assets, assembler) lives inside as `references/` + `scripts/assemble.py`. Editor CSVs are produced later by `editor-csv-export` |
+| `research` | Phase 1 standalone: landing-page positioning + competitor analysis + campaign strategy/settings → a `.docx` report |
+| `structuring` | The Phase-2 gate: ad groups + keyword selection (Exact/Phrase) + client-specific negatives → an `.xlsx` |
+| `assets` | Phase 3: sitelinks, callouts, structured snippets (lead forms are a manual UI step) → an `.xlsx` |
+| `responsive-search-ads` | The RSA copy engine: one ad group → an Editor-ready sheet with live `=LEN()` guards. Reused by `campaign-build` per group |
 
-### google-ads-optimization (2 skills) — optimize a live account
+### Optimize a live account
 
 | Skill | Purpose |
 |---|---|
-| `annonce-optimering` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief |
-| `search-terms` | Search-terms-report analysis → colour-coded sheet + import-ready negative-keyword list |
+| `soegeterm-analyse` | Lean search-terms-report analysis → one colour-coded `.xlsx` with live FILTER action-sheets (Negativ/Vinder) |
+| `search-term` | The conversational variant: surfaces the interesting findings and talks them through, then writes the agreed negatives/new keywords straight into Google Ads Editor import CSVs |
+| `annonce-optimering` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief fed back into `responsive-search-ads` |
+| `optimering-loop` | The whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score → one editable Excel review workbook |
 
-### google-ads-general (3 skills) — standalone deliverables
+### Standalone deliverables
 
 | Skill | Purpose |
 |---|---|
 | `ads-audit-report` | Full paid-search audit → polished HTML slide deck + rendered PDF report |
 | `ads-changelog` | Build a changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
-| `editor-csv-export` | The **shared** converter for both workflows: a confirmed review workbook — from setup's `assembler` (full new campaign) OR the optimization-loop `review_workbook` (subset) → the per-entity Google Ads Editor import CSVs. Reads both dialects on one contract. Pure transform, re-runs the no-Broad + length guards, never pushes to the account |
+| `editor-csv-export` | The **shared** converter for both workflows: a confirmed review workbook — from `campaign-build`'s `assembler` (full new campaign) OR `optimering-loop`'s `review_workbook` (subset) → the per-entity Google Ads Editor import CSVs. Reads both dialects on one contract. Pure transform, re-runs the no-Broad + length guards, never pushes to the account |
+| `ai-context-publish` | Publish per-client AI Context Docs to Drive + maintain the master client-index (vault→Drive, no Ads MCP; create-once) |
+| `kontekst-opdater` | On-demand per-client AI-context update + PM overview, all on Drive: diff what's new since the file's `Sidst opdateret` (Drive docs, HubSpot, status decks) with HITL-gated TILFØJ/ERSTAT/FJERN, write the updated file in place |
+| `opstart-analyse` | New-client onboarding: the 35-point ClickUp Analysearbejdet account review → a `.docx` checklist report in the client's Drive folder |
 
 ## Data integration
 
 - **Google Ads MCP** — read-only. Live account data (campaigns, keywords, search terms, RSA assets, the MCC shared negative list). No writes, no API push.
 - **Firecrawl** — landing-page + competitor scraping.
 - **Drive connector** — Cowork's built-in `mcp__claude_ai_Google_Drive__*`; each user authorises once. Drive root via `userConfig.inbound_root_folder_id` in each `plugin.json`.
-- **Semrush MCP** — optional, plan-gated; `semrush-research` uses it when available and degrades cleanly otherwise.
+- **Semrush MCP** — optional, plan-gated; the `research` skill uses it when available and degrades to theme-derived keywords otherwise.
 
 ## Philosophy
 
@@ -71,62 +72,51 @@ The marketplace is named `inbound-cph`, so the install syntax is `<plugin>@inbou
 
 ```
 .claude-plugin/
-  marketplace.json                # marketplace "inbound-cph", lists all three plugins
+  marketplace.json                # marketplace "inbound-cph", lists the one plugin
+CLAUDE.md                         # the shared operating contract (repo root)
 plugins/
-  google-ads-setup/
-    .claude-plugin/plugin.json
-    CLAUDE.md                     # shared operating contract
-    context/                      # about-inbound, drive-map, voice-house-style
-    skills/                       # the 9 setup skills (see table above)
-  google-ads-optimization/
-    .claude-plugin/plugin.json
-    CLAUDE.md                     # same contract (copy)
-    context/
-    skills/                       # annonce-optimering, search-terms
-  google-ads-general/
-    .claude-plugin/plugin.json
-    CLAUDE.md                     # same contract (copy)
-    context/
-    skills/                       # ads-audit-report, ads-changelog
+  inbound-ads/
+    .claude-plugin/plugin.json    # name "inbound-ads", version, userConfig
+    skills/                       # all 15 skills (see tables above)
+    _archive/                     # retired skills, kept for reference
 docs/
   project-status.md, session-handoff.md, ...
 ```
 
 ## Versioning + update flow
 
-Each plugin uses **explicit semver** in its `plugin.json`. Bump it every time you ship changes to that plugin — pushing without bumping does nothing for users (Claude Code compares version strings, not SHAs).
+The plugin uses **explicit semver** in its `plugin.json`. Bump it every time you ship changes — pushing without bumping does nothing for users (Claude Code compares version strings, not SHAs).
 
 After bumping and pushing:
 
 1. Users open Cowork → marketplace panel.
 2. Click `...` next to the **`inbound-cph`** marketplace → Refresh.
-3. The relevant plugin's "Update" button lights up → click.
+3. The `inbound-ads` "Update" button lights up → click.
 
 If marketplace metadata is stuck, the nuke-and-reinstall path:
 
 ```
 /plugin marketplace remove inbound-cph
 /plugin marketplace add CarlSvejstrup/inbound-cph-marketplace
-/plugin install google-ads-setup@inbound-cph
-/plugin install google-ads-optimization@inbound-cph
+/plugin install inbound-ads@inbound-cph
 ```
 
 ## Adding or editing a skill
 
 ```bash
-# 1. Create the skill directory in the right plugin
-mkdir -p plugins/<plugin>/skills/<skill-name>
+# 1. Create the skill directory
+mkdir -p plugins/inbound-ads/skills/<skill-name>
 # 2. Write SKILL.md (frontmatter: name, description; body: when-to-use, inputs, what-to-produce, rules)
-# 3. Bump plugins/<plugin>/.claude-plugin/plugin.json version
+# 3. Bump plugins/inbound-ads/.claude-plugin/plugin.json version
 # 4. Commit, push
 # 5. Refresh marketplace + update in Cowork to test
 ```
 
 Skill format follows Anthropic's universal SKILL.md spec; works across Cowork, Claude Code, Cursor, Codex.
 
-## Cross-plugin note
+## Skill coupling note
 
-`${CLAUDE_PLUGIN_ROOT}` resolves to a single plugin's directory, so a skill cannot reference files in a sibling plugin. That's why `responsive-search-ads` (the RSA engine that `rsa-copywriter` + `assembler` depend on in code) lives in `google-ads-setup` alongside its dependents. The `annonce-optimering` ↔ `responsive-search-ads` gap-brief loop crosses the plugin boundary, but it's manual paste (no code coupling), so it works as long as both plugins are installed.
+All 15 skills live in one plugin, so `${CLAUDE_PLUGIN_ROOT}` resolves to a directory they all share — there's no cross-plugin file-reference limitation. `campaign-build` reuses the `responsive-search-ads` RSA engine directly (via its internal pipeline references), and both `campaign-build` and `optimering-loop` feed the shared `editor-csv-export` converter. The `annonce-optimering` ↔ `responsive-search-ads` gap-brief loop is manual paste (no code coupling) between two sibling skills, so a single install closes the full build→operate→iterate loop.
 
 ## Language and tone
 
