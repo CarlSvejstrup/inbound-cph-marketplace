@@ -19,11 +19,10 @@ Seneste rapport læst: 2026-06 - Dantaxi Statusrapport (juni 2026) SEO&SEM [id: 
 ## Step-by-step
 
 ### 1. Find the newest deck
-`search` (rawQuery) the report folder:
-```
-'<report-folder id>' in parents and trashed = false
-```
-Decks are titled `YYYY-MM - <Klient> ...`. **Pick the newest by the `YYYY-MM` in the title** (not `modifiedTime` — re-exports muddy it). A given month often appears as BOTH a PDF and an uploaded PPTX (same title, different mime) — that's fine, prefer the PDF for extraction (see step 3).
+`listFolder(folderId=<report-folder id>)` (or `search` rawQuery `'<report-folder id>' in parents and trashed = false`).
+Decks are titled `YYYY-MM - <Klient> ...`. **Pick the newest by the `YYYY-MM` in the title** (not `modifiedTime` — re-exports muddy it). A given month often appears as BOTH a PDF and an uploaded PPTX (same title, different mime) — that's fine, prefer native Slides, then PPTX, then PDF (all three are readable, see step 3).
+
+**An `#1` folder can be a decoy.** Verified 2026-07-01 across the client set: some `#1 - Statusmøder` folders are EMPTY or hold only 2022-23 files while the live decks sit elsewhere (SecureFirst → `Paid Search`; Julemærket → `Google Ads/2026 - <Klient> - Møder`; some clients have a `Statusmøder/Statusmøder 2026` subfolder, a `a - Månedlige statusmøder` subfolder, or a `GEO Henning` subfolder). If the mapped/`#1` folder is empty or has no recent `YYYY-MM` deck, DRILL into its subfolders and search the client tree (`Paid Search`, `Google Ads/`, year-subfolders) before concluding "none". Only after that search comes up empty do you report no report. Also skip non-decks that share the folder (an `.mp3` workshop recording, a GEO/AI-visibility sales pitch that isn't a Paid Search status) and title-date lies (a file named `2026-05` whose content is March) — cite the title, state the real period.
 
 ### 2. Is it new? (the skip gate)
 Compare the newest deck against `Seneste rapport læst` in the AI-Context file:
@@ -32,8 +31,10 @@ Compare the newest deck against `Seneste rapport læst` in the AI-Context file:
 
 ### 3. Convert to readable text
 - **PDF present (the norm for recent reports):** `convertPdfToGoogleDoc(fileId=<pdf id>, newName="ZZ-TEMP <klient> rapport ekstraktion (delete me)")` → returns a temp Doc id. Then `readGoogleDoc(documentId=<temp id>, format="text")` (paginate with `readGoogleDocPaginated` if long). Verified 2026-07-01 on Dantaxi's juni deck: extraction is clean, readable Danish (full agenda, SEO, "Google Ads — Siden sidst", performance, next steps).
-- **Only a PPTX (no PDF):** `convertPdfToGoogleDoc` does NOT accept PPTX. Fall back to `downloadFile(fileId, localPath="/tmp/<name>.pptx")` into the connector's own sandbox, then extract with the pptx skill IF that skill runs in the same sandbox. NOTE (env caveat, 2026-07-01): the Workspace connector's `/tmp` is a SEPARATE filesystem from the main agent shell — a `downloadFile` there is NOT visible to local Bash/Read. So in a split-sandbox environment, prefer the PDF+convert path; if only a PPTX exists, surface the link and say the deck couldn't be auto-extracted rather than guessing.
-- **Native Google Slides deck** (some clients, e.g. Lime): read directly with `getGoogleSlidesContent(presentationId=<id>)` — no conversion needed.
+- **PPTX (a true Office file — common: Nemco, Capio, MMAKE, A&Til, Alpha, DNV):** `getGoogleSlidesContent` REJECTS it and `convertPdfToGoogleDoc` does not accept it. Two working paths, verified 2026-07-01 in bulk:
+  1. **Re-upload with conversion (preferred, always works):** `downloadFile(fileId)` into the connector's own sandbox, then re-upload with `convertToGoogleFormat: true` + the explicit PPTX mimeType (`application/vnd.openxmlformats-officedocument.presentationml.presentation`) to produce a temp native Slides file → `getGoogleSlidesContent(presentationId=<temp id>)` → `deleteItem` the temp. (The connector's `/tmp` is a separate filesystem from the main shell, so the download stays inside the connector — that's fine here, the re-upload reads from the same sandbox.)
+  2. **Convert the PDF twin** if the same month also exists as a PDF: use the PDF path above instead.
+- **Native Google Slides deck** (many clients, e.g. Lime, GSGroup, Retriever): read directly with `getGoogleSlidesContent(presentationId=<id>)` — no conversion needed. This is the cheapest; prefer it when the month exists as native Slides.
 
 ### 4. Clean up the temp Doc (mandatory)
 If you created a `ZZ-TEMP ...` conversion Doc in step 3, **delete it immediately** after reading: `deleteItem(itemId=<temp id>)` (moves to trash). Never leave conversion artifacts in Drive — that is the create-once clutter anti-pattern. One temp Doc, read it, trash it.
