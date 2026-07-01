@@ -38,13 +38,30 @@ Compare the newest deck against `Seneste rapport læst` in the AI-Context file:
 ### 4. Clean up the temp Doc (mandatory)
 If you created a `ZZ-TEMP ...` conversion Doc in step 3, **delete it immediately** after reading: `deleteItem(itemId=<temp id>)` (moves to trash). Never leave conversion artifacts in Drive — that is the create-once clutter anti-pattern. One temp Doc, read it, trash it.
 
-### 5. Extract DURABLE content only
-From the deck text, pull what belongs in the Klientoverblik (feed to the diff in the main skill's Trin 4), NOT the metrics:
-- **Keep:** what was reported/agreed, decisions, named next-steps and open levers ("Uberficering-splittest forlænget til 6. juli", "Customer Match — aftalt at vente"), structural/strategy changes, new campaigns/experiments, contact or scope changes.
-- **Drop (timeless rule):** all performance numbers — spend, CTR, CPC, impressions, clicks, installs, conversions, ROAS, share %, month-over-month deltas. A deck is a point-in-time snapshot; recast a useful verdict as a durable lever, never copy the number. (See `diff-classification.md` timeless guard.)
+### 5. Extract the report summary (its OWN section — NOT the Klientoverblik diff)
+Report content lives in a dedicated **`## Rapport`** section in the AI-Context file and is kept **entirely separate** from `## Klientoverblik`. Report-ingestion does NOT feed the Trin 4 TILFØJ/ERSTAT/FJERN diff and does NOT edit Klientoverblik — this keeps report insights traceable to their source and easy to find again, and keeps Klientoverblik as the clean durable operating context.
 
-### 6. Record the new watermark
-After the main skill has applied the approved diff, update (or add) the `Seneste rapport læst:` line in the AI-Context file to the just-ingested deck's title + id (part of the same gated write that updates Klientoverblik + `Sidst opdateret`). So the next run's step 2 correctly skips it.
+From the deck text, build a compact Danish summary of the newest report:
+- **Keep:** what was reported/agreed, decisions, named next-steps and open levers ("Uberficering-splittest forlænget til 6. juli", "Customer Match — aftalt at vente"), structural/strategy changes, new campaigns/experiments, contact or scope changes.
+- **Drop the numbers where they're just a snapshot** — a `## Rapport`-sektion må godt referere hvad rapporten konkluderede kvalitativt, men undgå at kopiere en mur af performance-tal (spend/CTR/CPC/impressions/clicks/ROAS/share%); det er en rapport-oversigt, ikke en gengivelse af hele decket. Behold datoen/perioden rapporten dækker.
+
+### 6. Section format (replace-with-latest)
+`## Rapport` holds the **latest** report only — REPLACE the whole section each run (matches the single `Seneste rapport læst` watermark). Shape:
+
+```
+## Rapport
+
+_Kilde: <deck-titel> (<link>). Læst <YYYY-MM-DD>. Dækker <periode fra decket>._
+
+- <kort punkt: hvad blev rapporteret/besluttet>
+- <næste skridt / aftale>
+- <strukturel/strategi-ændring>
+```
+
+(If Carl later wants a running history instead of latest-only, append newest-on-top under dated sub-headers rather than replacing — but default is latest-only.)
+
+### 7. Watermark
+Update (or add) the `Seneste rapport læst: <titel> [id: <fil-id>]` line, as part of the same gated write that writes `## Rapport` (Trin 6 of the main skill). So the next run's step 2 skips this deck.
 
 ## Return to the caller (structured)
 ```json
@@ -52,7 +69,8 @@ After the main skill has applied the approved diff, update (or add) the `Seneste
   "newest_report": {"title": "", "id": "", "yyyymm": "", "mime": "pdf|pptx|slides"},
   "already_ingested": false,
   "extracted": true,
-  "durable_points": ["Uberficering-splittest Jylland forlænget til 6. juli", "Customer Match aftalt udskudt", "..."],
+  "rapport_section_md": "## Rapport\n\n_Kilde: ..._\n\n- ...",
+  "watermark_line": "Seneste rapport læst: 2026-06 - Dantaxi Statusrapport (juni 2026) SEO&SEM [id: 1Vx3Mdo...]",
   "temp_doc_cleaned": true,
   "note": "PPTX-only + split sandbox → link surfaced, not extracted"  // only when relevant
 }

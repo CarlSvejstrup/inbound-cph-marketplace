@@ -1,6 +1,8 @@
 # Diff classification: TILFØJ / ERSTAT / FJERN
 
-How the skill turns "what's new since last sync" into proposed edits to the AI-Context file's `## Klientoverblik`. This file covers the diff + the confirm-gating; the timeless rule below is the skill's own contract (it matches how the AI-Context files were originally built by `ai-context-publish`).
+How the skill turns "what's new since last sync" **from Drive documents + HubSpot + Ads** into proposed edits to the AI-Context file's `## Klientoverblik`. This file covers the diff + the confirm-gating; the timeless rule below is the skill's own contract (it matches how the AI-Context files were originally built by `ai-context-publish`).
+
+**Report content is out of scope here.** Status-deck (rapport) content does NOT go through this diff — it gets its own standalone `## Rapport` section via `report-ingestion.md`, kept separate from Klientoverblik. Only the three live sources above feed the ADD/REPLACE/REMOVE diff.
 
 ## What is editable
 

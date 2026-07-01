@@ -28,14 +28,17 @@ ID / felt | Værdi
 ### Mål & konverteringer
 ### Sådan kører vi den
 ### Aktuel status & åbne håndtag
+## Rapport                    # <-- own section; replaced when a NEW report is ingested (kept SEPARATE from Klientoverblik)
 ## Drive-filer                # (do not touch)
 ```
 
 ## What this skill writes (and only this)
 
 1. The `## Klientoverblik` block — replaced in full with the new one (approved TILFØJ + approved ERSTAT/FJERN applied).
-2. The `Sidst opdateret:` line — bumped to today on a clean run.
-3. An ID-block `Rapporter:` line — added (or corrected) only if a report folder was found/confirmed and isn't already there.
+2. The `## Rapport` section — replaced with the latest report summary, but ONLY when report-ingestion loaded a new deck. It is a standalone section (from `report-ingestion.md`), never merged into Klientoverblik and never touched by the Trin 4 diff. If it doesn't exist yet, insert it right after `## Klientoverblik`. If no new report this run, leave it untouched.
+3. The `Sidst opdateret:` line — bumped to today on a clean run.
+4. The `Seneste rapport læst:` line — updated to the just-ingested deck (title + id), only when a new report was loaded.
+5. An ID-block `Rapporter:` line — added (or corrected) only if a report folder was found/confirmed and isn't already there.
 
 Do NOT touch the H1, intro, the rest of the ID-block, `## Om virksomheden`, `## Kontaktpersoner`, `## Drive-filer`, or the changelog link. Never re-create the file.
 
@@ -61,8 +64,8 @@ There is no separate timestamp field anywhere. The file's own `Sidst opdateret:`
 
 This is the only write. It goes through the gws probe + fallback (`source-contracts.md` capability matrix). Always gated: show the target file (name + link) + the exact new block, wait for `ja`, write, confirm. Never `create_file` a duplicate via the Drive connector to "fix" a failed gws write.
 
-- **Authed + writable:** gated update of the file's `## Klientoverblik` section. Prefer a **surgical `findAndReplaceInDoc`** of the old Klientoverblik block → the new one (keeps the rest of the file intact), plus a `findAndReplaceInDoc` on the `Sidst opdateret:` line (old date → today) and the `Rapporter:` line if added. `updateTextFile` (full new content) is acceptable if you reconstruct the entire file faithfully, but the surgical replace is safer (less chance of dropping an untouched section). Scope each `findText` tightly (include enough surrounding text to match exactly once).
-- **Not authed / 403 / any error:** do not write. Emit the **copy-paste-ready** new block in one fenced code block — the new `## Klientoverblik` (+ the new `Sidst opdateret:` line + any `Rapporter:` line) — and tell the human: "Åbn AI-Context-filen `<navn>` (`<link>`) og erstat `## Klientoverblik`-sektionen (og opdatér `Sidst opdateret`-linjen) med dette." Point to `ai-context-publish` for a full republish, noting its **create-once** caveat (a true republish needs a manual Drive-UI delete of the old file first, since the Drive connector can't overwrite).
+- **Authed + writable:** gated, surgical updates that keep the rest of the file intact. Prefer `findAndReplaceInDoc`/`updateTextFile` for each changed piece: (a) the old `## Klientoverblik` block → new; (b) the old `## Rapport` section → new, ONLY if a new report was ingested (insert after Klientoverblik if absent); (c) the `Sidst opdateret:` line (old date → today); (d) the `Seneste rapport læst:` line if a new report was ingested; (e) the `Rapporter:` line if newly found. `updateTextFile` (full new content) is acceptable if you reconstruct the entire file faithfully, but surgical replaces are safer. Scope each `findText` tightly (enough surrounding text to match exactly once).
+- **Not authed / 403 / any error:** do not write. Emit the **copy-paste-ready** blocks in fenced code blocks — the new `## Klientoverblik`, the new `## Rapport` (if any), and the updated `Sidst opdateret:` / `Seneste rapport læst:` / `Rapporter:` lines — and tell the human: "Åbn AI-Context-filen `<navn>` (`<link>`) og erstat de viste sektioner med dette." Point to `ai-context-publish` for a full republish, noting its **create-once** caveat (a true republish needs a manual Drive-UI delete of the old file first, since the Drive connector can't overwrite).
 
 ## Output (Trin 7)
 
