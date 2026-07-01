@@ -5,8 +5,8 @@ description: >-
   account diagnosis, audit, search-terms analysis, asset-hygiene review, or
   competitive/web research. It reads Google Ads data and the web, reasons about
   it, and returns findings and recommendations. It NEVER modifies an account.
-  Used by ads-audit-report, soegeterm-analyse, annonce-optimering,
-  opstart-analyse, and the diagnostic half of optimering-loop.
+  Used by inb-ads-account-audit, inb-ads-search-term-analyse, inb-ads-rsa-hygiene,
+  inb-ads-onboarding-analysis, and the diagnostic half of inb-ads-optimization-loop.
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
 color: cyan

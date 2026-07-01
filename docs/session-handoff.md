@@ -1,3 +1,30 @@
+# Session handoff — 2026-07-01 (skill-slug rename + search-skill merge → 15 skills)
+
+## Current state (2026-07-01)
+
+- **Plugin:** one plugin, `inbound-ads`, **v3.2.0**, **15 skills**. All skills carry `inb-ads-*` slugs.
+- **The rename.** Every skill directory was renamed to an `inb-ads-*` slug (dirs under
+  `plugins/inbound-ads/skills/`). The two search skills — the former `soegeterm-analyse` and
+  `search-term` — were **MERGED** into a single `inb-ads-search-term-analyse` (that merge is what
+  dropped the roster from 16 to 15).
+- **Current roster (the source of truth for slugs):**
+  - **Build** — `inb-ads-campaign-build`, `inb-ads-campaign-research`, `inb-ads-campaign-structure`,
+    `inb-ads-campaign-assets`, `inb-ads-rsa-copy`.
+  - **Optimize** — `inb-ads-search-term-analyse` (merged), `inb-ads-rsa-hygiene`,
+    `inb-ads-optimization-loop`, `inb-ads-display-placement-audit`.
+  - **Standalone** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-editor-csv-export`,
+    `inb-ads-context-publish`, `inb-ads-context-update`, `inb-ads-onboarding-analysis`.
+- **Docs synced to the new slugs:** repo-root `CLAUDE.md`, `README.md`, `plugin.json` description,
+  the two dispatching agent files (`ads-analyst`, `drive-knowledge`), and `docs/project-status.md`
+  (current-roster note added). The bundled agents (`ads-analyst`/`ads-writer`/`drive-knowledge`) and
+  the write-guardrail hook are unchanged.
+- **Historical note:** every dated handoff entry BELOW this one names the OLD slugs
+  (`campaign-build`, `research`, `structuring`, `assets`, `responsive-search-ads`, `soegeterm-analyse`,
+  `search-terms`, `annonce-optimering`, `optimering-loop`, `editor-csv-export`, etc.) and the old
+  3-plugin layout. Those are kept verbatim as the record of the pre-rename past — do not retro-rename them.
+
+---
+
 # Session handoff — 2026-06-10 (campaign-build consolidation: google-ads-setup 9→5 skills)
 
 ## Current state (2026-06-10, end of session)
