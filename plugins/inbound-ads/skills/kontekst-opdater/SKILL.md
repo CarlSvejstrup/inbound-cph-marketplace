@@ -47,13 +47,16 @@ Det er makker til `ai-context-publish` (som første gang publicerer en klients A
 
 **Sprog:** alt på dansk medmindre brugeren skriver engelsk. Real Æ Ø Å, aldrig ASCII (aa/oe/ae); `grep`/tjek indholdet før enhver skrivning.
 
-## Watermark = AI-Context-filens "Sidst opdateret"-linje
+## Watermarks (to stykker, begge i AI-Context-filen)
 
-Der er ingen separat tidsstempel-kolonne og intet lokalt felt. **AI-Context-filens egen `Sidst opdateret: YYYY-MM-DD`-linje er watermark'et.** Skillet:
-- **Læser** den linje for at beregne siden-vinduet ("nyt siden <dato>").
-- **Skriver** den til i dag når en kørsel var ren (alle tre kilder hentet uden fejl) og brugeren godkendte ændringer.
-- **Partial-success:** fejlede en kilde (HubSpot 403, Drive socket-drop), så ryk IKKE "Sidst opdateret" til i dag, og notér per-kilde as-of i Klientoverblik-introlinjen, så næste kørsel henter hullet.
-- Mangler filen en `Sidst opdateret`-linje (ældre format): behandl hele filen som siden-gulv, sig antagelsen højt, og tilføj linjen ved skrivning.
+Ingen separat tidsstempel-kolonne, intet lokalt felt. To linjer i selve AI-Context-filen er watermarks:
+
+1. **`Sidst opdateret: YYYY-MM-DD`** — hoved-watermark'et for Drive-dokumenter + HubSpot + Ads. Skillet:
+   - **Læser** den for at beregne siden-vinduet ("nyt siden <dato>").
+   - **Skriver** den til i dag når en kørsel var ren (alle tre kilder hentet uden fejl) og brugeren godkendte ændringer.
+   - **Partial-success:** fejlede en kilde (HubSpot 403, Drive socket-drop), så ryk IKKE "Sidst opdateret" til i dag, og notér per-kilde as-of i Klientoverblik-introlinjen, så næste kørsel henter hullet.
+   - Mangler linjen (ældre format): behandl hele filen som siden-gulv, sig antagelsen højt, tilføj linjen ved skrivning.
+2. **`Seneste rapport læst: <titel> [id: <fil-id>]`** — separat watermark for rapport-ingestion (rapporter kommer månedligt, ikke løbende, så de har deres eget spor). Skillet sammenligner den mod nyeste deck i rapport-mappen; matcher de → rapporten er allerede indlæst, spring den dyre konvertering over (se Trin 2 C + `references/report-ingestion.md`). Mangler linjen → ingen rapport indlæst endnu, nyeste er altid ny. Opdateres i samme gated skrivning som Klientoverblik (Trin 6).
 
 ## Trin 0.5 — Start i indekset (obligatorisk indgang)
 
@@ -76,7 +79,7 @@ Dispatch tre subagenter samtidigt (ét message, flere tool-kald), hver med de re
 
 - **Drive-ekspert** (kun Drive-connectoren):
   - **(A) Nye/ændrede dokumenter:** `search_files parentId='<Drive-mappe-ID>'` + `get_file_metadata`, filtrér `modifiedTime > siden` (RFC-3339 UTC), rekursér undermapper, mærk per marked for delte mapper, `read_file_content` på dokumenter i vinduet.
-  - **(C) Rapporter (høj prioritet, statusmøde-decks):** mappen er ankeret, ikke filtypen — det er klientmappens undermappe `#1 - Præsentationer og statusmøder` (varianter: `... Statusmøder og -rapporter`, `... Præsentationer & statusmøder`; `#1 -`-præfiks + "sentation"/"statusm"). Decks kan ligge som native Google Slide, uploadet PowerPoint (ofte uden filendelse) ELLER PDF-eksport — vælg den **nyeste efter `YYYY-MM` i titlen** (ikke `modifiedTime`). Står mappen allerede i AI-Context-filen → gå direkte dertil, list ALT (ingen mime-filter), læs nyeste deck (`read_file_content` virker for Slides/PPTX/PDF). Ellers **find-foreslå:** list klientmappens undermapper, vælg rapport-mappen på navn (`title contains 'sentation' or title contains 'statusm' or title contains 'statusrapport'`; ignorér `OLD - ...`), og returnér kandidat-mappen til hovedskillet så den kan gemmes i AI-Context-filen (Trin 5/6). Træk det klient-vendte narrativ fra den nyeste deck (hvad blev rapporteret/aftalt/håndtag — den rigeste kilde). Ulæselig/låst deck → vis linket, opfind ikke. Degradér på socket-drop, ingen blind-retry; rapportér partial.
+  - **(C) Rapporter (høj prioritet, statusmøde-decks):** mappen er ankeret, ikke filtypen — det er klientmappens undermappe `#1 - Præsentationer og statusmøder` (varianter set i praksis: `... Statusmøder og -rapporter`, `... Præsentationer & statusmøder`, `#1 - Statusmøder`, `#1 - Møder`, en-dash `#1 – Præsentationer`; mønster = `#1`-præfiks + "sentation"/"statusm"/"Møder"). Nogle klienter har ingen `#1`-mappe men år-baserede `<Klient> møder 20XX`-mapper → fald tilbage til nyeste år. Nogle har slet ingen rapport-mappe → accepter "ingen" pænt, opfind ikke. **To trin:** (1) **find nyeste deck** — står rapport-mappen allerede i AI-Context-filen, gå direkte dertil (`search '<mappe-id>' in parents and trashed=false`), ellers find mappen på navn (`title contains 'sentation' or title contains 'statusm' or title contains 'Møder'`; ignorér `OLD - ...`) og returnér den til hovedskillet så den kan gemmes (Trin 5/6). Vælg nyeste deck efter `YYYY-MM` i titlen (ikke `modifiedTime`; en måned findes ofte som både PDF og PPTX). (2) **er nyeste deck NYERE end `Seneste rapport læst` i AI-Context-filen → kald `references/report-ingestion.md`** for at konvertere + udtrække durable indhold (konvertering er dyr, så KUN når ny). Allerede indlæst → spring over. Ulæselig deck → vis linket, opfind ikke. Degradér på socket-drop, ingen blind-retry; rapportér partial.
 - **HubSpot-ekspert** (HubSpot MCP): firma via indeksrækkens `HubSpot ID`. **Aldrig** `engagement_details_*` (403). Brug `notes_search`/`emails_search`/`calls_search`/`meetings_search`/`tasks_search` med `associations.company` EQ `<HubSpot ID>` + recency på `hs_lastmodifieddate`/`createdAt`/`updatedAt` `> siden`. Afkod lifecycle/deal-stage-ID'er til labels. Kollaps til menneskelæsbar aktivitet. Fejl → markér HubSpot partial.
 - **Ads-ekspert** (Google Ads MCP, let): kun durable fakta til overblikkets "hvad ændrede sig på kontoen"-linje. `get_change_summary(customer_id=<Google Ads ID>, lookback_days=29)` / `get_change_history` (≤29; 30 hard-fejler `START_DATE_TOO_OLD`). Bulk-kollaps på (timestamp, ressourcetype). **Fejlroute-vagt:** sanity-check identitet mod `Google Ads ID`; kassér mismatch.
 
@@ -105,13 +108,14 @@ Sammenlign nyt materiale mod den nuværende `## Klientoverblik` i AI-Context-fil
 - **TILFØJ:** ét batchet bekræft ("tilføj 1,4,5? ja/vælg/nej").
 - **ERSTAT/FJERN:** eksplicit per-punkt (eller udtrykkeligt-listet sæt), vis den præcise tekst der fjernes.
 - **Rapport-mappe:** blev en kandidat fundet i Trin 2 og er den ikke allerede noteret i filen, så foreslå at tilføje en `Rapporter:`-linje i ID-blokken med mappe-linket; bekræft.
-- Saml de godkendte ændringer (TILFØJ + godkendte ERSTAT/FJERN + evt. rapport-linje) til én ny `## Klientoverblik`-blok + opdateret ID-blok. Opdatér `Sidst opdateret`-linjen til i dag **kun hvis alle 3 kilder var rene** (ellers lad stå + notér per-kilde as-of i Klientoverblik-introlinjen). Intet er skrevet endnu — det sker i Trin 6.
+- **Rapport-watermark:** blev en NY rapport indlæst (Trin 2 C via `report-ingestion.md`), så opdatér `Seneste rapport læst:`-linjen til den indlæste decks titel + fil-id.
+- Saml de godkendte ændringer (TILFØJ + godkendte ERSTAT/FJERN + evt. `Rapporter:`-linje + evt. `Seneste rapport læst:`-linje) til én ny `## Klientoverblik`-blok + opdateret ID-blok. Opdatér `Sidst opdateret`-linjen til i dag **kun hvis alle 3 kilder var rene** (ellers lad stå + notér per-kilde as-of i Klientoverblik-introlinjen). Intet er skrevet endnu — det sker i Trin 6.
 
 ## Trin 6 — Skriv den opdaterede AI-Context-fil (gated, gws-eller-fallback)
 
 Den eneste skrivning. Probe gws (`authGetStatus` på `mcp__acc7a973-…`):
-- **Authed + filen skrivbar:** gated skrivning til AI-Context-filen. Foretræk en surgisk `findAndReplaceInDoc`/`updateTextFile` der erstatter den gamle `## Klientoverblik`-blok (+ `Sidst opdateret`-linjen, + evt. ny `Rapporter:`-linje) med den nye — hold resten af filen intakt. Vis target-fil (navn + link) + den præcise nye blok, vent på `ja`, skriv, bekræft tilbage.
-- **`needs_reauth` / 403 / fejl:** skriv ikke. Lever den **copy-paste-klare** nye Klientoverblik-blok (+ den nye `Sidst opdateret`-linje + evt. `Rapporter:`-linje) i én kodeblok, og sig: "Åbn AI-Context-filen <navn + link> og erstat `## Klientoverblik`-sektionen med dette. Jeg kan ikke skrive til filen lige nu (Workspace-MCP'en er ikke auth'et / mangler adgang)." Peg evt. på `ai-context-publish` for en fuld genudgivelse (notér dens create-once-forbehold).
+- **Authed + filen skrivbar:** gated skrivning til AI-Context-filen. Foretræk en surgisk `findAndReplaceInDoc`/`updateTextFile` der erstatter den gamle `## Klientoverblik`-blok (+ `Sidst opdateret`-linjen, + evt. ny `Rapporter:`- og `Seneste rapport læst:`-linje) med den nye — hold resten af filen intakt. Vis target-fil (navn + link) + den præcise nye blok, vent på `ja`, skriv, bekræft tilbage.
+- **`needs_reauth` / 403 / fejl:** skriv ikke. Lever den **copy-paste-klare** nye Klientoverblik-blok (+ den nye `Sidst opdateret`-linje + evt. `Rapporter:`- og `Seneste rapport læst:`-linje) i én kodeblok, og sig: "Åbn AI-Context-filen <navn + link> og erstat `## Klientoverblik`-sektionen med dette. Jeg kan ikke skrive til filen lige nu (Workspace-MCP'en er ikke auth'et / mangler adgang)." Peg evt. på `ai-context-publish` for en fuld genudgivelse (notér dens create-once-forbehold).
 
 Opret ALDRIG en ny/dublet fil via Drive-connectoren her.
 
