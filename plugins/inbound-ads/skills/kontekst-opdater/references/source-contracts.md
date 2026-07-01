@@ -45,8 +45,8 @@ The Drive connector drops the socket on long multi-read runs. On a drop: return 
   "partial": false,
   "new_docs": [{"title": "", "id": "", "modified": "YYYY-MM-DD", "market": "", "summary": "one-line what-changed"}],
   "report_folder": {"status": "already_noted | candidate_found | none", "id": "", "name": "", "path": ""},
-  "latest_report": {"title": "", "id": "", "modified": "YYYY-MM-DD", "narrative": "what was reported/agreed/levers", "in_window": true},
-  "notes": "anything the main skill needs (shared-folder caveats, unreadable files)"
+  "newest_report": {"title": "", "id": "", "yyyymm": "", "mime": "pdf|pptx|slides", "newer_than_watermark": true},
+  "notes": "anything the main skill needs (shared-folder caveats, unreadable files). Report EXTRACTION + the ## Rapport summary is done by report-ingestion.md only when newer_than_watermark is true — not returned here."
 }
 ```
 
