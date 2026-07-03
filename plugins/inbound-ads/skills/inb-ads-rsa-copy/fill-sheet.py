@@ -59,7 +59,7 @@ LIMITS = {"headline": 30, "description": 90, "path": 15}
 
 # --- Quality guardrails -----------------------------------------------------
 # These are NOT Google limits. They encode the tested craft rules from
-# references/headline-craft.md that the model is supposed to follow but can
+# ../../shared/headline-craft.md that the model is supposed to follow but can
 # silently skip. They block the build by default; pass --allow-quality-warnings
 # to override for a genuine edge case (and say why in the run).
 MIN_SHORT_HEADLINES = 4        # rule: 4-5 headlines under 20 chars

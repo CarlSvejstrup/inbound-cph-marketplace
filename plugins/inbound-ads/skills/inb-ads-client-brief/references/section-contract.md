@@ -1,6 +1,6 @@
 # Section contract: the canonical AI-Context layout
 
-The one true section set for every client's AI-Context file (the `.md` linked from the master index) AND the local `clients/*.md` mirror. Both surfaces use the same headings so an agent can find the same thing in the same place on any client. This file is the source of truth for that layout; `insertion-and-resync.md` points here for the file shape.
+The one true section set for every client's AI-Context file (the **native Google Doc** linked from the master index — filtype is locked in `../../shared/ai-context-file-contract.md`) AND the local `clients/*.md` mirror. Both surfaces use the same headings so an agent can find the same thing in the same place on any client. This file is the source of truth for that layout; `insertion-and-resync.md` points here for the file shape, and the shared contract for the artifact type.
 
 Two audits over the client set found the `## Klientoverblik` block is already uniform everywhere, but the surrounding H2 sections drifted into two generations (an old scattered set with thin one-liners, and a newer consolidated set). This contract retires the scattered set by **folding**, never deleting content.
 

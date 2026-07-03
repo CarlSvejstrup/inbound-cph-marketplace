@@ -67,7 +67,7 @@ tilgængelig) og udled:
 - **`sea_of_sameness`** — claims ALLE bruger (commoditiseret) → RSA skal undgå at lede med dem.
 - **`positioning_gaps`** — white space ingen konkurrent besætter.
 - **`angle_recommendations`** — mappet til vinkel-taksonomien i
-  `${CLAUDE_SKILL_DIR}/../inb-ads-rsa-copy/references/headline-craft.md` (benefit, trust, urgency,
+  `${CLAUDE_SKILL_DIR}/../../shared/headline-craft.md` (benefit, trust, urgency,
   CTA, feature, keyword-led, brand, location, garanti). Sømmen: dette trin anbefaler *hvilke vinkler der
   differentierer vs. er bordkant*; RSA udfører copyen.
 - **`vocabulary_overlap`** — termer konkurrenterne bruger for samme ydelse (keyword-seeds + negative-hints
@@ -111,5 +111,5 @@ Slå scope-grænsen fast: analyseret de navngivne konkurrenter for DENNE kørsel
 ## Maintenance
 
 Ekstraktionen bor i `page-extraction.md` — ret den ÉT sted. Vinkel-taksonomien bor i
-`inb-ads-rsa-copy/references/headline-craft.md`. **Ingen scripts** — ren JSON-syntese, hold det
+`${CLAUDE_SKILL_DIR}/../../shared/headline-craft.md`. **Ingen scripts** — ren JSON-syntese, hold det
 script-frit.

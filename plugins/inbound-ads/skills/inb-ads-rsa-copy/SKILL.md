@@ -7,27 +7,23 @@ description: Skriver Google Ads RSA-annoncetekster ud fra en landingsside, keywo
 
 Lav Google Ads-annoncetekster (Responsive Search Ads) ud fra en kundes landingsside, en udvidet intake og keyword-data fra Google Ads MCP, og aflever dem i et regneark som kunden kan gennemse og rette med live tegntælling + rød farvekode. Hele forløbet og alt output er på dansk.
 
-**Vigtigt om Editor-import (rettet 2026-06-03):** Google Ads Editor importerer IKKE .xlsx-filer (`support.google.com/google-ads/editor/answer/56368`: "Google Ads Editor doesn't import XLS files"). Arket her er **menneske-review/redigerings-laget** (live `=LEN()` + rød farve så kundens for lange rettelser fanges), IKKE selve import-filen. Editors rigtige import-stier er: (1) **File import** af en CSV (eller Unicode-tekst `.txt`) i Editors kolonne-skema, eller (2) **"Make multiple changes" → paste** af tab-separerede rækker. Hvilken sti ads-teamet bruger er uafklaret — se "Editor-import" nedenfor.
+**Vigtigt om Editor-import (rettet 2026-06-03):** Google Ads Editor importerer IKKE .xlsx-filer (`support.google.com/google-ads/editor/answer/56368`: "Google Ads Editor doesn't import XLS files"). Arket her er **menneske-review/redigerings-laget** (live `=LEN()` + rød farve så kundens for lange rettelser fanges), IKKE selve import-filen. Editors rigtige import-stier er: (1) **File import** af en CSV (eller Unicode-tekst `.txt`) i Editors kolonne-skema, eller (2) **"Make multiple changes" → paste** af tab-separerede rækker. Hvilken sti ads-teamet bruger er uafklaret — fuld detalje i `references/sheet-and-editor-contract.md`.
 
-## Why this skill exists
-
-The ads team turns a client's landing page into RSA ad copy, fills a sheet, sends it to the client for review, then gets the corrected copy into Google Ads Editor (via a CSV export or a paste — Editor does not import the .xlsx itself). The slow, skilled part is the landing-page analysis + copywriting under hard character limits. The risky part is the client editing a headline too long and it sneaking back over-length. This skill automates the copywriting and ships a sheet with live char-count + red color-code so over-length text is caught the moment the client types it.
-
-Bygget om en udvidet intake (USP-hierarki, aktivt tilbud + udløb, trust-tal, brand voice/banned words, top-keywords fra MCP), et valgfrit trin der **lærer budskab af kundens egne top-performende annoncer** (Trin 2.5 — kun aktive annoncer), og de testede skrive-regler i `references/headline-craft.md` (angle-taksonomi, Sentence case, længde-variation, 2026 disapproval-policy).
+Det slow, skilled arbejde er landingsside-analysen + copywriting under hårde tegngrænser; risikoen er at kunden retter en headline for lang og den sniger sig over-længde tilbage. Skillen automatiserer copywriting og leverer et ark med live tegntælling + rød farve så over-længde fanges i det øjeblik kunden taster. Bygget om en udvidet intake, et valgfrit trin der **lærer budskab af kundens egne top-performende annoncer** (Trin 2.5), og de testede skrive-regler i `../../shared/headline-craft.md`.
 
 ## When to use
 
 Trigger-fraser: "lav annoncetekster", "RSA til", "annonce-ark", "responsive search ad", "tekster til [klient]", "annoncetekster ud fra landingsside".
 
-## How it works (architecture — read once)
+## How it works (kort — fuld detalje i reference)
 
-A **new file is built from scratch every run** — there is no cloning of any remote sheet and no cell-editing of an existing file.
+Et **nyt ark bygges fra bunden hver kørsel** (ingen kloning, ingen celle-redigering). `sheet_layout.py` er single source of truth for layout + `=LEN()`-formler + røde CF-regler; `fill-sheet.py` læser `ads.json`, bygger arket friskt for N rækker, skriver kun tekstceller og validerer per RSA. Én kørsel = 1 RSA (én række) eller flere RSA'er (én række hver) i samme ad group. Kører i **Cowork** (Drive-connector) og **lokalt** — ingen `gws`, ingen Sheets API; scripts self-bootstrapper `openpyxl`.
 
-- `sheet_layout.py` is the single source of truth for the layout: column order, the `=LEN()` formula beside every text field, and the red conditional-formatting rules (headline LEN > 30, description LEN > 90, path LEN > 15). `build_sheet(n_rows)` builds a workbook with header row 1 and `n_rows` data rows, each row pre-wired with its own LEN formulas and the CF range extended to cover all rows. Because these live in the `.xlsx` layer (not in CSV values), they survive upload to Drive and stay live when the client edits the sheet. Verified: uploading a filled `.xlsx` via the Drive connector keeps `=LEN()` computing.
-- `build-template.py` regenerates the committed single-RSA `template.xlsx` (calls `build_sheet(1)`). It is a reference artifact + a quick smoke check; the skill does **not** load it at fill time — `fill-sheet.py` rebuilds the layout fresh for exactly as many rows as there are RSAs. Run `build-template.py` only when you want to inspect the empty layout.
-- `fill-sheet.py` reads `ads.json`, calls `build_sheet(len(ads))`, writes only the text cells (never the LEN cells), validates every string per RSA, and saves a new `.xlsx`. One run can produce **1 RSA (one data row) or several RSAs (one row each) in the same ad group**.
+**Arkitektur, kolonne-kontrakt, multi-row `ads.json`-format og Editor-import-detaljen bor i `references/sheet-and-editor-contract.md`.** Læs den hvis du skal ændre layoutet, forstå multi-row-formatet eller forklare Editor-stien. Kort om det vigtigste:
 
-Runs in **Cowork** (Drive connector) and **locally** (write file to disk) — no `gws` CLI, no Sheets API. Both scripts self-bootstrap `openpyxl` via `pip install` if missing, so the only prerequisite is Python 3 with pip — no checked-in virtualenv, no machine-specific paths, no external account auth.
+- **Arket er menneske-review-laget, ikke import-filen.** Google Ads Editor importerer IKKE .xlsx (answer 56368). Editor får teksten via (a) File-import af en CSV i Editor-skemaet eller (b) paste via "Make multiple changes". Hvilken sti ads-teamet bruger er uafklaret — se reference-filen.
+- **Kolonnenavne spejler Editors felt-navne** (`Campaign`, `Ad Group`, `Headline 1`, …), plus review-only kolonner `LEN`, `Vinkel`, `Hypotese`. Kun Editor-skema-kolonnerne tages med i en import-CSV; review-kolonnerne bliver i arket.
+- **Multi-row:** gentag `Campaign` + `Ad Group` på flere rækker → flere RSA'er i samme ad group. `fill-sheet.py` tager to `ads.json`-former (single top-level, eller en `ads`-liste der arver top-niveau-felter). Antal + vinkler vælges i intake (Trin 1, Kald 1, spørgsmål 4) — default 1.
 
 ## Hard limits (Google rejects over-length, it does not truncate)
 
@@ -37,70 +33,15 @@ Runs in **Cowork** (Drive connector) and **locally** (write file to disk) — no
 | Description (x4) | 90 |
 | Path (x2) | 15 |
 
-## Column contract (defined in sheet_layout.py)
-
-Kolonnenavnene følger Editors felt-navne (`Campaign`, `Ad Group`, `Headline 1`, …), så arket er en tro 1:1-spejling af Editor-skemaet — men arket selv (.xlsx) importeres ikke direkte, se "Editor-import". Header row 1, then **one data row per RSA** (row 2 for a single ad; rows 2..N+1 for N ads). Every text column is followed by a `LEN` column. Pre-seeded on every data row: `Ad type = "Responsive search ad"`. `Campaign`-cellen overskrives ved hver kørsel med det navn brugeren bekræfter i Trin 1.
-
-```
-Campaign | Ad Group | Ad type | Labels |
-Headline 1 | LEN | ... | Headline 15 | LEN |
-Description 1 | LEN | ... | Description 4 | LEN |
-Path 1 | LEN | Path 2 | LEN |
-Final URL | Final mobile URL | Vinkel | Hypotese
-```
-
-`LEN`, `Vinkel` og `Hypotese` er IKKE Editor-felter — de hører kun til menneske-review-laget. `LEN` giver live tegntælling + rød farve til kunden; `Vinkel`/`Hypotese` (de to sidste kolonner) dokumenterer annoncens led-vinkel + hypotese per RSA. **Når data konverteres til en import-CSV, tager CSV'en KUN Editor-skema-kolonnerne med** — review-laget bærer ekstra-kolonnerne, import-laget bærer kun Editor-felterne. (Bruger ads-teamet i stedet paste-stien, skal mennesket markere kun Editor-kolonnerne — antag ikke at Editor selv filtrerer dem fra.)
-
-### Editor-import (det .xlsx'en IKKE gør)
-
-Google Ads Editor importerer **ikke** .xlsx (answer 56368: "Google Ads Editor doesn't import XLS files"). Editors to rigtige import-stier:
-
-1. **File import:** en **CSV** (eller Unicode-tekst `.txt`) i Editors kolonne-skema → Account → Import → From file.
-2. **Paste:** "Make multiple changes" → indsæt tab-separerede rækker (kolonne-auto-mapping).
-
-**Uafklaret (workflow-fakta, ikke en API-fakta):** hvilken sti ads-teamet faktisk bruger. Rikkes oprindelige beskrivelse ("importer arket … bulk-upload") er tvetydig. Spørg/afklar med Rikke før der bygges en CSV-eksportør — `inb-ads-campaign-build`-spec'en (§4) planlægger allerede at emittere Editor-skema RSA-CSV'er, så en CSV-eksportør hører sandsynligvis hjemme dér, ikke som en parallel sti her.
-
-### Flere RSA'er i samme ad group (multi-row)
-
-Editor opretter **én RSA per række** i import-skemaet. Gentager man `Campaign` + `Ad Group` på flere rækker, lander de som flere RSA'er i samme ad group — ÉT ark (review) → ÉN CSV med flere rækker (import), ikke flere filer.
-
-`fill-sheet.py` accepterer to `ads.json`-former:
-
-- **Én RSA (default):** top-level `headlines`/`descriptions`/`paths` (uændret fra før).
-- **Flere RSA'er:** `campaign`/`ad_group`/`final_url` på top-niveau + en `ads`-liste hvor hvert element er én RSA's tekst. Top-niveau-felterne arves af hver annonce medmindre annoncen selv overstyrer dem.
-
-```json
-{
-  "campaign": "IC | GSN | Generic | Brandsikring",
-  "ad_group": "Brandsikring",
-  "final_url": "https://...",
-  "ads": [
-    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...2..."] },
-    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...2..."] },
-    { "headlines": ["...15..."], "descriptions": ["...4..."], "paths": ["...2..."] }
-  ]
-}
-```
-
-Hårde grænser og kvalitets-gates køres **per RSA**; fejl labelles med "RSA 2, Headline 4: …" så du ved hvilken annonce der skal rettes.
-
-*Antallet af RSA'er og deres vinkler vælges af brugeren i intake (Trin 1, Kald 1, spørgsmål 4) — default 1. Selve vinkel-strategien står i Trin 4.*
-
 ## Trin 0 — Hent klient-kontekst (AI Context) FØRST
 
-Før al anden handling på en navngiven klient skal du hente klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated), men obligatorisk — sådan arver du alt Inbound ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er, pausede-kampagners-intention) i stedet for at starte blindt. **Den vigtigste del her er klientens brand voice / tone** — annonceteksterne i Trin 4 skal følge den stemme der står i AI Context-filen, ikke en gættet tone.
+Kør `../../shared/client-context-intake.md` som allerførste trin på en navngiven klient — før intake, scrape og alt andet. Det er en læsning (aldrig gated), men obligatorisk: sådan arver du ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagners-intention i stedet for at starte blindt. Den fil holder også Stage-tjekket, delte-Drive-mappe-reglen og fallback når en klient endnu ikke har en AI Context-fil.
 
-**Når `inb-ads-rsa-copy` kaldes som under-trin af en anden skill (`inb-ads-campaign-build`, `inb-ads-rsa-hygiene`) er AI Context allerede i kontekst** — kør kun dette opslag når RSA-skillen køres standalone på en navngiven klient.
+**Load-bearing for denne skill:** den vigtigste del i AI Context-filen er klientens **brand voice / tone** — annonceteksterne i Trin 4 skal følge den stemme der står dér, ikke en gættet tone.
 
-1. **Identificér klienten.** Er det uklart hvilken klient, spørg før du fortsætter.
-2. **Åbn master-klientindekset i Drive** via Drive-connectoren: `search_files` efter Google Doc'en med titlen `Inbound CPH — Google Ads klient-index (AI Context)` (aktuelt id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, **Stage**, Drive-mappe og **AI Context-fil**.
-3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér **Stage** (customer / lead / opportunity / "ikke tagget") — en ikke-`customer`-stage betyder en ikke-lukket konto; vægt anbefalinger derefter og antag aldrig en aktiv retainer. For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
-4. **Åbn klientens AI Context-`.md`** via Drive-linket i indeksrækken (`read_file_content`). Den indeholder driftsbriefen: ID'er, kontakter, hårde rammer, mål/KPI'er, navngivningskonvention, **brand voice/tone** (load-bearing for Trin 4), sådan-kører-vi-den, samt link til changelog/optimeringslog (læs også changelog-doc'et hvis opgaven kræver ændringshistorik).
-5. **Først derefter** starter du skillens egentlige arbejde (Trin 1 intake), med AI Context som ground truth for klient-fakta — og lad klientens brand voice styre tonen i annonceteksterne (Trin 4).
+**Når `inb-ads-rsa-copy` kaldes som under-trin af en anden skill (`inb-ads-campaign-build`, `inb-ads-rsa-hygiene`) er AI Context allerede i kontekst** — spring opslaget over; kør det kun standalone på en navngiven klient.
 
-Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP), men flag hullet. Spring aldrig opslaget stille over (medmindre AI Context allerede er loadet af en kaldende skill).
-
-## Trin 0.5 — Kontekst
+## Trin 0.5 — Sprog + write-gate
 
 At gemme filen (til Drive eller lokalt) er en ekstern write — gated bag eksplicit bekræftelse.
 
@@ -138,7 +79,7 @@ Saml i samme kald:
    **Gap-brief-tilstand (lukker loopet fra `inb-ads-rsa-hygiene`):** hvis brugeren starter kørslen med et gap-brief — typisk indsat manuelt fra en tidligere `inb-ads-rsa-hygiene`-kørsel — skal det *forvælge* dette spørgsmål i stedet for at spørge fra bunden. Gap-brief'et er en liste af manglende vinkler per ad group (se "Gap-brief-kontrakt" nedenfor). Behandling:
    - Lav én challenger-RSA per manglende vinkel, ledet af den vinkel. Vis det forvalgte sæt som options med `(Anbefalet — fra gap-brief)` så brugeren kan bekræfte eller justere.
    - Sæt hver challengers `vinkel`-felt (Trin 4 / ark-kolonnen) til den manglende vinkel den fylder, og skriv i `hypotese` at den lukker et gap fundet i optimerings-kørslen (fx "Challenger: fylder manglende urgency-vinkel fra inb-ads-rsa-hygiene").
-   - **Gap-brief'et forvælger KUN dette vinkel-spørgsmål.** Resten af intaken kører som normalt: landingssiden scrapes stadig (Trin 2), USP/trust/tilbud spørges stadig (Kald 4), og `headline-craft.md`-reglerne gælder stadig — en challenger har lige så meget brug for fuldt copy-kontekst som en frisk annonce.
+   - **Gap-brief'et forvælger KUN dette vinkel-spørgsmål.** Resten af intaken kører som normalt: landingssiden scrapes stadig (Trin 2), USP/trust/tilbud spørges stadig (Kald 4), og reglerne i `../../shared/headline-craft.md` gælder stadig — en challenger har lige så meget brug for fuldt copy-kontekst som en frisk annonce.
 
 ### Gap-brief-kontrakt (delt med `inb-ads-rsa-hygiene`)
 
@@ -148,7 +89,7 @@ Formen er en liste per ad group:
 ```
 - Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>
 ```
-Vinkel-navnene er fra vinkel-taksonomien i `references/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti). Hvis brugeren indsætter noget der ligner men ikke matcher, map til den nærmeste taksonomi-vinkel og nævn det.
+Vinkel-navnene er fra vinkel-taksonomien i `../../shared/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti). Hvis brugeren indsætter noget der ligner men ikke matcher, map til den nærmeste taksonomi-vinkel og nævn det.
 
 ### Kald 2 — Navngivnings-felter komprimeret (1 AskUserQuestion, 2-4 spørgsmål)
 
@@ -187,7 +128,7 @@ Dette er det tunge kald — det henter alt der driver kvaliteten af annoncetekst
    - **Google Ads MCP tilgængelig:** spørg om (eller udled fra konteksten) klientens `customer_id`. Hent top 10-20 keywords for kontoen (rangeret efter impressions/conversions) FØR du sender kaldet, og vis dem som options. Brugeren vælger 3-5. **Samme `customer_id` genbruges i Trin 2.5** til at lære af kundens top-annoncer — spørg kun én gang.
    - **MCP IKKE tilgængelig:** vis "(brug landingssidens hovedtermer)" som første option, og lad brugeren skrive 3-5 keywords manuelt via "Other" hvis hen har en Search Terms-eksport. Trin 2.5 springes da også over.
 
-   Begrundelse: top-keyword skal stå i mindst 3 headlines for Google's relevans-score (se `references/headline-craft.md`). Dette samme MCP+`customer_id`-check afgør også om Trin 2.5 kører — ét check, én konto, ét spørgsmål.
+   Begrundelse: top-keyword skal stå i mindst 3 headlines for Google's relevans-score (se `../../shared/headline-craft.md`). Dette samme MCP+`customer_id`-check afgør også om Trin 2.5 kører — ét check, én konto, ét spørgsmål.
 
 ### Bekræft scope (1 tekstbesked, ingen AskUserQuestion)
 
@@ -206,52 +147,7 @@ Begge gemninger er eksterne writes — bed om eksplicit bekræftelse én gang, s
 
 ## Navngivnings-skabelon — byg kampagnenavnet
 
-Saml svarene efter den skabelon som matcher kampagnetypen. Vis ALTID resultatet til brugeren via et `AskUserQuestion` med strengen som første option `(Anbefalet)` — brugeren kan overstyre.
-
-### Search / Shopping / pMax
-Skabelon: `IC | NETVÆRK | Målretning | Kampagnenavn | Eventuelt`
-
-| Felt | Mulige værdier (vis som options) |
-|---|---|
-| NETVÆRK | `GSN` (Google Search Network), `Shopping`, `pMax` |
-| Målretning | `Brand`, `Product`, `Generic`, `brand products` (kun Shopping) |
-| Kampagnenavn | fri tekst (produkt/tema) |
-| Eventuelt | fri tekst eller `(ingen)` — typisk brandnavn |
-
-Eksempler:
-- `IC | GSN | Brand | Securitas`
-- `IC | GSN | Product | Alarmsystemer`
-- `IC | GSN | Generic | Alarmsystemer`
-- `IC | Shopping | Generic | Alarmsystemer`
-- `IC | Shopping | brand products | Alarmsystemer`
-- `IC | pMax | Generic | Alarmsystemer`
-
-### Display / YouTube / Demand Gen
-Skabelon: `IC | FORMAT | KAMPAGNENAVN | MÅLRETNING`
-
-| Felt | Mulige værdier |
-|---|---|
-| FORMAT | `GDN` (Google Display Network), `YT` (YouTube), `DG` (Demand Gen) |
-| KAMPAGNENAVN | fri tekst (kampagne/tema) |
-| MÅLRETNING | `Reach`, `Retargeting`, `Awareness`, `Consideration`, `Conversion` (eller fri tekst via "Other") |
-
-Eksempler:
-- `IC | GDN | Webinarer | Reach`
-- `IC | YT | Bliv grønnere sammen | Retargeting`
-- `IC | DG | Gratis introforløb | Retargeting`
-
-### Audience
-Skabelon: `YYYY-MD - IC - Audience type - Audience navn`
-
-| Felt | Værdi |
-|---|---|
-| YYYY-MD | Indeværende år + måned uden ledende nul (fx `2025-1`, ikke `2025-01`). Brug dagens dato som default. **Bemærk:** eksemplerne fra Inbound bruger `2025-01` med ledende nul — spørg brugeren om begge varianter via AskUserQuestion. |
-| Audience type | `Custom Intent`, `Retargeting`, `Affinity`, `In-Market`, `Similar`, `Lookalike` (eller fri tekst) |
-| Audience navn | fri tekst (fx "Søgninger på HR system", "Alle besøgende") |
-
-Eksempler:
-- `2025-01 - IC - Custom Intent - Søgninger på HR system`
-- `2025-01 - IC - Retargeting - Alle besøgende`
+De fulde felt-værdier og eksempler per kampagnetype (Search/Shopping/pMax, Display/YT/DG, Audience) bor i `references/naming-and-angle-templates.md`, Del 1. Slå den op når du bygger navnet i Kald 2-3. Metode uændret: saml svarene efter den skabelon der matcher kampagnetypen, og vis ALTID resultatet via et `AskUserQuestion` med strengen som første option `(Anbefalet)` — brugeren kan overstyre.
 
 ## Trin 2 — Analyser landingssiden
 
@@ -269,11 +165,11 @@ Hvis siden ikke kan hentes: sig det og stop. Vi opfinder ikke claims.
 
 ## Trin 2.5 — Lær af kundens top-annoncer (valgfrit — kun hvis konto + MCP)
 
-**Kør kun dette trin hvis Google Ads MCP er tilgængelig OG du har et `customer_id`** (samme check som Kald 4, spørgsmål 4). Hvis ikke — ny kunde uden historik, eller ingen MCP — **spring trinet over** og gå direkte til Trin 3. Landingssiden + branchestudierne i `references/headline-craft.md` bærer da teksterne, hvilket er helt fint for nye kunder.
+**Kør kun dette trin hvis Google Ads MCP er tilgængelig OG du har et `customer_id`** (samme check som Kald 4, spørgsmål 4). Hvis ikke — ny kunde uden historik, eller ingen MCP — **spring trinet over** og gå direkte til Trin 3. Landingssiden + branchestudierne i `../../shared/headline-craft.md` bærer da teksterne, hvilket er helt fint for nye kunder.
 
 ### Hvorfor dette trin findes
 
-Keyword-data (Kald 4) fortæller dig *hvilke ord* der søges på. Dette trin fortæller dig *hvordan netop denne kunde formulerer sig når annoncerne faktisk virker.* Branchestudierne i reference-filen er generiske; kundens egne vindere er kunde-specifikke. De to lag supplerer hinanden.
+Keyword-data (Kald 4) fortæller dig *hvilke ord* der søges på. Dette trin fortæller dig *hvordan netop denne kunde formulerer sig når annoncerne faktisk virker.* Branchestudierne i `../../shared/headline-craft.md` er generiske; kundens egne vindere er kunde-specifikke. De to lag supplerer hinanden.
 
 ### Hent kun de vindende, aktive annoncer (GAQL — ikke get_ad_performance)
 
@@ -317,7 +213,7 @@ Dette er den vigtigste regel i trinnet. Kundens top-annoncer er valgt på perfor
 
 - Du arver kundens **budskaber, USP-vægtning, hooks, tone og CTA-formuleringer** (det semantiske lag).
 - Du arver **ALDRIG** kundens casing, længde-fordeling, keyword-tæthed, struktur eller eventuelle forbudte ord.
-- **`references/headline-craft.md` og scriptets gates vinder hver eneste konflikt.** Sentence case, mindst 4 korte headlines, ingen næsten-ens linjer, ingen banned words, descriptions mod 61-70 tegn, hårde tegngrænser — alt det står over kundens stilguide. Er kundens vindere Title Case, skriver du stadig Sentence case; er deres vindere alle 30 tegn, skriver du stadig 4-5 korte.
+- **`../../shared/headline-craft.md` og scriptets gates vinder hver eneste konflikt.** Sentence case, mindst 4 korte headlines, ingen næsten-ens linjer, ingen banned words, descriptions mod 61-70 tegn, hårde tegngrænser — alt det står over kundens stilguide. Er kundens vindere Title Case, skriver du stadig Sentence case; er deres vindere alle 30 tegn, skriver du stadig 4-5 korte.
 
 Skriv eksplicit i dit svar: "Lærte budskab fra X top-annoncer; formatering følger headline-craft.md (ikke kundens)."
 
@@ -327,14 +223,14 @@ Tilføj senere i output (Trin 7) at top-annonce-analysen brugte Google Ads MCP (
 
 ## Trin 3 — Læs skrive-reglerne
 
-**FØR du skriver annonceteksterne:** læs `references/headline-craft.md`. Den indeholder angle-fordelingen, længde-variation-målene, Sentence case-reglen, keyword-tilstedeværelse, 2026 disapproval-forbud, description-fordelingen og kvalitets-check-listen — testet på millioner af annoncer, og den vinder ved enhver konflikt med Trin 4 nedenfor.
+**FØR du skriver annonceteksterne:** læs `../../shared/headline-craft.md`. Den indeholder angle-fordelingen, længde-variation-målene, Sentence case-reglen, keyword-tilstedeværelse, 2026 disapproval-forbud, description-fordelingen og kvalitets-check-listen — testet på millioner af annoncer, og den vinder ved enhver konflikt med Trin 4 nedenfor.
 
 ## Trin 4 — Generer annoncetekster
 
-Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder angle-fordelingen fra reference-filen. Plus **4 descriptions** og **2 paths**. (Hårde grænser: se tabellen øverst — 30/90/15.)
+Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder angle-fordelingen fra `../../shared/headline-craft.md`. Plus **4 descriptions** og **2 paths**. (Hårde grænser: se tabellen øverst — 30/90/15.)
 
-**Regler (uddybet i `references/headline-craft.md`):**
-- **Kunde-stilguide fra Trin 2.5 (hvis den blev kørt):** læn dig på de budskaber, USP'er, hooks og CTA-formuleringer du udledte — kun det semantiske lag, formatering følger stadig headline-craft.md (firewall-reglen i Trin 2.5).
+**Regler (uddybet i `../../shared/headline-craft.md`):**
+- **Kunde-stilguide fra Trin 2.5 (hvis den blev kørt):** læn dig på de budskaber, USP'er, hooks og CTA-formuleringer du udledte — kun det semantiske lag, formatering følger stadig `../../shared/headline-craft.md` (firewall-reglen i Trin 2.5).
 - Kun claims der står på landingssiden eller blev bekræftet i intake (USP-hierarki, trust-tal). Ingen opfundne tal, garantier eller priser.
 - **Sentence case overalt** — ikke Title Case.
 - **Top-keyword** (fra Google Ads MCP eller manuelt intake) skal stå i **mindst 3 headlines**.
@@ -346,23 +242,12 @@ Producer **20-25 headline-kandidater**, derefter vælg de 15 bedste der opfylder
 
 ### Obligatorisk vinkel-audit — udfyld FØR du skriver `ads.json`
 
-Vinkel-mixet kan ikke tjekkes mekanisk af scriptet (det er semantisk), så **du** skal selv dokumentere det. Skriv denne tabel ud i dit svar før arket bygges. Mål-kolonnen er fra reference-filen; "Faktisk" er dit sæt. **Enhver afvigelse skal have en grund på én linje** — ellers retter du sættet.
+Vinkel-mixet kan ikke tjekkes mekanisk af scriptet (det er semantisk), så **du** skal selv dokumentere det. **Udfyld vinkel-audit-tabellen fra `references/naming-and-angle-templates.md` (Del 2) og skriv den ud i dit svar før arket bygges.** Mål-kolonnen er consumer-defaulten fra `../../shared/headline-craft.md`; "Faktisk" er dit sæt.
 
-| Vinkel | Mål | Faktisk | Grund hvis afvigelse |
-|---|---|---|---|
-| Brand + keyword | 2 | ? | |
-| Keyword-led | 3 | ? | |
-| Benefit / udbytte | 3 | ? | |
-| Feature / spec | 2 | ? | |
-| Social proof / trust | 1 | ? | |
-| Urgency | 0-1 | ? | |
-| CTA (specifik) | 1 | ? | |
-| Garanti / risiko | 1 | ? | |
-| Location / segment | 1 | ? | |
+- **Enhver afvigelse skal have en grund på én linje** — ellers retter du sættet. Målene bøjer sig efter branchen (se "Vinkel-mix pr. branche" i `../../shared/headline-craft.md`); en afvigelse uden grund er en fejl, ikke en stil.
+- **Auditen køres PER RSA:** N annoncer → N audit-tabeller (én per annonce), hver skal selvstændigt opfylde mixet og længde-variationen.
 
-Målene er en **consumer-default** (alarm-eksemplet) og bøjer sig efter branchen — se "Vinkel-mix pr. branche" i reference-filen. Eksempel på en legitim afvigelse: et B2B-compliance/certificerings-produkt må gerne være trust-tungt (3 i stedet for 1) og udelade urgency/garanti — skriv da grunden, fx "trust-tungt: compliance-vertikal, akkreditering ER købsargumentet". En afvigelse uden grund er en fejl, ikke en stil.
-
-Gennemgå kvalitets-check-listen fra reference-filen før du skriver `ads.json`.
+Gennemgå kvalitets-check-listen fra `../../shared/headline-craft.md` før du skriver `ads.json`.
 
 ### Flere RSA'er i samme ad group (styret af Kald 1, spørgsmål 4)
 
@@ -381,11 +266,9 @@ Hver RSA er stadig et **komplet 15-headline-sæt med hele 9-vinkel-mixet ovenfor
 | **Trust signals** | Social proof / trust-tal (omformuleret) | + benefit, feature, CTA, keyword-led, … |
 | **Clear CTA** | Tilbud / urgency / handling | + benefit, feature, trust, keyword-led, … |
 
-**Hvorfor ikke mono-tematiske RSA'er:** en RSA der KUN er trust-headlines ville (a) dumpe vinkel-auditen ovenfor, og (b) trippe `fill-sheet.py`'s næsten-ens-gate (3+ headlines der deler de første 12 tegn afvises). Reference-filen og scriptets gates vinder hver konflikt her også — lav *fuldt udfyldte* RSA'er der hver især består auditen, ikke tynde tema-annoncer.
+**Hvorfor ikke mono-tematiske RSA'er:** en RSA der KUN er trust-headlines ville (a) dumpe vinkel-auditen ovenfor, og (b) trippe `fill-sheet.py`'s næsten-ens-gate (3+ headlines der deler de første 12 tegn afvises). `../../shared/headline-craft.md` og scriptets gates vinder hver konflikt her også — lav *fuldt udfyldte* RSA'er der hver især består auditen (én audit-tabel per RSA, jf. Trin 4-auditen), ikke tynde tema-annoncer.
 
-**Vinkel-auditen køres PER RSA.** Med N RSA'er skriver du N audit-tabeller (én per annonce) i dit svar — hver RSA skal selvstændigt opfylde mixet og længde-variationen.
-
-Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i intake (Trin 1, punkt 8).
+Skriv teksten til en `ads.json`. Brug det kampagnenavn brugeren bekræftede i intake (Trin 1, Kald 3).
 
 **Én RSA (default):**
 ```json
@@ -482,6 +365,5 @@ Næste: del .xlsx'en med kunden til review. Til Editor: eksportér godkendte ræ
 
 ## Maintenance
 
-- Layoutet bor ÉT sted: `sheet_layout.py` (`FIELDS`, `COLUMNS`, `build_sheet`, `text_cell`, `autosize_columns`). `build-template.py` og `fill-sheet.py` importerer begge derfra — ret kun `sheet_layout.py`, så følger begge med automatisk.
-- Regenerer det committede single-RSA `template.xlsx` (reference + smoke test): `python3 ${CLAUDE_SKILL_DIR}/build-template.py` (kun når layoutet ændrer sig). Skillen loader IKKE filen ved kørsel — `fill-sheet.py` bygger layoutet friskt for N rækker.
-- Skrive-reglerne i `references/headline-craft.md` skal re-checkes hvis Google ændrer disapproval-policy eller Ad Strength-vægtning. Kilder med tal-driven evidens (Optmyzr-studiet) må ikke være over 12 måneder gamle uden ny verifikation.
+- Layout + template-regen: layoutet bor ÉT sted (`sheet_layout.py`); regenerer `template.xlsx` med `build-template.py` kun når layoutet ændrer sig. Fuld maintenance-note i `references/sheet-and-editor-contract.md`.
+- Skrive-reglerne i `../../shared/headline-craft.md` skal re-checkes hvis Google ændrer disapproval-policy eller Ad Strength-vægtning. Kilder med tal-driven evidens (Optmyzr-studiet) må ikke være over 12 måneder gamle uden ny verifikation.

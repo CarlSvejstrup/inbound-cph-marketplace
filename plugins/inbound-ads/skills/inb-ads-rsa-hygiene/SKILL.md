@@ -25,31 +25,25 @@ Derfor dømmer skillet aldrig en asset på konverteringsrate. Det rapporterer ku
 - Klassificerer hver asset som DØDVÆGT / FOR NY / AKTIV ud fra `MIN_IMPRESSIONS`.
 
 **Gør ikke:**
-- Dømmer ikke assets på CVR (konfunderet + under signifikans). Google-label og CVR-indikation vises ikke i arket — på Inbounds konti er de altid identiske og dermed støj. Kan stadig bruges internt til status-logik, men er ikke en kolonne.
+- Dømmer ikke assets på CVR (se Baggrund). Google-label og CVR-indikation vises ikke i arket — på Inbounds konti er de altid identiske og dermed støj; må bruges internt i status-logikken, men er ikke en kolonne.
 - Skriver/redigerer/pauser aldrig på kontoen — alt er anbefalinger.
 - Vurderer aldrig pausede kampagner/annoncer — de er bevidste, ekskluderes, og flages aldrig som negativt fund.
 
 ## Architecture
 
-En læse-skill: henter per-asset data via Google Ads MCP (`run_custom_gaql`), bygger en farvekodet `.xlsx` via `build-sheet.py` (openpyxl), og gemmer den til Drive (connector) eller lokalt. Samme xlsx-mekanik som `inb-ads-search-term-analyse`. Ingen `gws`, ingen Sheets-API — kører i Cowork og lokalt. Eneste forudsætning er Python 3 med `pip`; `build-sheet.py` self-bootstrapper openpyxl hvis det mangler.
+En læse-skill: henter per-asset data via Google Ads MCP (`run_custom_gaql`), bygger en farvekodet `.xlsx` via `build-sheet.py` (openpyxl, self-bootstrapper), og gemmer den til Drive (connector) eller lokalt. Samme xlsx-mekanik som `inb-ads-search-term-analyse`. Ingen `gws`, ingen Sheets-API — kører i Cowork og lokalt; eneste forudsætning er Python 3 med `pip`.
 
 ## Trin 0 — Hent klient-kontekst (AI Context) FØRST
 
-Før al anden handling, og før det første Google Ads MCP-kald, hent klientens AI Context-fil ind i din kontekst. Det er en læsning, men obligatorisk — arv ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagners-intention i stedet for at diagnosticere blindt.
+Kør `../../shared/client-context-intake.md` som allerførste trin — før det første Google Ads MCP-kald. Det er en læsning (aldrig gated), men obligatorisk: sådan arver du ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagners-intention i stedet for at diagnosticere blindt. Den fil holder også opslaget i master-klientindekset, reglen om delte Drive-mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI → vælg rækken for det specifikke marked) og fallback når en klient endnu ikke har en AI Context-fil.
 
-Fire ting i AI Context'en styrer direkte hvad du må flage og hvor hårdt du må anbefale:
+Fire ting i AI Context'en styrer direkte hvad du må flage og hvor hårdt du må anbefale — hav dem i hovedet, når du klassificerer i Trin 3 og formulerer anbefalinger:
 - **Hårde rammer** — afgrænser hvad du overhovedet må røre/anbefale.
 - **Budstrategi-norm** — tCPA/tROAS/manuel afgør om "for ny / Google lærer" er forventet, og hvordan dødvægt-anbefalinger formuleres.
 - **Pausede-kampagners-intention** — bekræfter at pausede kampagner/annoncer er bevidste og aldrig flages som negativt fund.
 - **Stage** — en ikke-`customer`-stage betyder en ikke-lukket konto; antag aldrig en aktiv retainer.
 
-1. Identificér klienten. Uklart → spørg hvilken klient før du fortsætter.
-2. Åbn master-klientindekset i Drive via Drive-connectoren: `search_files` efter Google Doc'en `Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"). Læs med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, Stage, Drive-mappe og AI Context-fil.
-3. Find klientens række (match på navn/domæne/Ads-ID). Notér Stage. For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
-4. Åbn klientens AI Context-`.md` via Drive-linket i indeksrækken (`read_file_content`). Den indeholder ID'er, kontakter, hårde rammer, mål/KPI'er, navngivningskonvention, og link til changelog/optimeringslog (læs den også hvis opgaven kræver ændringshistorik).
-5. Derefter går du videre til Trin 0.5 med AI Context som ground truth for klient-fakta (også til at bekræfte `customer_id` i Trin 1).
-
-Ingen række/AI Context-fil endnu: sig det, fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP), men flag hullet. Spring aldrig opslaget over.
+Behandl AI Context som ground truth for klient-fakta (også til at bekræfte `customer_id` i Trin 1), og gå videre til Trin 0.5.
 
 ## Trin 0.5 — Forudsætninger
 
@@ -92,7 +86,7 @@ WHERE campaign.status = 'ENABLED'
 
 For et vindue over 30 dage: erstat `DURING LAST_30_DAYS` med `BETWEEN '<start>' AND '<end>'` (beregnede datoer — `LAST_90_DAYS` virker ikke).
 
-**Verificeret feltform (live, 2026-05-29):** `ad_group_ad_asset_view.field_type` = `HEADLINE`/`DESCRIPTION`; `performance_label` returnerer typisk `NOT_APPLICABLE`/`PENDING` (sjældent BEST/GOOD/LOW); per-asset `clicks`/`conversions`/`cost_micros`/`impressions` kommer alle tilbage. `cost_micros` er micros → DKK = `cost_micros / 1_000_000`.
+Feltformen blev verificeret live mod Inbound-konti 2026-05-29 — hvad hvert felt faktisk returnerer (`field_type`, `performance_label`, per-asset metrics, `cost_micros` → DKK) står i `references/gaql-verified-fields.md`. Læs den før du fortolker rå-outputtet.
 
 For at tælle RSA per ad group (champion-challenger), kør en let separat query:
 
@@ -113,13 +107,13 @@ For hver asset, beregn `status` (skriv ASCII-enummet i JSON; arket viser den dan
 - **FOR_NY** (vises som **FOR NY**) — `performance_label` er `LEARNING`/`PENDING` OG impressions er lave. "Google lærer stadig — rør ikke endnu."
 - **AKTIV** — impressions på eller over `MIN_IMPRESSIONS`. Serveres med rimeligt volumen.
 
-Tærsklen er bevidst en ren impression-grænse, ikke en konvertering, fordi CVR-data er upålidelig på disse konti.
+Tærsklen er bevidst en ren impression-grænse, ikke en konvertering (se "Baggrund — hvorfor ingen profit-matrix" for hvorfor CVR-data er upålidelig på disse konti).
 
-For hver asset, udled `vinkel` (benefit / trust / urgency / CTA / feature / keyword-led / brand / location / garanti — samme taksonomi som `inb-ads-rsa-copy/references/headline-craft.md`) ud fra asset-teksten.
+For hver asset, udled `vinkel` (benefit / trust / urgency / CTA / feature / keyword-led / brand / location / garanti — samme taksonomi som `../../shared/headline-craft.md`) ud fra asset-teksten.
 
 Per ad group: hvilke vinkler har INGEN serveret asset? Det er `manglende_vinkler` → fødes til gap-brief.
 
-`google_label` og `cvr_hint` behøves ikke i `analysis.json` — de vises ikke som kolonner (altid identiske på Inbounds konti). Brug dem internt i klassificeringen hvis nyttigt, men arket viser kun `status`.
+`google_label` og `cvr_hint` behøves ikke i `analysis.json` — de renderes ikke som kolonner (se Baggrund). Brug dem internt i klassificeringen hvis nyttigt; arket viser kun `status`.
 
 Anbefalinger er recommend-only, altid formuleret som forslag til mennesket, aldrig som kommando. Eksempler: "Aldrig serveret — kandidat til at skære." / "Kun 1 RSA i denne ad group — byg en challenger." / "Mangler en CTA-vinkel — tilføj i næste runde."
 
@@ -127,15 +121,13 @@ Anbefalinger er recommend-only, altid formuleret som forslag til mennesket, aldr
 
 Saml `manglende_vinkler` per ad group til en `gap_brief`-liste. For hver: et konkret `forslag` til hvilke challenger-headlines `inb-ads-rsa-copy` skal skrive. Det er her build→operate→iterate-loopet lukkes: outputtet fra dette skill er inputtet til næste `inb-ads-rsa-copy`-kørsel.
 
-### Gap-brief-kontrakt (delt med `inb-ads-rsa-copy`)
-
-Dette skill *producerer* gap-brief'et; `inb-ads-rsa-copy` *forbruger* det, i samme form. Medium: brugeren kopierer det manuelt ind i den næste kørsel — det skrives ikke til en delt fil, og forbrugeren parser hverken xlsx-fanen eller `analysis.json`. Det holder de to Cowork-kørsler løst koblet. `inb-ads-rsa-hygiene` og `inb-ads-rsa-copy` er søster-skills i samme plugin (`inbound-ads`), så loopet lukker uden krav om at installere flere plugins.
-
 Ud over `gap_brief`-feltet i `analysis.json` (til arkets Gap-brief-fane), udskriv gap-brief'et i dit svar i denne kopiér-klare form, én linje per ad group:
 ```
 - Ad group: <navn> | Manglende vinkler: <vinkel1>, <vinkel2> | Forslag: <kort tekst>
 ```
-Vinkel-navnene skal være fra taksonomien i `inb-ads-rsa-copy/references/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti), så forbrugeren kan forvælge dem direkte. Nævn at brugeren kan indsætte blokken i en `inb-ads-rsa-copy`-kørsel for at få challenger-annoncer der fylder hullerne.
+Vinkel-navnene skal være fra taksonomien i `../../shared/headline-craft.md` (benefit, trust, urgency, CTA, feature, keyword-led, brand, location, garanti), så `inb-ads-rsa-copy` kan forvælge dem direkte. Nævn at brugeren kan indsætte blokken i en `inb-ads-rsa-copy`-kørsel for at få challenger-annoncer der fylder hullerne.
+
+Den fulde kontrakt — hvorfor transporten er manuel-paste (løs kobling mellem to Cowork-kørsler i samme plugin), og at forbrugeren hverken parser xlsx-fanen eller `analysis.json` — står i `references/gap-brief-contract.md`.
 
 ## Trin 5 — Skriv analysis.json og byg arket
 
@@ -147,16 +139,7 @@ python3 ${CLAUDE_SKILL_DIR}/build-sheet.py \
   --out "Annonce-optimering - <klient> - <YYYY-MM-DD>.xlsx"
 ```
 
-Output: en `.xlsx` med fanerne **Oversigt** (ærligheds-banner om hvad rapporten er/ikke er), **Ad group-dækning** (challenger-flag + manglende vinkler på tværs af alle grupper), **én fane pr. ad group**, og **Gap-brief** (til `inb-ads-rsa-copy`).
-
-Hver ad group-fane åbner med et overblik øverst:
-- Ad group + Kampagne (fulde navne — fanenavnet kan være afkortet til Excels 31-tegns-grænse)
-- Aktive RSA i gruppen + "Byg challenger?" (gul hvis under 2)
-- Assets i alt (split i headlines/descriptions)
-- Status-fordeling (antal aktive / dødvægt / for ny)
-- Manglende vinkler (gul hvis der er huller)
-
-Derunder asset-tabellen med kolonnerne `Felt | Tekst | Vinkel | Impressions | Klik | Spend (DKK) | Status | Anbefaling` — Google-label og CVR-indikation er fjernet.
+Output: en farvekodet `.xlsx` med fanerne **Oversigt** (ærligheds-banner + `MIN_IMPRESSIONS`-floor), **Ad group-dækning** (challenger-flag + manglende vinkler på tværs af alle grupper), **én fane pr. ad group** (overblik øverst + asset-tabel med kolonnerne `Felt | Tekst | Vinkel | Impressions | Klik | Spend (DKK) | Status | Anbefaling`), og **Gap-brief** (til `inb-ads-rsa-copy`). Google-label og CVR-indikation er bevidst udeladt. Fuld fane- og kolonne-layout: `references/xlsx-layout.md`.
 
 ## Trin 6 — Gem (write — gated)
 
@@ -188,17 +171,22 @@ Drive: https://docs.google.com/.../<file id>
 
 - 3 ad groups har kun 1 RSA -> byg en challenger i hver.
 - 7 assets er dødvægt (under 50 impressions i perioden) -> kandidater til at skære.
-- Vinkel-huller: 'Hojskole udland' mangler en CTA + urgency; 'Sabbataar' er fuldt dækket.
+- Vinkel-huller: 'Højskole udland' mangler en CTA + urgency; 'Sabbatår' er fuldt dækket.
 
-Forbehold: strukturel hygiejne. Ingen CVR-dom - Google-label er PENDING/NOT_APPLICABLE
-på kontoen, og per-asset-metrics er konfunderede.
-
-Gap-brief'et er klar til at fodre inb-ads-rsa-copy's næste challenger-runde.
-Næste: du beslutter hvad der skæres/bygges. Skillet rører aldrig kontoen.
+Forbehold: strukturel hygiejne. Ingen CVR-dom — Google-label er PENDING/NOT_APPLICABLE
+på kontoen, og per-asset-metrics er konfunderede. Gap-brief'et følger (klar til
+inb-ads-rsa-copy). Du beslutter hvad der skæres/bygges; skillet rører aldrig kontoen.
 ```
 
 ## Maintenance
 
 - `build-sheet.py` self-bootstrapper openpyxl; kør lokalt for at smoke-teste mod en `analysis.json`.
-- Hvis Google begynder at tildele BEST/GOOD/LOW på Inbounds konti (højere volumen i fremtiden), kan signifikans-gaten i Trin 3 løsnes — men kun efter en ny live-verifikation, ikke på antagelse.
-- Feltformen for `ad_group_ad_asset_view` blev verificeret live 2026-05-29; re-verificér hvis Google ændrer API-versionen.
+- GAQL-feltformen (verificeret 2026-05-29) og hvornår signifikans-gaten kan løsnes står i `references/gaql-verified-fields.md`; re-verificér live hvis Google ændrer API-versionen — ikke på antagelse.
+
+## References
+
+- `../../shared/client-context-intake.md` — Trin 0 klient-kontekst-intake (delt).
+- `../../shared/headline-craft.md` — vinkel-taksonomien (delt med `inb-ads-rsa-copy`).
+- `references/gaql-verified-fields.md` — verificeret GAQL-feltform + dato-literal-gotcha + re-verifikation.
+- `references/gap-brief-contract.md` — den fulde gap-brief-kontrakt med `inb-ads-rsa-copy`.
+- `references/xlsx-layout.md` — fuld fane- og kolonne-layout for `build-sheet.py`-arket.

@@ -11,17 +11,12 @@ bekræftelse. Read-only indtil da. Svar på dansk. Sæt `LIB=${CLAUDE_SKILL_DIR}
 
 ## 0. Hent klientkontekst først
 
-Identificér klienten (uklart → spørg). Åbn master-klientindekset i Drive — Google Doc'en
-`Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`,
-i "A - Kunder") — og find klientens række for Google Ads-ID og link til AI Context. Åbn AI Context
-(`read_file_content`): ID'er, kontakter, mål/KPI'er, navngivningskonvention, budstrategi-norm. Delte
-mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) → vælg rækken for det
-specifikke marked.
-
-Hvis den linkede `.md`-fil ikke kan læses ("ineligible to be used in generative AI contexts"), søg i
-klientens AI Context-mappe efter Google Doc-versionen (fx `<Klient> - Projektoverblik`) — Google Docs er
-læsbare hvor rå `.md`-uploads ikke er. Kan intet læses: sig det og fortsæt med det du har (Drive-mappe,
-Ads MCP), men flag hullet.
+Kør `../../shared/client-context-intake.md` som allerførste trin: master-klientindekset i Drive →
+klientens række (Google Ads-ID, Stage, AI Context-link) → AI Context-filen som ground truth. Den fil
+dækker også delte-mappe-grupperne (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone,
+DI → vælg markedets række), `.md`-ulæselig→Google Docs-fallback, og no-row/no-file-fallback. Ren
+læsning, aldrig gated. Kan intet læses: sig det, fortsæt med det du har (Drive-mappe, Ads MCP), flag
+hullet.
 
 ## 1. Intake (ét `AskUserQuestion`-kald)
 
@@ -38,11 +33,13 @@ Udled så meget som muligt selv; saml resten i ét kald:
 5. **Hvilken konvertering tæller** — alle, eller kun primære (leads/opkald)? Ved tvivl: antag alle, men
    skriv forbeholdet.
 
-## 2. Forstå tilbuddet billigt
+## 2. Forstå tilbuddet billigt (nice-to-have)
 
-Ét `firecrawl-scrape` af forsiden + ad group-navnene (de staver geografi + ydelses-opdeling). Skriv 3-5
-linjers forståelse til dig selv, så du kan kende "vores tilbud" fra "ikke vores tilbud". Fejler scrape:
-brug ad group-navnene og sig det.
+Skriv 3-5 linjers forståelse af tilbuddet til dig selv, så du kan kende "vores tilbud" fra "ikke vores
+tilbud" — det er linsen al relevans-dom hviler på. Ad group-navnene (geografi + ydelses-opdeling) bærer
+det meste. Vil du have det skarpere, tilføj ét `firecrawl-scrape` af forsiden — UX-polish, ikke krav;
+fejler scrape, kør videre på ad group-navnene og sig det. Tilgangen (landingsside + konto-signaler →
+`OFFERING_TOKENS`) er fuldt beskrevet i `../../shared/offering-brief.md`.
 
 ## 3. Hent data server-side filtreret
 
@@ -117,6 +114,11 @@ opsummering og `## Kilder`.
 
 ## lib/
 
-`slim.py` (slanker rapporten, `where_predicate()`, `aggregate_terms()`) og `ngram.py` (temaer per
-1/2/3-gram) fodrer `digest.py`. `write_csv.py` og `build_xlsx.py` gør beslutningerne til CSV/Excel med
-hårde guards. Ingen af scripterne vurderer noget — al klassifikation sker i samtalen.
+- **`digest.py`** — orkestratoren: tager det rå pull og printer den kompakte indsigts-brief (Trin 4).
+- **`slim.py`** — skærer pullet ned til de få felter en dom kræver; leverer `where_predicate()` (bygger
+  GAQL-filtret) og `aggregate_terms()` (samme term på tværs af ad groups). Fodrer `digest.py`.
+- **`ngram.py`** — n-gram-analyse (temaer per 1/2/3-gram) af søgeterm-listen. Fodrer `digest.py`.
+- **`write_csv.py`** — gør den godkendte `decisions.json` til Editor-import-CSV'er med hårde guards (7B).
+- **`build_xlsx.py`** — opt-in, farvekodet Excel-overblik af gennemgangen (7C).
+
+Ingen af scripterne vurderer noget — al klassifikation sker i samtalen.

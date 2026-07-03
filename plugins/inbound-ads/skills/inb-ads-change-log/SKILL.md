@@ -43,15 +43,11 @@ Alt mod Google Ads er read-only.
 
 ## Trin 0.5 - Hent klient-kontekst (AI Context) først
 
-Før du henter ændringshistorik eller resolver changelog-Doc'et på en navngiven klient, hent klientens AI Context-fil ind i din kontekst. Det er en læsning (aldrig gated) men obligatorisk - sådan arver du alt Inbound ved om klienten (ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er, pausede-kampagner-intention) i stedet for at starte blindt. AI Context-filen linker klientens changelog/optimeringslog-Doc, hvilket hjælper direkte i Trin 4.
+Kør `../../shared/client-context-intake.md` som allerførste trin på en navngiven klient (identificér klient → åbn master-klientindekset → find rækken + Stage → åbn AI Context-filen). Læsning, aldrig gated, men obligatorisk - sådan arver du klientens ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagner-intention i stedet for at starte blindt.
 
-1. **Identificér klienten.** Er det uklart hvilken klient, spørg før du fortsætter. (PER PERSON: gør dette per berørt kunde inden du resolver hver kundes changelog-Doc.)
-2. **Åbn master-klientindekset i Drive** via `search_files` efter Google Doc'en `Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"-mappen). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, Stage, Drive-mappe og AI Context-fil.
-3. **Find klientens række** (match på navn/domæne/Ads-ID). Notér Stage (customer / lead / opportunity / "ikke tagget") - en ikke-`customer`-stage betyder en ikke-lukket konto, antag aldrig en aktiv retainer. For delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) vælg rækken for det specifikke marked/konto.
-4. **Åbn klientens AI Context-`.md`** via Drive-linket i indeksrækken og tag den ind i din kontekst. Den indeholder driftsbriefen inklusive link til changelog/optimeringslog - brug det link som første kandidat i Trin 4.
-5. **Først derefter** går du videre til Trin 1-intake, med AI Context som ground truth for klient-fakta.
-
-Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, og fortsæt med den kontekst du kan samle (Drive-mappe, Ads MCP), men flag hullet. Spring aldrig opslaget stille over.
+To ting der er specifikke for dette skill:
+- **AI Context-filen linker klientens changelog/optimeringslog-Doc** - brug det link som **første kandidat i Trin 4**.
+- **PER PERSON:** kør intaket per berørt kunde inden du resolver hver kundes changelog-Doc.
 
 ## Trin 1 - Intake (ét spørgsmål ad gangen)
 
@@ -61,7 +57,7 @@ Har klienten ingen række i indekset eller ingen AI Context-fil endnu: sig det, 
 
 **1b-kunde. Klientnavn.** Match mod `list_accessible_accounts` på kontonavn. Nogle konti ligger under sub-MCC'er og dukker ikke op der (den enumererer kun ét niveau) - i så fald bed om konto-ID'et direkte, eller find det via sub-MCC-traversal (`run_custom_gaql` mod manager-ID: `SELECT customer_client.id, customer_client.descriptive_name FROM customer_client`). Bekræft: "Fandt [Kontonavn] (ID: XXXXXXXXXX) - rigtig konto?"
 
-**1b-person. Hvem.** Spørg om personens navn og bekræft email (Inbound-mønster: `rkj@inboundcph.dk` = Rikke, `cri@` = Caroline, `na@` = Nur osv. - bekræft den fulde email, ikke et gæt). Find personens konti via listen over Inbound-konti og deres ansvarlige specialist. Kun personens egne konti, med mindre brugeren beder om andet (holder loopet lille: "deres bog", ikke "hvert tastetryk overalt"). En person kan have ændret på en konto de ikke står som ansvarlig på - det fanges kun ved den udtømmende variant (alle konti, filtreret på email).
+**1b-person. Hvem.** Spørg om personens navn og bekræft email (Inbound-mønster: `rkj@inboundcph.dk` = Rikke, `cri@` = Caroline, `na@` = Nur osv. - bekræft den fulde email, ikke et gæt). Find personens konti via specialist-rosteren: den ligger i master-klientindeks-Doc'et (`1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, hentet i Trin 0.5) med en ansvarlig specialist per klientrække; alternativt de lokale `clients/*.md` frontmatter-felter `responsible`. Kun personens egne konti, med mindre brugeren beder om andet (holder loopet lille: "deres bog", ikke "hvert tastetryk overalt"). En person kan have ændret på en konto de ikke står som ansvarlig på - det fanges kun ved den udtømmende variant (alle konti, filtreret på email).
 
 **1c. Periode.** Tilbyd "Sidste 7 dage (standard for ugentlig)", "Sidste 24 timer", "Sidste 14 dage", "Sidste 30 dage", eller custom. Standard = sidste 7 dage. `lookback_days` ≤ 29 altid. Omsæt til et konkret vindue og vis det overalt (f.eks. "29. maj - 4. jun 2026").
 
@@ -126,6 +122,11 @@ For hver konto med aktivitet: find klientens changelog/optimeringslog-Doc på Dr
 1. `search_files` efter navnemønster (`optimeringslog`, `changelog`, `ads log`) scoped til klientmappen under `${user_config.inbound_root_folder_id}`.
 2. Hvis flere kandidater eller ingen sikker match: vis kandidaterne (navn + ID + mappesti) og bed mennesket bekræfte hvilket Doc før du udkaster. Et fejl-resolvet Doc korrumperer klientens log.
 3. `read_file_content` på det bekræftede Doc for at aflæse dets format (måneds-headers, datoformat) og hvor "øverst under aktuelle måned" er, så blokken matcher.
+
+### Fejlfinding - changelog-Doc'et
+
+- **Flere changelog-docs (gammel + ny):** klienter migrerer ofte fra en ældre log ("Google/Bing Ads") til en nyere ("Optimeringslog") - begge kan stadig ligge i mappen. Skriv aldrig blindt i den nyeste. Vis begge kandidater (navn + ID + sti + sidst ændret) og bed mennesket bekræfte den aktive, før du udkaster. Prioritér AI Context-filens changelog-link som den kanoniske, hvis den peger på én.
+- **Søgning giver ingen match:** udvid navnemønstret (`log`, `optimering`, `historik`) og søg bredere i klientmappen inkl. undermapper. Stadig intet: sig det, lever udkastet uden target-Doc (blokken er brugbar i sig selv), og bed mennesket pege på det rigtige Doc eller bekræfte at ingen log findes endnu. Opfind aldrig et Doc-ID.
 
 ## Trin 5 - Formatmatch (ikke et nyt format)
 

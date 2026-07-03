@@ -7,17 +7,18 @@ description: Kør en fuld read-only Google Ads paid search-audit for én klient 
 
 Producér en komplet paid search-audit for en Google Ads-konto og lever den som et professionelt slide deck. Alt mod Google Ads er read-only. Enhver ekstern write (Drive, fil, mail) er gated bag eksplicit bekræftelse — vis hvad og hvor, vent på "ja", skriv så. Alt på dansk (intake, statusbeskeder, slide-copy) medmindre brugeren skriver engelsk.
 
+## Forudsætninger (bundtede filer)
+
+Skillen leverer et HTML slide deck + renderet PDF ud fra to filer der ligger i skill-mappen ved siden af denne `SKILL.md`:
+
+- **`template.html`** — Inbound-designsystemets deck-skabelon (CSS, logoer, slide-navigation). § 6 udfylder den; rediger den ikke pr. audit.
+- **`render-pdf.js`** — Node-scriptet der renderer det færdige deck til PDF (kræver `puppeteer-core` + Google Chrome + `pdfunite`/poppler; se `node_modules/` i mappen). § 7 kalder det.
+
+Derudover citerer skillen tre delte kontrakter (relative stier fra denne fil): `../../shared/client-context-intake.md` (klient-kontekst-intake), `../../shared/quality-score-pull.md` (QS-pull), og de to lokale `references/`-filer nævnt undervejs.
+
 ## 1. Hent klientkontekst først
 
-Før al dataindhentning på en navngiven klient: hent klientens AI Context ind i din kontekst. Det er en fri læsning, men obligatorisk — sådan arver du ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagner-intention i stedet for at starte blindt.
-
-1. Identificér klienten (navn, domæne eller konto). Uklart → spørg før du fortsætter (kontobekræftelsen sker i trin 2a).
-2. Åbn master-klientindekset i Drive via Drive-connectoren: `search_files` efter Google Doc'en `Inbound CPH — Google Ads klient-index (AI Context)` (id `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`, i "A - Kunder"). Læs den med `read_file_content`. Den mapper hver klient til Google Ads ID, HubSpot ID, ClickUp-mappe, Stage, Drive-mappe og AI Context-fil.
-3. Find klientens række (match på navn/domæne/Ads-ID). Notér Stage (customer / lead / opportunity / ikke tagget) — en ikke-`customer`-stage betyder ingen lukket konto; antag aldrig en aktiv retainer. Delte mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI) → vælg rækken for det specifikke marked/konto.
-4. Åbn klientens AI Context-`.md` via Drive-linket (`read_file_content`). Den indeholder ID'er, kontakter, hårde rammer, mål/KPI'er, navngivningskonvention, og link til changelog/optimeringslog — læs også det hvis opgaven kræver ændringshistorik.
-5. Derefter videre til intake i trin 2, med AI Context som ground truth for klient-fakta.
-
-Ingen række i indekset eller ingen AI Context-fil: sig det, fortsæt med det du kan samle (Drive-mappe, Ads MCP), men flag hullet eksplicit — spring aldrig opslaget stille over.
+Kør `../../shared/client-context-intake.md` som **allerførste trin** — før al dataindhentning på klienten. Det er en læsning (aldrig gated), men obligatorisk: sådan arver du ID'er, kontakter, hårde rammer, navngivningskonvention, budstrategi-norm, KPI'er og pausede-kampagners-intention i stedet for at starte blindt. Den fil holder også Stage-tjekket (en Stage ≠ `customer` betyder ingen lukket, betalende konto), reglen om delte Drive-mapper (Lime, Retriever/Infomedia, GSGroup, Nemco, Julemærket, PhoneAlone, DI → vælg rækken for det specifikke marked), og fallback når en klient endnu ikke har en AI Context-fil. Behandl AI Context som ground truth for klientfakta; kontobekræftelsen sker i trin 2a.
 
 ## 2. Intake (ét spørgsmål ad gangen)
 
@@ -39,7 +40,9 @@ Når alle svar er indsamlet: bekræft scope og gå i gang. "Godt — jeg henter 
 
 ## 3. Dataindhentning
 
-Uddelegér konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet; den henter og vurderer kontodata og returnerer fund. Giv den det bekræftede `customer_id`, det valgte scope + datointerval, og AI Context'en fra trin 1; brug MCP-kaldene og GAQL-spørgsmålene nedenfor som kontrakten for hvad den skal trække per modul. Kald alle relevante MCP-værktøjer for det valgte scope, parallelt hvor muligt.
+Uddelegér konto-læsningen til `ads-analyst`-agenten (read-only account analyst) via Task-værktøjet; den henter og vurderer kontodata og returnerer fund. Giv den det bekræftede `customer_id`, det valgte scope + datointerval, og AI Context'en fra trin 1; brug MCP-kald-tabellen nedenfor som kontrakten for hvad den skal trække per modul. Kald alle relevante MCP-værktøjer for det valgte scope, parallelt hvor muligt.
+
+**Sparsom data / kald der fejler:** hvis et modul returnerer tom eller tynd data (ingen kampagner i den kanal, ingen QS-keywords) eller et MCP-kald fejler, så **notér det på selve modulets slide** ("Ingen data for dette modul i perioden" / "Kald fejlede — ikke vurderet") og score modulet konservativt eller markér det som ikke-vurderet. Fejl aldrig hele auditten stille på ét manglende kald: fortsæt de øvrige moduler og gør hullet synligt for brugeren.
 
 ### MCP-kald per modul
 
@@ -50,7 +53,7 @@ Uddelegér konto-læsningen til `ads-analyst`-agenten (read-only account analyst
 | Indstillinger | `run_custom_gaql` — search partners, display select, geo, sprog, DSA, IP-ekskluderinger, ACA-flag |
 | Kreativer & annoncetekster | `get_ad_performance` + `get_disapproved_ads` + `get_ad_extensions` |
 | Keywords & negative keywords | `get_keyword_performance` + `get_search_terms_report` + `run_custom_gaql` (delte negativlister) |
-| Quality score | `get_quality_score_audit` (LAST_90_DAYS altid) |
+| Quality score | `get_quality_score_audit` (LAST_90_DAYS altid) — følg den delte kontrakt i `../../shared/quality-score-pull.md` (QS lever på keyword-grain, landingsside er et flag ikke en score) |
 | Målretning & audiences | `get_age_gender_performance` + `get_location_performance` + `run_custom_gaql` (audiences, observation/targeting-mode) |
 | Landingsider | `get_ad_performance` (udtræk unikke final URLs) + web_fetch per URL (se trin 4) |
 | Feed & merchant center | `run_custom_gaql` — shopping campaigns, merchant center-link, feed-status |
@@ -60,48 +63,13 @@ Uddelegér konto-læsningen til `ads-analyst`-agenten (read-only account analyst
 
 ### GAQL-hjælpespørgsmål
 
-Til kontostruktur-detektion:
-```sql
-SELECT campaign.name, campaign.status, campaign.advertising_channel_type,
-       campaign.bidding_strategy_type, ad_group.name
-FROM ad_group
-WHERE campaign.status != 'REMOVED'
-ORDER BY campaign.name
-```
-
-Til konverteringshandlinger:
-```sql
-SELECT conversion_action.name, conversion_action.category,
-       conversion_action.counting_type, conversion_action.value_settings.default_value,
-       conversion_action.status
-FROM conversion_action
-WHERE conversion_action.status = 'ENABLED'
-```
-
-Til delte negativlister:
-```sql
-SELECT shared_set.name, shared_set.type, shared_set.member_count
-FROM shared_set
-WHERE shared_set.type = 'NEGATIVE_KEYWORDS'
-```
-
-Til audience-lister:
-```sql
-SELECT user_list.name, user_list.size_for_search,
-       user_list.type, user_list.membership_status
-FROM user_list
-WHERE user_list.membership_status = 'OPEN'
-```
+De eksakte `run_custom_gaql`-spørgsmål (kontostruktur, konverteringshandlinger, delte negativlister, audience-lister + vejledning til de øvrige moduler) ligger i `references/gaql-queries.md`. Læs den fil og kør queries derfra — alt er read-only SELECT.
 
 ## 4. Landingsider via web_fetch
 
-Udtræk alle unikke final URLs fra `get_ad_performance`. Deduplikér, tag de 10 hyppigste. For hver URL, kald `web_fetch`:
-- Check at siden loader (ingen fejl)
-- Udtræk primære overskrift og CTA-tekst (ordret fra siden)
-- Notér mobiloptimering (viewport meta til stede?)
-- Vurdér relevans ift. tilsvarende annonce-overskrift
+Udtræk alle unikke final URLs fra `get_ad_performance`, deduplikér, tag de 10 hyppigste og kald `web_fetch` per URL. Den fulde udvælgelses- og relevans-rubrik (hvad der læses per side: loader den, ordret overskrift + CTA, viewport-meta, annonce↔side-match, hvad "relevant" betyder) ligger i `references/landing-page-rubric.md` — følg den. Skriv aldrig en påstand du ikke kan se i den hentede side.
 
-Flag landingssider-sektionen med manuel-review-banneret (§ i trin 6.3).
+Flag altid landingssider-sektionen med manuel-review-banneret (se trin 6.3).
 
 ## 5. Scoring
 
@@ -185,14 +153,14 @@ Sæt den altid på: "Hvad gør konkurrenterne?", Landingsider, og Display/YouTub
 
 ### 6.4 Quality score chart
 
-Quality score-sektionen skal indeholde et SVG-chart der viser spend-fordeling på QS 1-10. Byg det som inline SVG-stolpediagram i slide-HTML ud fra `get_quality_score_audit`-data.
+Quality score-sektionen skal indeholde et SVG-chart der viser QS-fordelingen (keyword-antal pr. QS 1-10). Byg det som inline SVG-stolpediagram i slide-HTML ud fra `spend_by_qs`-distributionen i den normaliserede QS-output — se `../../shared/quality-score-pull.md` for den præcise form. QS er keyword-grain og recommend-only: fabrikér aldrig en konto- eller ad group-QS, og opfind aldrig en "LP-score" (landingsside er et flag, ikke et tal).
 
 ## 7. Fil-output
 
 1. Gem HTML-deck som `YYYY-MM-DD-<klient-slug>-ads-audit.html` i Inbound CPH-vault under `work/inbound-cph/operations/decks/`.
-2. Kør PDF-renderer:
+2. Kør PDF-rendereren (`render-pdf.js` fra skill-mappen, se Forudsætninger) med deck-sti, PDF-sti og antal slides:
    ```bash
-   node $(dirname "$0")/render-pdf.js <deck.html> <deck.pdf> <slideCount>
+   node <skill-mappe>/render-pdf.js <deck.html> <deck.pdf> <slideCount>
    ```
 3. Rapportér begge stier til brugeren.
 
@@ -206,3 +174,11 @@ Write-gate: vis stier og filnavne før du skriver. Bekræft med brugeren: "Skriv
 - Ingen em-streger (--) i slide-copy — brug komma, kolon eller omstrukturering.
 - Logo altid embedded som base64, aldrig en ekstern filsti.
 - Afslut med en `## Datakilder`-sektion i chatten der lister hvilke MCP-værktøjer der blev kaldt.
+
+## Læs også
+
+- `../../shared/client-context-intake.md` — Trin 0 klient-kontekst-intake (obligatorisk første trin).
+- `../../shared/quality-score-pull.md` — den delte QS-kontrakt (tool, keyword-grain, dato-gotcha, normaliseret output-form). Citeret, ikke duplikeret.
+- `references/gaql-queries.md` — de eksakte read-only GAQL-spørgsmål per modul.
+- `references/landing-page-rubric.md` — web_fetch-udvælgelse + landingssiders relevans-rubrik.
+- `template.html`, `render-pdf.js` — bundtet deck-skabelon + PDF-renderer (se Forudsætninger).

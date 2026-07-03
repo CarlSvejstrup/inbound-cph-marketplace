@@ -1,10 +1,10 @@
 # Writing the updated AI-Context file + the watermark
 
-The mechanics for writing approved changes into the client's AI-Context file on Drive (the `.md` linked from the master index), and advancing the watermark. There is no local file and no frontmatter — everything is the Drive AI-Context file.
+The mechanics for writing approved changes into the client's AI-Context file on Drive (the **native Google Doc** linked from the master index), and advancing the watermark. There is no local file and no frontmatter — everything is the Drive AI-Context Doc.
 
 ## The AI-Context file shape (what you are editing)
 
-`inb-ads-context-publish` created the file. It starts with a `Sidst opdateret:` line, then an H1, an intro, an ID-block, durable sections, and the `## Klientoverblik` (with its ### subsections). The canonical section set + order is defined in `references/section-contract.md` (the source of truth for the layout, shared with the local `clients/*.md` mirror). Schematically:
+`inb-ads-context-publish` created the file as a **native Google Doc** (filtype + section skeleton locked in `../../shared/ai-context-file-contract.md`, the shared source of truth both skills follow). Being a native Doc is exactly what makes the `findAndReplaceInDoc` write path below work — a raw `.md` could not be edited in place. It starts with a `Sidst opdateret:` line, then an H1, an intro, an ID-block, durable sections, and the `## Klientoverblik` (with its ### subsections). The canonical section set + order is defined in `references/section-contract.md` (the layout, shared with the local `clients/*.md` mirror); the artifact type is the shared contract's. Schematically:
 
 ```
 Sidst opdateret: 2026-06-17
@@ -66,7 +66,7 @@ There is no separate timestamp field anywhere. The file's own `Sidst opdateret:`
 
 ## The write itself (Trin 6 — gated, findAndReplaceInDoc only)
 
-One Drive MCP (`mcp__acc7a973-…`), and the AI-Context file is a Google **Doc**, so the write is a gated **`findAndReplaceInDoc`**. No auth probe, no second connector, no "copy-paste by default". Always gated: show the target Doc (name + link) + the exact new blocks, wait for `ja`, replace, confirm.
+One Drive MCP (`mcp__acc7a973-…`), and the AI-Context file is a **native Google Doc** (per `../../shared/ai-context-file-contract.md`), so the write is a gated **`findAndReplaceInDoc`** — which is only possible because it is a native Doc, not a raw `.md`. No auth probe, no second connector, no "copy-paste by default". Always gated: show the target Doc (name + link) + the exact new blocks, wait for `ja`, replace, confirm.
 
 - **Replace surgically, one `findAndReplaceInDoc` per piece,** keeping the rest of the Doc intact: (a) the old `## Klientoverblik` block → new; (b) the old `## Rapport` section → new, ONLY if a new report was ingested; (c) the `Sidst opdateret:` line (old date → today); (d) the `Seneste rapport læst:` line if a new report was ingested; (e) the `Rapporter:` line if newly found. `findText` = the exact existing text with enough surrounding context to match **exactly once** (run `dryRun=true` first to confirm the count). This is the ONLY inline operation — do NOT use `updateTextFile`/`updateDocFromMarkdown`/`insertText`.
 - **Inserting a section that doesn't exist yet** (e.g. the Doc has no `## Rapport`): `findAndReplaceInDoc` can't insert text, so make the insertion a *replacement of a unique anchor* — replace the tail of the `## Klientoverblik` block with "that same tail + `\n\n## Rapport\n\n<new section>`". Same trick to add a missing `Rapporter:` line (extend an adjacent ID-block line).
