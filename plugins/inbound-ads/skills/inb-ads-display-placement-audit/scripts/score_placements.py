@@ -4,19 +4,31 @@ score_placements.py — Tier 1 deterministic risk scoring for Google Ads Display
 
 This is the ONLY deterministic part of inb-ads-display-placement-audit. It never judges intent or
 writes prose — it computes one additive 0-100 risk score per placement from cheap local
-signals (bundled blocklist, TLD, account performance data, network type) and sorts
-placements into three bands. Everything past that (the middle "unsure" band, the final
-ranked report, the human-facing reasoning) is the model's job, not this script's.
+signals (bundled blocklist, TLD, gambling keyword, app-network type) and sorts placements into
+three bands. Everything past that (the middle "unsure" band, the final ranked report, the
+human-facing reasoning) is the model's job, not this script's.
 
-Banding is recall-biased by explicit design (2026-07-01): "low" means ZERO signals matched,
-nothing more nuanced than that. Any placement with even one weak signal lands in "unsure"
-rather than being silently cleared — see band_for_score() for the live-test failure that drove
-this (a real Danish gambling site scored under the old numeric low-threshold and disappeared).
-There is deliberately no --low-threshold flag.
+Signals are deliberately narrow (redesigned 2026-07-03, after a live DBI run flagged bt.dk,
+proff.no and mentedidactica.com as "usikker"): "zero conversions at spend" and "CTR anomaly" were
+dropped entirely. Both are NORMAL Display behavior for a large, legitimate site — Display rarely
+converts and CTR runs far lower than Search — so they fired constantly on sites with nothing wrong
+with them and drowned out the small number of real junk placements. Only signals that mean
+something specific about the SITE ITSELF remain: a known-junk domain, a risky TLD, a gambling
+keyword in the name, or app-network traffic. Fewer signals, higher precision, less to review.
+
+Banding is still recall-biased on the signals that remain: "low" means ZERO signals matched.
+Any placement with a real signal lands in "unsure" rather than being silently cleared — see
+band_for_score() for the live-test failure that drove this (a real Danish gambling site scored
+under the old numeric low-threshold and disappeared). There is deliberately no --low-threshold
+flag. The difference from before is not the banding rule — it's that far fewer placements now
+trigger a signal in the first place, because the noisy signals are gone.
+
+The report layer (SKILL.md Trin 5) sorts and prioritizes by SPEND, not by score — cost-first, so
+the expert's attention goes where the money is, not where the algorithm is most excited.
 
 Usage:
     python3 score_placements.py --in placements.json --out scored.json \
-        [--high-threshold 70] [--tier3-cap 20] [--zero-conv-floor 20]
+        [--high-threshold 70] [--tier3-cap 20]
 
 Input JSON schema (placements.json):
 {
@@ -43,7 +55,7 @@ Output JSON schema (scored.json): same placements, each with an added "score" bl
   "score": {
     "total": 0-100,
     "band": "high" | "unsure" | "low",
-    "signals": ["blocklist:gambling", "risky_tld:.top", "zero_conv_at_spend", ...],
+    "signals": ["blocklist:gambling", "risky_tld:.top", ...],
     "already_excluded": true/false
   }
 }
@@ -88,20 +100,12 @@ GAMBLING_KEYWORD_PATTERN = re.compile(
 )
 WEIGHT_GAMBLING_KEYWORD_IN_NAME = 15
 
-# Additive weights. Tuned to be directionally right, not precisely calibrated —
-# expected to be adjusted over time as the skill is used against real accounts.
+# Additive weights. Deliberately just three signals (2026-07-03 redesign) — all about the SITE,
+# none about performance. A site is either recognizably junk (blocklist/TLD/keyword) or
+# structurally riskier (app network); how it performed on Display is not evidence of either.
 WEIGHT_BLOCKLIST = 70          # a direct hit is close to decisive on its own
 WEIGHT_RISKY_TLD = 20
-WEIGHT_ZERO_CONV_AT_SPEND = 25
-WEIGHT_CTR_TOO_LOW = 15
-WEIGHT_CTR_TOO_HIGH = 15
-WEIGHT_APP_NETWORK = 20
-WEIGHT_NO_CONVERSION_TRACKING_SIGNAL = 0  # reserved, not used yet (see SKILL.md limitations)
-
-CTR_LOW_IMPRESSION_FLOOR = 500       # need enough volume for a CTR anomaly to mean anything
-CTR_TOO_LOW_THRESHOLD = 0.0005       # 0.05% CTR at high volume — classic MFA/bot-fill signature
-CTR_TOO_HIGH_MIN_CLICKS = 5
-CTR_TOO_HIGH_THRESHOLD = 0.15        # 15%+ CTR is not organic for GDN display
+WEIGHT_APP_NETWORK = 15        # lowered from 20 — real signal, but shouldn't alone read as "junk"
 
 
 def load_junk_domains():
@@ -150,15 +154,11 @@ def check_risky_tld(domain):
     return None
 
 
-def score_placement(p, junk_domains, zero_conv_floor_micros):
+def score_placement(p, junk_domains):
     signals = []
     score = 0
 
-    domain = p.get("domain") or p.get("display_name", "")
-    impressions = p.get("impressions", 0) or 0
-    clicks = p.get("clicks", 0) or 0
-    cost_micros = p.get("cost_micros", 0) or 0
-    conversions = p.get("conversions", 0) or 0
+    domain = p.get("domain") or p.get("display_name") or ""
     placement_type = p.get("placement_type", "")
 
     # Signal 1: blocklist match (heavy weight, often decisive alone)
@@ -179,22 +179,7 @@ def score_placement(p, junk_domains, zero_conv_floor_micros):
         score += WEIGHT_GAMBLING_KEYWORD_IN_NAME
         signals.append("gambling_keyword_in_domain")
 
-    # Signal 3: zero conversions at meaningful spend
-    if cost_micros >= zero_conv_floor_micros and conversions == 0:
-        score += WEIGHT_ZERO_CONV_AT_SPEND
-        signals.append("zero_conv_at_spend")
-
-    # Signal 4: CTR anomaly (only meaningful at real volume)
-    if impressions >= CTR_LOW_IMPRESSION_FLOOR:
-        ctr = (clicks / impressions) if impressions else 0
-        if ctr < CTR_TOO_LOW_THRESHOLD:
-            score += WEIGHT_CTR_TOO_LOW
-            signals.append("ctr_too_low")
-        elif clicks >= CTR_TOO_HIGH_MIN_CLICKS and ctr > CTR_TOO_HIGH_THRESHOLD:
-            score += WEIGHT_CTR_TOO_HIGH
-            signals.append("ctr_too_high")
-
-    # Signal 5: mobile app network traffic — structural risk regardless of individual site quality
+    # Signal 3: mobile app network traffic — structural risk regardless of individual site quality
     if placement_type == "MOBILE_APPLICATION":
         score += WEIGHT_APP_NETWORK
         signals.append("app_network_traffic")
@@ -231,35 +216,24 @@ def main():
     parser.add_argument("--high-threshold", type=int, default=70,
                          help="Score >= this -> auto-flag as junk, no network lookup needed (default 70)")
     parser.add_argument("--tier3-cap", type=int, default=20,
-                         help="Max number of 'unsure' placements (ranked by score first, then spend) "
-                              "the skill should resolve via a live web search; everything beyond this "
-                              "cap is left as 'needs manual review' rather than skipped silently "
-                              "(default 20). This script does not call the web itself — it just marks "
-                              "which placements qualify for that step. Banding is recall-biased "
-                              "(any signal at all -> 'unsure', see band_for_score docstring), so on a "
-                              "messy account 'unsure' can be a large triage pile — the cap controls "
-                              "lookup cost, not review cost. The report layer still shows every "
-                              "unsure placement, capped or not; only the web-search step is capped.")
-    parser.add_argument("--zero-conv-floor", type=float, default=20.0,
-                         help="Spend floor (account currency units) above which a zero-conversion "
-                              "placement is flagged. Default 20 (e.g. 20 DKK) — deliberately low, "
-                              "because GDN junk is usually many small-spend placements rather than "
-                              "one big-spend one (verified against a live account: a real gambling "
-                              "placement had ~13 DKK spend / 0 conversions over 30 days). Tune up "
-                              "for high-volume/high-AOV accounts where 20 is noise-level.")
+                         help="Max number of 'unsure' placements (ranked by spend) the skill should "
+                              "resolve via a live web search; everything beyond this cap is left as "
+                              "'needs manual review' rather than skipped silently (default 20). This "
+                              "script does not call the web itself — it just marks which placements "
+                              "qualify for that step. The report layer still shows every unsure "
+                              "placement, capped or not; only the web-search step is capped.")
     args = parser.parse_args()
 
     with open(args.infile, encoding="utf-8") as f:
         data = json.load(f)
 
     junk_domains = load_junk_domains()
-    zero_conv_floor_micros = args.zero_conv_floor * 1_000_000
     already_excluded = set(d.lower() for d in data.get("already_excluded", []))
 
     scored = []
     for p in data.get("placements", []):
-        domain = (p.get("domain") or p.get("display_name", "")).lower()
-        score, signals = score_placement(p, junk_domains, zero_conv_floor_micros)
+        domain = (p.get("domain") or p.get("display_name") or "").lower()
+        score, signals = score_placement(p, junk_domains)
         band = band_for_score(score, signals, args.high_threshold)
         is_excluded = any(candidate in already_excluded for candidate in root_domain_candidates(domain))
 
@@ -272,13 +246,12 @@ def main():
         }
         scored.append(p_out)
 
-    # Rank the "unsure" band by score first (the more ambiguous-but-suspicious cases win the
-    # lookup budget), then by spend as a tiebreaker (where the money is, within equally-scored
-    # cases). This is deliberately NOT spend-only anymore: under recall-biased banding, a
-    # single-weak-signal placement with tiny spend and a multi-signal placement just under the
-    # high threshold can both be "unsure" — the latter deserves the web-search budget first.
+    # Rank the "unsure" band by SPEND, cost-first (2026-07-03 direction): the expert's — and the
+    # web-search budget's — attention should go where the money is, not where the score happens to
+    # be highest. A gambling-keyword or blocklist hit still always qualifies regardless of rank
+    # (see SKILL.md Trin 4 override) — this ordering only decides who else gets the remaining slots.
     unsure = [p for p in scored if p["score"]["band"] == "unsure" and not p["score"]["already_excluded"]]
-    unsure.sort(key=lambda p: (p["score"]["total"], p.get("cost_micros", 0)), reverse=True)
+    unsure.sort(key=lambda p: p.get("cost_micros", 0), reverse=True)
     for i, p in enumerate(unsure):
         p["score"]["tier3_eligible"] = i < args.tier3_cap
         p["score"]["tier3_rank"] = i + 1
@@ -294,7 +267,6 @@ def main():
         "thresholds": {
             "high": args.high_threshold,
             "tier3_cap": args.tier3_cap,
-            "zero_conv_floor": args.zero_conv_floor,
         },
     }
 

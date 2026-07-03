@@ -5,7 +5,7 @@
     {
       "name": "inbound-ads",
       "source": "./plugins/inbound-ads",
-      "description": "Inbound CPH's full Google Ads suite in one plugin: build a new campaign (campaign-build + research/structuring/assets/responsive-search-ads), optimize a live account (soegeterm-analyse, search-term, annonce-optimering, optimering-loop), and standalone deliverables (ads-audit-report, ads-changelog, editor-csv-export, ai-context-publish, kontekst-opdater, opstart-analyse). Danish-default, read-only against Google Ads except HITL-gated confirmed writes."
+      "description": "Inbound CPH's Google Ads suite covering the full client lifecycle — build new campaigns, optimize live accounts, and produce audits, changelogs, Editor exports and client-context docs — Danish-default and read-only against Google Ads except HITL-gated writes through the ads-writer agent."
     }
   ]
 }

@@ -17,26 +17,43 @@ viste Display-annoncer kørende på `euro-jackpot.net`, `danskelotto.com` (lotte
 (børne-spil-site) og en håndfuld content-farm-domæner — alt sammen forbrug uden en eneste
 konvertering.
 
-**Scoring, ikke en binær dom, bevidst forspændt mod at flage for meget frem for for lidt.** Hver
-placering får et 0-100 risiko-tal bygget additivt af billige lokale signaler
-(`scripts/score_placements.py`, se Trin 3). Banding-reglen er eksplicit valgt af brugeren
-(2026-07-01): hellere en stor "usikker"-bunke eksperten selv skimmer, end at én reel junk-placering
-forsvinder tavst fordi intet enkelt signal alene ramte en talgrænse.
+**Scoring, ikke en binær dom — men få, håndfaste signaler, ikke en punkt-maskine.** Hver placering
+får et 0-100 risiko-tal bygget additivt af tre lokale signaler om SELVE SITET
+(`scripts/score_placements.py`, se Trin 3): kendt junk-domæne, risikabel TLD, gambling-nøgleord i
+navnet, plus app-netværk-trafik som et strukturelt (ikke site-specifikt) flag. Det er bevidst kun
+disse — se "Redesign 2026-07-03" nedenfor for hvorfor performance-baserede signaler (forbrug uden
+konvertering, CTR-anomali) er fjernet helt.
 
-- **Høj (≥70 som standard):** afgøres af lokale data alene, intet opslag nødvendigt. Flere stærke
-  signaler lægger sammen (fx blocklist-match + risikabel TLD).
-- **Usikker (alt med mindst ét signal, der ikke rammer høj-grænsen):** også et enkelt svagt signal
-  (fx bare `zero_conv_at_spend`) lander her. Scriptet er additivt og lokalt uden mønster-genkendelse
-  på tværs af rækker, så ét svagt signal skal nedgradere tilliden, ikke slette placeringen. Kun de
-  øverste ~15-20 (efter score, forbrug som tiebreaker — se Trin 4) får et websøg; resten markeres
-  "kræver manuel gennemgang".
-- **Lav (ingen signaler overhovedet):** ingen blocklist-match, ingen risikabel TLD, ingen
-  forbrug-uden-konvertering, ingen CTR-anomali, intet app-netværk-flag. Intet at gennemgå.
+- **Høj (≥70 som standard):** afgøres af lokale data alene, intet opslag nødvendigt. Typisk et
+  direkte blocklist-match, evt. lagt sammen med en risikabel TLD.
+- **Usikker (alt med mindst ét signal, der ikke rammer høj-grænsen):** fx en risikabel TLD alene,
+  eller et gambling-nøgleord i navnet. Kun de øverste ~15-20 efter FORBRUG (se Trin 4) får et
+  websøg; resten markeres "kræver manuel gennemgang". Fordi signalerne nu er få og specifikke, er
+  denne gruppe langt mindre end før — typisk under 10-15 placeringer på en almindelig konto, ikke
+  hundredvis.
+- **Lav (ingen signaler overhovedet):** ingen blocklist-match, ingen risikabel TLD, intet
+  gambling-nøgleord, intet app-netværk-flag. Det inkluderer nu ALLE normale sites uanset hvor lidt
+  de konverterer på Display — det er forventet adfærd, ikke et risikotegn. Intet at gennemgå.
 
 Verificeret live (Dantaxi, re-test 2026-07-01): den gamle banding (score < 30 → lav) lod
 `spil2vind.dk` (reel dansk gambling-side) forsvinde tavst, fordi dens eneste signal
-(`gambling_keyword_in_domain`, vægt 15) ikke alene nåede 30. Med den nye regel lander den korrekt i
-usikker-gruppen.
+(`gambling_keyword_in_domain`, vægt 15) ikke alene nåede 30. Med den nuværende regel lander den
+korrekt i usikker-gruppen.
+
+**Redesign 2026-07-03 — for skarpt, ikke "for meget flagget".** En live-kørsel på DBI viste at
+`bt.dk`, `proff.no` og `mentedidactica.com` — alle sammen legitime, store sites — landede i
+"usikker" udelukkende fordi de brugte penge uden at konvertere på Display, eller havde en
+CTR-anomali. Det er ikke junk, det er helt normal Display-adfærd: lav CTR og lav konvertering er
+reglen, ikke undtagelsen, for banner-annoncer på store sider. At bruge det som et risikosignal
+producerede en stor, useriøs "usikker"-bunke fyldt med sund fornuft-tilfælde i stedet for reelle
+kandidater. De to signaler (`zero_conv_at_spend`, `ctr_too_low`/`ctr_too_high`) er derfor fjernet
+helt fra scriptet — de sagde noget om KONTOENS performance, ikke om SITETS kvalitet, og de to ting
+er ikke det samme. Tilbage er kun signaler der faktisk identificerer sitet: er det på en kendt
+junk-liste, har det en risikabel endelse, hedder det noget med gambling, eller er det app-trafik.
+
+Cost-first er den anden del af samme fix: rapporten og websøgs-loftet prioriterer nu efter FORBRUG,
+ikke efter score (se Trin 4-5) — eksperten skal bruge tiden der hvor pengene faktisk er, ikke der
+hvor et scoretal tilfældigvis er højest.
 
 Høj-grænsen (70) og loftet (15-20) er parametre eksperten kan justere per kørsel ("vær strengere
 denne gang"), ikke faste konstanter. Der er bevidst intet separat "lav-grænse"-parameter — "lav"
@@ -112,9 +129,8 @@ Udled så meget som muligt fra samtalen først. Saml resten i ét kald:
    `LAST_30_DAYS` virker direkte).
 3. **Scope** — hele kontoen eller specifik kampagne.
 4. **Score-tærskler** (tilbyd default, lad brugeren justere): høj-grænse (default 70), loft for
-   websøg (default 15-20), nul-konv-forbrugsgulv (default 20 kr/valuta-ækvivalent). Bevidst ingen
-   separat "lav-grænse" at stille — "lav risiko" betyder nul signaler, ikke et tal under en grænse.
-   "Brug default" er et gyldigt svar.
+   websøg (default 15-20). Bevidst ingen separat "lav-grænse" at stille — "lav risiko" betyder nul
+   signaler, ikke et tal under en grænse. "Brug default" er et gyldigt svar.
 5. **Skriv-destination for bekræftede negativer** — direkte til kontoen via ads-writer (standard)
    eller kun rapportér, skriv intet.
 
@@ -167,8 +183,7 @@ Skriv agentens fund til en `placements.json` efter skemaet i toppen af
 python3 ${CLAUDE_SKILL_DIR}/scripts/score_placements.py \
   --in placements.json --out scored.json \
   --high-threshold <fra Trin 1, default 70> \
-  --tier3-cap <fra Trin 1, default 20> \
-  --zero-conv-floor <fra Trin 1, default 20>
+  --tier3-cap <fra Trin 1, default 20>
 ```
 (Bevidst intet `--low-threshold`-flag, jf. "Baggrund".)
 
@@ -178,13 +193,18 @@ Scriptet gør præcis dette og intet mere (samme filosofi som `slim.py` i
   MFA/clickbait-proxy + scam, kilder og licens i `references/junk_domains_SOURCES.md`).
 - Flager risikable TLD'er (`.top .xyz .icu .club .online .cfd .sbs .bond .win .rest .mom .cn`).
 - Flager et gambling/betting-nøgleord literal i domænenavnet (lavpræcision-backstop, se Baggrund).
-- Flager nul-konvertering-ved-forbrug (dit tunbare gulv) og CTR-anomalier (for lav eller
-  mistænkeligt høj ved reelt volumen).
 - Flager al app-netværk-trafik som strukturelt risikabel (uanset det enkelte site/apps kvalitet —
   små skærme + spil-UI'er giver ved-et-uheld-klik).
 - Krydstjekker mod de allerede-ekskluderede fra Trin 2 (sætter `already_excluded: true` — foreslå
   aldrig noget der allerede er blokeret).
-- Sorterer den usikre gruppe efter forbrug og markerer hvilke der er inden for tier-3-loftet.
+- Sorterer den usikre gruppe efter FORBRUG (ikke score) og markerer hvilke der er inden for
+  tier-3-loftet — cost-first, se "Redesign 2026-07-03" i Baggrund.
+
+**Bevidst IKKE med:** performance-signaler som forbrug-uden-konvertering eller CTR-anomali. Lav
+konvertering og lav CTR er normalt for Display — det er ikke bevis på junk, kun bevis på at Display
+konverterer dårligere end Search. At score på det producerede falske positiver på store, legitime
+sites (bt.dk, proff.no) i en live-test. Scriptet dømmer kun sitet selv, aldrig hvordan det
+performede.
 
 Læs `scored.json`. Høj-bånd behøver intet websøg (allerede afgjort af stærke signaler). Lav-bånd
 betyder nu udelukkende "nul signaler ramte" — intet at gennemgå, intet websøg. Al reel tvivl, selv
@@ -198,7 +218,7 @@ forvent at dette sjældent sker, fordi banding-reglen er designet til at fange d
 ## Trin 4 — Websøg kun på den usikre gruppe (tier 3, loft-begrænset)
 
 For hver placering med `tier3_eligible: true` i `scored.json` (de øverste ~15-20 i den usikre
-gruppe, sorteret efter score først og forbrug som tiebreaker):
+gruppe, sorteret efter FORBRUG — cost-first, se Baggrund):
 
 1. Foretræk et websøg ("hvad er [domæne] for et site") frem for et rå side-fetch. Billigere,
    hurtigere, og mere robust mod cloaking/bot-blokering — gambling- og MFA-sites bruger ofte netop
@@ -213,17 +233,14 @@ Loftet er bevidst — et websøg koster mere end et lokalt scoretjek, og det hol
 på en konto med hundredvis af usikre placeringer. Sig altid i rapporten hvor mange der blev slået
 op vs. hvor mange der ligger som "kræver manuel gennemgang".
 
-**Undtagelse — blocklist- og gambling-nøgleord-hits springer altid køen, uanset loft.** Live-test
-(Dantaxi, 2026-07-01) viste en reel fejl i den gamle ren-forbrugs-sortering: `euro-jackpot.net` og
-`spil2vind.dk` (begge reelt gambling, begge lavt forbrug) endte under loftet — bag store,
-sandsynligvis-uskyldige nyhedssider med højere forbrug men kun ét svagt "ingen
-konvertering"-signal. En placering der scorer via `blocklist:*` eller `gambling_keyword_in_domain`
-skal altid med i websøgs-runden, uanset dens `tier3_rank` — disse signaler peger specifikt på
-gambling/junk-kategori, mens et rent `zero_conv_at_spend`- eller `ctr_too_low`-signal er langt mere
-tvetydigt (kan sagtens være en legitim side der bare ikke konverterer på Display). Filtrér
-`scored.json` på `"blocklist:"` eller `"gambling_keyword_in_domain"` i `signals`, tilføj dem til
-websøgs-runden selvom `tier3_eligible` er `false`, og nævn eksplicit i rapporten at de blev
-prioriteret ud over loftet.
+**Undtagelse — blocklist- og gambling-nøgleord-hits springer altid køen, uanset loft.** Sorteringen
+er nu cost-first, så et lavt-forbrug gambling-fund kan i princippet stadig havne under loftet bag
+høj-forbrug placeringer der kun har en risikabel-TLD eller slet intet signal. En placering der
+scorer via `blocklist:*` eller `gambling_keyword_in_domain` skal altid med i websøgs-runden, uanset
+dens `tier3_rank` og uanset forbrug — disse to signaler peger specifikt på gambling/junk-kategori og
+fortjener altid et opslag, uanset hvor lidt der er brugt. Filtrér `scored.json` på `"blocklist:"`
+eller `"gambling_keyword_in_domain"` i `signals`, tilføj dem til websøgs-runden selvom
+`tier3_eligible` er `false`, og nævn eksplicit i rapporten at de blev prioriteret ud over loftet.
 
 ## Trin 5 — Byg den rangerede rapport (i chatten, ikke .xlsx som default)
 
@@ -242,60 +259,86 @@ Grupér efter **hvorfor** en placering er et problem, ikke efter det interne sco
 sprog for kategorien (gambling/spil, mistænkelige småsider, pakke-sporing/støj, osv.) og lad
 score/signaler blive til den bagvedliggende BEGRUNDELSE i prosa — aldrig en synlig kolonne.
 
+### Fast rapport-skabelon (brug PRÆCIS disse 5 sektioner, i denne rækkefølge, altid)
+
+Dette er ikke et løst eksempel — det er den bindende struktur. Samme overskrifter, samme
+rækkefølge, samme emoji, hver gang, uanset klient eller kørsel. Konsistens på tværs af kørsler
+betyder mere end at finpudse ordlyden per gang; en ekspert der kører skillet på flere klienter skal
+kunne genkende rapporten uden at læse den forfra hver gang.
+
+**Global regel for alle 5 sektioner:** flere placering×kampagne-rækker på SAMME domæne slås sammen
+til ÉN linje i rapporten (læg forbrug sammen, nævn "flere kampagner" hvis relevant) — vis aldrig
+samme domæne to gange i samme sektion. Domænet er hvad eksperten handler på, ikke rækken.
+
 ```markdown
 ## Display-placement-audit — <klient> — <vindue>
 
-**Kort sagt:** annoncerne har vist sig på <N> steder i perioden. <M> af dem bør I overveje at
-fjerne — <kort hvorfor, fx "gambling-sider og useriøse klikfarme">. Resten er enten fint, eller I
-har allerede blokeret det.
+**Kort sagt:** annoncerne har vist sig på <N> forskellige steder i perioden. <M> af dem bør I
+overveje at fjerne — <kort hvorfor, fx "gambling-sider og useriøse klikfarme">. Resten er enten
+fint, eller I har allerede blokeret det.
 
-### 🚫 Anbefales fjernet — <N> steder, <samlet forbrug> kr spildt
+### 🚫 Anbefales fjernet — <N> steder, <samlet forbrug> kr
+Placeringer hvor et lokalt signal ELLER et websøg gjorde konklusionen tydelig nok til at anbefale
+en handling. Grupér i almindeligt-sprog-underkategorier (gambling/spil, content-farme/klikfarme,
+useriøse apps, osv.) — ikke efter score.
+
 Gambling og spil
-- **euro-jackpot.net** (og 1 side til på samme site) — dansk lotteri-side. 23 kr brugt, ingen der har
-  konverteret. Klart ikke jeres målgruppe.
-- **spil2vind.dk** — dansk gambling-side. 13 kr brugt, ingen konvertering.
+- **<domæne>** — <hvad det er, én linje, fx "dansk lotteri-side">. <forbrug> kr brugt, <konv> konv.
 
-Useriøse/lav-kvalitets sider
-- **mydating.online** — datingside, helt uden for jeres branche. 20 kr brugt, ingen konvertering.
-- (Yderligere N sider i samme kategori — se den fulde liste hvis I vil have alle med i skrivningen.)
+Useriøse/content-farme
+- **<domæne>** — <hvad det er>. <forbrug> kr brugt, <konv> konv.
+- (Er der mange ens content-farm-fund: "+N steder til på samme mønster (`.top`/`.xyz`-endelser),
+  se den fulde liste hvis I vil have alle med i skrivningen" — men navngiv altid mindst de 3-5
+  dyreste enkeltvis, saml aldrig ALT under ét "+N til".)
 
-### 🤔 Værd at kigge på, men ikke et klart problem — <N> steder
-Disse har ikke konverteret, men er ikke nødvendigvis skadelige — mange er legitime sider (store
-medier, pakke-sporing) hvor Display bare sjældent konverterer. Vi anbefaler IKKE at fjerne dem
-medmindre I selv genkender et mønster:
-- **bt.dk**, **berlingske.dk** — store danske medier, 69 kr / 38 kr brugt, ingen konvertering. Helt
-  normalt for Display-annoncer på nyhedssider; ingen handling anbefalet.
-- **parcelsapp.com** (flere undersider) — pakke-sporing, sandsynligvis irrelevant trafik men ikke
-  decideret skadeligt. Jeres kald om det er værd at ekskludere.
+### 🤔 Værd at kigge på — <N> steder, <samlet forbrug> kr
+Reelt tvetydige tilfælde: et svagt signal (fx en risikabel endelse) uden et bekræftende websøg,
+enten fordi websøget var inkonklusivt ELLER fordi placeringen lå uden for opslags-loftet. Eksperten
+tager stilling, ikke skillet.
+- **<domæne>** — <kort hvorfor det er tvivlsomt, og om det blev websøgt eller ej>. <forbrug> kr.
+- (Placeringer under loftet, aldrig websøgt: saml dem i én linje "+N steder til, samme
+  navnemønster men ikke websøgt (under loft) — se fuld liste ved behov", medmindre en enkelt af
+  dem har mærkbart forbrug og fortjener sin egen linje.)
 
-### ✅ Ingen problemer fundet
-<N> steder havde intet mistænkeligt at bemærke — normal Display-trafik, ingen handling.
+### ✅ Ingen problemer fundet ELLER allerede korrekt vurderet legitimt
+To slags rækker samlet i én sektion — begge betyder "ingen handling":
+- **Normal trafik** (langt de fleste): "<N> steder havde intet mistænkeligt at bemærke — normal
+  Display-trafik, ingen handling. Samlet forbrug: <sum> kr."
+- **Bekræftede falske alarmer** (websøgt og renset): navngiv dem individuelt, aldrig kun i summen,
+  fordi de så ellers ligner et gæt: "**<domæne>** — så mistænkeligt ud pga. <hvorfor>, men et
+  websøg viste <hvad det faktisk er>. Anbefales IKKE fjernet."
 
 ### ⚠️ Kan ikke fjernes automatisk (Performance Max)
 Performance Max-annoncer viser desværre ikke hvilke sider de kører på med samme detalje, og
 Google tillader ikke at blokere specifikke sider på PMax-kampagner. Vi kan ikke gøre noget ved
-dette teknisk — kun nævne det hvis noget virker påfaldende.
+dette teknisk — kun nævne det hvis noget virker påfaldende. Ingen PMax-data denne kørsel er en
+gyldig, forventet tilstand — sig det som en kendsgerning, ikke en fejl: "Performance Max indgår
+ikke i denne visning (platform-begrænsning)."
 
 ### Allerede håndteret
 I har allerede blokeret <N> steder på denne konto tidligere (fx en liste kaldet "Web
-placeringer"). De optræder ikke igen her.
+placeringer"). De optræder ikke igen ovenfor. Hvis overlap mellem jeres eksisterende
+eksklusioner og periodens faktiske trafik er lavt (de fleste blokerede domæner/kanaler dukker
+slet ikke op i perioden), sig det ligeud — det er en normal og forventet observation, ikke et
+problem: "Jeres eksisterende blokeringer og periodens trafik overlapper kun på <N> sted(er) — det
+er forventeligt, blokeringerne dækker typisk andre kanaler end dem der er aktive lige nu."
 ```
 
-**Grupperingen "Anbefales fjernet" er bevidst bredere end kun de sikre høj-score-fund** — den
-inkluderer også de svagere "usikker"-fund hvor et websøg eller et klart mønster (fx et
-gambling-nøgleord i navnet) gjorde konklusionen tydelig nok til at anbefale en handling.
-"Værd at kigge på" er resten af den usikre gruppe: reelt tvetydige tilfælde hvor et menneske
-med kendskab til kontoen bør tage stilling, ikke skillet. Denne skelnen — handling vs. ikke-handling
-— er den, den ikke-tekniske ekspert rent faktisk skal bruge; det interne score-tal er kun et
-mellemregnestykke og hører ALDRIG hjemme i selve rapporten.
+**Under de 5 sektioner, altid, i denne rækkefølge:**
+1. En kort dansk konklusion i 2-4 sætninger, almindeligt sprog — de vigtigste mønstre, samlet
+   forbrug i "anbefales fjernet", og at børneindhold er et kendt blindt punkt vi ikke kan opdage
+   automatisk endnu (skriv DET som "vi kan endnu ikke opdage børneindhold automatisk", ikke som en
+   teknisk fodnote om manglende datasæt).
+2. Én sætning om hvor mange placeringer der blev slået op via websøg vs. hvor mange der ligger
+   uverificeret pga. loftet (samme tal som i "værd at kigge på", men sagt i ord: "Vi har slået de
+   <M> dyreste tvivlsomme steder op enkeltvis; resten (<K> steder, tilsammen <sum> kr) har samme
+   mistænkelige navnemønster men er ikke tjekket enkeltvis endnu.").
+3. **Eksperten redigerer her, i chatten** — fjern rækker, flyt noget fra "værd at kigge på" til
+   "fjern det", eller omvendt. Skillet foreslår; mennesket dømmer den endelige liste.
 
-Under grupperne: en kort dansk konklusion i 2-4 sætninger, almindeligt sprog — de vigtigste mønstre,
-hvor meget der er spildt i alt, og at børneindhold er et kendt blindt punkt vi ikke kan opdage
-automatisk endnu (skriv DET som "vi kan endnu ikke opdage børneindhold automatisk", ikke som en
-teknisk fodnote om manglende datasæt).
-
-**Eksperten redigerer her, i chatten** — fjern rækker, flyt noget fra "værd at kigge på" til
-"fjern det", eller omvendt. Skillet foreslår; mennesket dømmer den endelige liste.
+**Ingen sektion droppes, selv når den er tom.** Er der fx ingen PMax-data, eller nul allerede
+håndterede overlap, skriv sektionen alligevel med den ærlige "0/ingen"-besked (se skabelon-teksten
+ovenfor) — en manglende sektion ligner en fejl, en sektion der siger "ingen fund her" er tydelig.
 
 ## Trin 6 — Bekræft, så skriv (human-in-the-loop, ingen undtagelse)
 
@@ -358,28 +401,58 @@ Lever, i almindeligt sprog (samme regel som Trin 5 — ingen interne termer):
    fra jeres Google Ads-konto (placeringsrapporten for perioden) og krydstjekket mod jeres
    eksisterende blokeringer, så I ikke får de samme forslag to gange."
 
-## Eksempel-output (fra live-verificering, Dantaxi 2026-07-01)
+## Eksempel-output (fra live-verificering, DBI, kørt 2026-07-03 med det faste skabelon)
+
+Alle 5 sektioner er med, i den faste rækkefølge, også der hvor der ikke var noget at rapportere
+(Performance Max, Allerede håndteret) — det er skabelonens pointe, ikke noget der udelades for at
+holde svaret kort.
 
 ```
-Display-placement-audit klar — Dantaxi, sidste 90 dage.
+Display-placement-audit klar — DBI, sidste 90 dage.
 
-Kort sagt: annoncerne har vist sig 60 forskellige steder. 3 af dem bør I overveje at fjerne —
-gambling-sider og en datingside, ingen af dem relevante for en taxi-kunde.
+Kort sagt: annoncerne har vist sig på ~9.300 forskellige steder i perioden. 15 af dem bør I
+overveje at fjerne — gambling-/lotteri-sider og useriøse content-farme. Resten er enten fint,
+eller allerede blokeret.
 
-🚫 Anbefales fjernet (3 steder, 46 kr brugt, ingen konverteringer):
-- euro-jackpot.net — dansk lotteri-side
-- spil2vind.dk — dansk gambling-side
-- mydating.online — datingside, uden for jeres branche
+🚫 Anbefales fjernet (15 steder, ~131 kr brugt):
+Gambling og spil
+- nlcbplaywhelotto.com — lotteri-resultatside, Trinidad & Tobago. 0,6 kr, 0 konv.
+- lottosociety.com — thailandsk aktie-lotteri-side. 0 kr, 0 konv.
+- tippetips.info — norsk betting-tips-side. 3,9 kr, 0 konv.
 
-🤔 Værd at kigge på, men ikke et klart problem (5 steder):
-- bt.dk, berlingske.dk — store danske medier uden konvertering på Display. Helt normalt, ingen
-  handling anbefalet medmindre I selv ser et mønster.
-- (3 sider til i samme kategori — pakke-sporing/tracking-sider, sandsynligvis bare irrelevant
-  trafik, jeres kald)
+Useriøse content-farme/klikfarker
+- enjoygrid.top — tom content-farm-skabelon, intet reelt indhold. 39,5 kr, 0 konv.
+- pastimehub.top — samme skabelon som enjoygrid.top. 14,1 kr, 0 konv.
+- poiy.online — spundet finans-fyld-indhold på flere underdomæner. 10,2 kr, 0 konv.
+- promocodes.club — generisk rabatkode-side. 10,5 kr, 0 konv.
+- +8 steder til på samme mønster (`.top`/`.xyz`/`.club`-endelser, tomme skabelon-sider),
+  tilsammen ~53 kr — se fuld liste hvis I vil have alle med i skrivningen.
 
-✅ Ingen problemer fundet: 52 steder — normal trafik, ingen handling.
+🤔 Værd at kigge på (38 steder, ~76 kr brugt):
+- bestenrezepte.top — tysk opskrifts-aggregator, lav kvalitet men ikke gambling/scam. Websøgt,
+  inkonklusivt. Jeres kald.
+- +37 steder til, samme mistænkelige navnemønster (`.online`/`.top`-endelser) men ikke websøgt
+  enkeltvis (lå under opslagsloftet, alle under 2 kr hver) — se fuld liste ved behov.
 
-Bekræft de 3 anbefalede fjernelser for at skrive dem til kontoen, eller sig til hvis I vil justere
+✅ Ingen problemer fundet eller bekræftet legitimt:
+- ~9.250 steder havde intet mistænkeligt at bemærke — normal Display-trafik, ingen handling.
+  Samlet forbrug: 9.751 kr.
+- tipsbladet.dk — så mistænkeligt ud pga. ordet "tips" i navnet, men et websøg viste at det er et
+  etableret dansk fodboldmedie (Better Collective). Anbefales IKKE fjernet.
+- intipseleb.com — samme mønster, viste sig at være et etableret indonesisk kendismedie.
+  Anbefales IKKE fjernet.
+
+⚠️ Performance Max: ingen PMax-data i denne visning (platform-begrænsning) — ikke fordi der intet
+kører, men fordi Google Ads ikke deler placeringsdata for PMax med samme detalje.
+
+Allerede håndteret: jeres tre delte negativlister overlappede kun med periodens faktiske trafik på
+1 sted — det er forventeligt, blokeringerne dækker typisk andre kanaler end dem der er aktive lige
+nu.
+
+Vi har slået de 20 dyreste/mest mistænkelige steder op enkeltvis; resten (38 steder, ~76 kr) har
+samme mistænkelige navnemønster men er ikke tjekket enkeltvis endnu.
+
+Bekræft de 15 anbefalede fjernelser for at skrive dem til kontoen, eller sig til hvis I vil justere
 listen først.
 ```
 
@@ -399,8 +472,10 @@ listen først.
 ## Maintenance
 
 - `scripts/score_placements.py` — den eneste deterministiske del. Matcher blocklist, TLD,
-  nøgleord-mønster, forbrug/CTR-signaler, app-flag, allerede-ekskluderet-tjek. Ingen model-dømmekraft
-  heri; ret aldrig scoringen til at "dømme" i stedet for at signalere.
+  gambling-nøgleord, app-flag, allerede-ekskluderet-tjek — bevidst KUN site-signaler, ingen
+  performance-signaler (forbrug/konvertering/CTR blev fjernet 2026-07-03, se Baggrund). Ingen
+  model-dømmekraft heri; ret aldrig scoringen til at "dømme" i stedet for at signalere, og tilføj
+  ikke et performance-baseret signal igen uden at genoverveje hele "Redesign 2026-07-03"-afsnittet.
 - `references/junk_domains.tsv` — 9.834 domæner (gambling + MFA-proxy + scam), bygget fra Blocklist
   Project + Steven Black's hosts, begge fri licens. Se `junk_domains_SOURCES.md` for fuld
   proveniens, licenser, og genopfrisknings-kommando. Statisk snapshot, ikke en live feed —
