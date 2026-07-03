@@ -14,24 +14,27 @@ konvertering.
 
 ## Scoring, ikke en binær dom — men få, håndfaste signaler, ikke en punkt-maskine
 
-Hver placering får et 0-100 risiko-tal bygget additivt af tre lokale signaler om SELVE SITET
+Hver placering får et 0-100 risiko-tal bygget additivt af lokale signaler om SELVE SITET
 (`scripts/score_placements.py`, se Trin 3): kendt junk-domæne, risikabel TLD, gambling-nøgleord i
-navnet, plus app-netværk-trafik som et strukturelt (ikke site-specifikt) flag. Det er bevidst kun
-disse — se "Redesign 2026-07-03" nedenfor for hvorfor performance-baserede signaler (forbrug uden
-konvertering, CTR-anomali) er fjernet helt.
+navnet, app-netværk-trafik som et strukturelt (ikke site-specifikt) flag, og — gen-indført
+2026-07-04, se "Redesign 2026-07-04" nedenfor — forbrug-uden-konvertering som en SVAG tiebreaker
+der kun tæller oveni et allerede eksisterende signal. Se "Redesign 2026-07-03" for hvorfor
+performance-signaler først blev fjernet helt, og "Redesign 2026-07-04" for hvorfor én kom tilbage
+i en anden, ufarlig form.
 
-Banding:
+Banding (grænser opdateret 2026-07-04):
 
-- **Høj (≥70 som standard):** afgøres af lokale data alene, intet opslag nødvendigt. Typisk et
-  direkte blocklist-match, evt. lagt sammen med en risikabel TLD.
+- **Høj (≥50 som standard, sænket fra 70):** afgøres af lokale data alene, intet opslag
+  nødvendigt. Typisk et direkte blocklist-match, eller flere signaler lagt sammen (risikabel TLD +
+  gambling-nøgleord, eller et signal + tiebreaker).
 - **Usikker (alt med mindst ét signal, der ikke rammer høj-grænsen):** fx en risikabel TLD alene,
-  eller et gambling-nøgleord i navnet. Kun de øverste ~15-20 efter FORBRUG (se Trin 4) får et
-  websøg; resten markeres "kræver manuel gennemgang". Fordi signalerne nu er få og specifikke, er
-  denne gruppe langt mindre end før — typisk under 10-15 placeringer på en almindelig konto, ikke
-  hundredvis.
+  et gambling-nøgleord i navnet, evt. med tiebreakeren oveni. Kun de øverste ~15-20 efter FORBRUG
+  (se Trin 4) får et websøg; resten markeres "kræver manuel gennemgang". Denne gruppe er bevidst
+  bredere igen efter 2026-07-04 — se nedenfor for hvorfor.
 - **Lav (ingen signaler overhovedet):** ingen blocklist-match, ingen risikabel TLD, intet
-  gambling-nøgleord, intet app-netværk-flag. Det inkluderer nu ALLE normale sites uanset hvor lidt
-  de konverterer på Display — det er forventet adfærd, ikke et risikotegn. Intet at gennemgå.
+  gambling-nøgleord, intet app-netværk-flag. Tiebreakeren kan IKKE alene løfte en placering ud af
+  "lav" — den udløses kun oveni et andet signal. Almindelige sites med højt forbrug og nul
+  konvertering (bt.dk-typen) lander derfor stadig her — forventet adfærd, ikke et risikotegn.
 
 Verificeret live (Dantaxi, re-test 2026-07-01): den gamle banding (score < 30 → lav) lod
 `spil2vind.dk` (reel dansk gambling-side) forsvinde tavst, fordi dens eneste signal
@@ -73,6 +76,38 @@ Efter det første redesign (over) kom to yderligere justeringer, samme dag:
    PMax/allerede-håndteret-sektioner medmindre eksperten selv beder om uddybning (se Trin 5).
    Begrundelsen er brugsmønsteret: skillet køres én-to gange om måneden af en ekspert der vil se
    hvad der skal handles på, ikke læse en rapport.
+
+## Redesign 2026-07-04 — bevidst bredere net, eksplicit brugerdirektiv
+
+Efter at have kørt skillet i praksis kom feedback: det narrowede script fra 2026-07-03 lod nu reel
+junk glide igennem som "lav" — for stramt i den anden retning. Brugerens eksplicite direktiv: false
+negatives (junk der forbliver usynligt) koster mere end false positives (et par ekstra legitime
+sites i "usikker" til et hurtigt menneskeligt kig). To ændringer, begge i `score_placements.py`:
+
+1. **`zero_conv_at_spend` genindført, men KUN som en svag tiebreaker.** Vægt 8, og — kritisk
+   forskel fra versionen fjernet 2026-07-03 — den udløses ALDRIG standalone. Den tæller kun oveni
+   et allerede eksisterende site-signal (`score_placement()`: tjekker `if signals and cost_micros
+   >= floor and conversions == 0`). Den gamle version anvendte samme logik på ALLE placeringer
+   uafhængigt af andre signaler, hvilket er præcis hvorfor den fangede bt.dk/proff.no/
+   mentedidactica.com — store, legitime sites hvor lav Display-konvertering er normalt, ikke et
+   symptom. Den nye version kan aldrig alene flytte en signal-fri placering ud af "lav"; den kan
+   kun skubbe en placering der allerede har en anden grund til mistanke lidt højere op.
+2. **`--high-threshold` sænket fra 70 til 50.** Gør det lettere for kombinerede signaler (risikabel
+   TLD + gambling-nøgleord, eller ét signal + tiebreakeren) at nå "høj"-båndet uden at kræve et
+   direkte blocklist-match alene.
+
+**Hvorfor dette ikke er det samme fejltrin som 2026-07-03:** forskellen er gating, ikke vægt. Den
+gamle fejl var at lade et performance-signal afgøre båndet PÅ EGEN HÅND. Den nye tiebreaker kan
+aldrig gøre det — den kræver et site-identitets-signal at hægte sig på, præcis som
+gambling-nøgleord- og TLD-signalerne allerede krævede før 2026-07-03 blev tegnet forkert.
+
+**Sund fornuft er stadig et krav, ikke en efterretning.** Sænket høj-grænse og en bredere "usikker"
+gruppe betyder flere kandidater at kigge på, ikke flere automatiske fjernelser. Et etableret dansk
+medie- eller erhvervssite skal ALDRIG anbefales fjernet i rapporten bare fordi det rammer et enkelt
+svagt signal + tiebreakeren — Trin 5's "værd at kigge på"-sektion findes netop til den slags, og
+modellen skal stadig anvende dømmekraft før noget lander i "anbefales fjernet". Testet direkte mod
+bt.dk/proff.no/normalsite.dk (høj forbrug, nul konvertering, ingen site-signaler) — de forbliver i
+"lav" efter denne ændring, som de skal.
 
 ## Ingen permanent negativliste bygges af dette skill
 

@@ -1,7 +1,7 @@
 {
   "name": "inbound-ads",
   "description": "Inbound CPH's Google Ads suite covering the full client lifecycle — build new campaigns, optimize live accounts, and produce audits, changelogs and client-context docs — Danish-default and read-only against Google Ads except HITL-gated writes through the ads-writer agent.",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "author": { "name": "Inbound CPH" },
   "userConfig": {
     "inbound_root_folder_id": {

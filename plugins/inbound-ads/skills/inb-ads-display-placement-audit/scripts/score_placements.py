@@ -8,27 +8,43 @@ signals (bundled blocklist, TLD, gambling keyword, app-network type) and sorts p
 three bands. Everything past that (the middle "unsure" band, the final ranked report, the
 human-facing reasoning) is the model's job, not this script's.
 
-Signals are deliberately narrow (redesigned 2026-07-03, after a live DBI run flagged bt.dk,
-proff.no and mentedidactica.com as "usikker"): "zero conversions at spend" and "CTR anomaly" were
-dropped entirely. Both are NORMAL Display behavior for a large, legitimate site — Display rarely
-converts and CTR runs far lower than Search — so they fired constantly on sites with nothing wrong
-with them and drowned out the small number of real junk placements. Only signals that mean
-something specific about the SITE ITSELF remain: a known-junk domain, a risky TLD, a gambling
-keyword in the name, or app-network traffic. Fewer signals, higher precision, less to review.
+Signals were narrowed on 2026-07-03 (after a live DBI run flagged bt.dk, proff.no and
+mentedidactica.com as "usikker") by dropping "zero conversions at spend" and "CTR anomaly"
+entirely — both are NORMAL Display behavior for a large, legitimate site, so they fired
+constantly on sites with nothing wrong with them.
 
-Banding is still recall-biased on the signals that remain: "low" means ZERO signals matched.
-Any placement with a real signal lands in "unsure" rather than being silently cleared — see
-band_for_score() for the live-test failure that drove this (a real Danish gambling site scored
-under the old numeric low-threshold and disappeared). There is deliberately no --low-threshold
-flag. The difference from before is not the banding rule — it's that far fewer placements now
-trigger a signal in the first place, because the noisy signals are gone.
+**2026-07-04 re-widen: false negatives cost more than false positives here.** The user reported
+the narrowed script was now letting real junk through as "low" — explicit direction: recall
+matters more than precision, it is fine (expected, even) for the "usikker" pile to catch some
+legitimate sites as long as real junk stops disappearing into "low" unreviewed. Two changes:
+
+1. `zero_conv_at_spend` is back, but as a WEAK, NEVER-ALONE-DECISIVE tiebreaker (weight 8, see
+   WEIGHT_ZERO_CONV_AT_SPEND) — it nudges a placement that already has some other reason to look
+   twice, it cannot by itself move a signal-free placement out of "low" (see score_placement: it
+   only applies on top of an existing site-identity signal, mirroring how the hard-exclusion
+   keyword/TLD signals already work). This is deliberately NOT the same mechanism that caused the
+   bt.dk/proff.no false positives — those fired standalone, at high enough weight to reach
+   "usikker" on their own with nothing else backing them up.
+2. `--high-threshold` default lowered 70 -> 50 so combinations of existing signals (e.g. risky TLD
+   + gambling keyword, or blocklist + zero-conv tiebreaker) reach "high" more easily.
+
+Common, obviously-legitimate Danish/Nordic sites are still expected to land in "low" or "usikure"
+as they did before — this widening does not touch the hard-exclusion allowlist logic
+(`_TLD_ALLOWLIST` in hard_exclusion_patterns.py exempts .dk/.se/.no/.fi/.de/.uk) and the model is
+still expected to apply judgment before recommending removal of anything that reads as an
+established Danish media/business site, per SKILL.md.
+
+Banding stays recall-biased on top of this: "low" means ZERO signals matched. Any placement with a
+real signal lands in "unsure" rather than being silently cleared — see band_for_score() for the
+live-test failure that drove this (a real Danish gambling site scored under the old numeric
+low-threshold and disappeared). There is deliberately no --low-threshold flag.
 
 The report layer (SKILL.md Trin 5) sorts and prioritizes by SPEND, not by score — cost-first, so
 the expert's attention goes where the money is, not where the algorithm is most excited.
 
 Usage:
     python3 score_placements.py --in placements.json --out scored.json \
-        [--high-threshold 70] [--tier3-cap 20]
+        [--high-threshold 50] [--tier3-cap 20]
 
 Input JSON schema (placements.json):
 {
@@ -116,12 +132,24 @@ GAMBLING_KEYWORD_PATTERN = re.compile(
 )
 WEIGHT_GAMBLING_KEYWORD_IN_NAME = 15
 
-# Additive weights. Deliberately just three signals (2026-07-03 redesign) — all about the SITE,
-# none about performance. A site is either recognizably junk (blocklist/TLD/keyword) or
-# structurally riskier (app network); how it performed on Display is not evidence of either.
+# Additive weights. Site-identity signals (2026-07-03 redesign) — all about the SITE, none about
+# performance. A site is either recognizably junk (blocklist/TLD/keyword) or structurally riskier
+# (app network); how it performed on Display is not evidence of either, on its own.
 WEIGHT_BLOCKLIST = 70          # a direct hit is close to decisive on its own
 WEIGHT_RISKY_TLD = 20
 WEIGHT_APP_NETWORK = 15        # lowered from 20 — real signal, but shouldn't alone read as "junk"
+
+# Re-added 2026-07-04 as a WEAK TIEBREAKER ONLY — never fires unless at least one site-identity
+# signal above already fired. This is the deliberate difference from the version removed
+# 2026-07-03: that version applied to every placement standalone (any spend + zero conversions),
+# which is why it caught bt.dk/proff.no/mentedidactica.com — large, legitimate sites where low
+# Display conversion is simply normal. Gating it behind "only on top of an existing signal" keeps
+# it from ever being the sole reason a clean site gets flagged, while still nudging an
+# already-suspicious placement (e.g. risky TLD alone, previously a borderline "usikure" case)
+# a bit further up the score, and giving the "high" band an easier path to trigger on combined
+# weak signals now that --high-threshold defaults lower (see module docstring).
+WEIGHT_ZERO_CONV_AT_SPEND = 8
+ZERO_CONV_SPEND_FLOOR_MICROS = 5_000_000  # 5 currency units; below this, spend is too noisy to read
 
 
 def load_domain_list(path, label, has_header=False):
@@ -239,6 +267,16 @@ def score_placement(p, junk_domains):
         score += WEIGHT_APP_NETWORK
         signals.append("app_network_traffic")
 
+    # Signal 4 (tiebreaker ONLY, re-added 2026-07-04): zero conversions despite real spend.
+    # Deliberately gated on `signals` already being non-empty — this must never be the sole
+    # reason a placement gets flagged (that was the exact bt.dk/proff.no failure mode). It only
+    # nudges a placement that already has a site-identity reason to look twice.
+    cost_micros = p.get("cost_micros", 0) or 0
+    conversions = p.get("conversions", 0) or 0
+    if signals and cost_micros >= ZERO_CONV_SPEND_FLOOR_MICROS and conversions == 0:
+        score += WEIGHT_ZERO_CONV_AT_SPEND
+        signals.append("zero_conv_at_spend_tiebreaker")
+
     score = min(score, 100)
     return score, signals
 
@@ -274,8 +312,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--in", dest="infile", required=True, help="Input placements JSON")
     parser.add_argument("--out", dest="outfile", required=True, help="Output scored JSON")
-    parser.add_argument("--high-threshold", type=int, default=70,
-                         help="Score >= this -> auto-flag as junk, no network lookup needed (default 70)")
+    parser.add_argument("--high-threshold", type=int, default=50,
+                         help="Score >= this -> auto-flag as junk, no network lookup needed (default "
+                              "50, lowered from 70 on 2026-07-04 per explicit user direction to widen "
+                              "recall — false negatives cost more than false positives here)")
     parser.add_argument("--tier3-cap", type=int, default=20,
                          help="Max number of 'unsure' placements (ranked by spend) the skill should "
                               "resolve via a live web search; everything beyond this cap is left as "

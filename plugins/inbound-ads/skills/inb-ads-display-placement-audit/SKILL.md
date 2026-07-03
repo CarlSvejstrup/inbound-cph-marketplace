@@ -13,12 +13,20 @@ eksplicit bekræftelse — ekskludér de bekræftede fra kontoen via `ads-writer
 
 Display-annoncer vises på tredjeparts-sites, apps og YouTube valgt af Googles algoritme, ikke af en
 søgning — så junk (gambling, content-farme, low-quality apps) sniger sig ind. Skillet scorer hver
-placering 0-100 additivt af **kun site-signaler** (`scripts/score_placements.py`, se Trin 3): kendt
-junk-domæne, risikabel TLD, gambling-nøgleord i navnet, plus app-netværk-trafik som strukturelt
-flag. Performance-signaler (forbrug-uden-konvertering, CTR-anomali) er BEVIDST fjernet — lav CTR/konv
-er normal Display-adfærd, ikke junk, og at score på det producerede falske positiver på store
-legitime sites (bt.dk, proff.no). Prioritering er cost-first: tid og websøg går efter FORBRUG, ikke
-efter scoretal.
+placering 0-100 additivt af **primært site-signaler** (`scripts/score_placements.py`, se Trin 3):
+kendt junk-domæne, risikabel TLD, gambling-nøgleord i navnet, app-netværk-trafik som strukturelt
+flag, plus (gen-indført 2026-07-04) forbrug-uden-konvertering som en SVAG tiebreaker der kun tæller
+oveni et allerede eksisterende site-signal — den kan aldrig alene flage en placering. Prioritering
+er cost-first: tid og websøg går efter FORBRUG, ikke efter scoretal.
+
+**2026-07-04 — bevidst bredere net, eksplicit brugerdirektiv:** falske negativer (junk der aldrig
+bliver vist) koster mere end falske positiver (et par ekstra sites i "usikker" til gennemsyn).
+Høj-grænsen er sænket 70 → 50, og forbrug-uden-konvertering er tilbage som tiebreaker (se ovenfor).
+Almindelige, tydeligt legitime danske/nordiske sites (fx bt.dk, proff.no) lander STADIG i "lav" —
+tiebreakeren udløses kun oveni et andet signal, den samme mekanisme der forårsagede den gamle
+false-positive-fejl er ikke genindført. Brug sund fornuft: et etableret dansk medie/erhvervssite
+skal ikke anbefales fjernet bare fordi det har et enkelt svagt signal — se Trin 5 og
+`references/design-decisions.md` for hvordan det afvejes i rapporten.
 
 **Ærlige huller (sig dem højt i outputtet):** børneindhold detekteres ikke direkte (intet gratis
 signal findes; fanges kun indirekte via app-flag + hard-exclusion-kids-kategori), og blocklisten
@@ -65,7 +73,7 @@ Udled så meget som muligt fra samtalen først. Saml resten i ét kald:
    gyldigt GAQL-literal i en `WHERE`-clause på dette view (kun nogle få faste literals som
    `LAST_30_DAYS` virker direkte).
 3. **Scope** — hele kontoen eller specifik kampagne.
-4. **Score-tærskler** (tilbyd default, lad brugeren justere): høj-grænse (default 70), loft for
+4. **Score-tærskler** (tilbyd default, lad brugeren justere): høj-grænse (default 50), loft for
    websøg (default 15-20). Bevidst ingen separat "lav-grænse" at stille — "lav risiko" betyder nul
    signaler, ikke et tal under en grænse. "Brug default" er et gyldigt svar.
 5. **Skriv-destination for bekræftede negativer** — direkte til kontoen via ads-writer (standard)
@@ -119,7 +127,7 @@ og kør:
 ```bash
 python3 ${CLAUDE_SKILL_DIR}/scripts/score_placements.py \
   --in placements.json --out scored.json \
-  --high-threshold <fra Trin 1, default 70> \
+  --high-threshold <fra Trin 1, default 50> \
   --tier3-cap <fra Trin 1, default 20>
 ```
 (Bevidst intet `--low-threshold`-flag, jf. Baggrund.)
@@ -147,7 +155,7 @@ Scriptet gør præcis dette og intet mere (samme filosofi som `slim.py` i `inb-a
 **Bevidst IKKE med:** performance-signaler (forbrug-uden-konvertering, CTR-anomali). Scriptet dømmer
 kun sitet selv, aldrig hvordan det performede (se `references/design-decisions.md` for hvorfor).
 
-**Banding kort:** hård-ekskludering og høj-bånd (≥70) er allerede afgjort → intet websøg. Lav-bånd =
+**Banding kort:** hård-ekskludering og høj-bånd (≥50) er allerede afgjort → intet websøg. Lav-bånd =
 nul signaler → intet at gennemgå. Al reel tvivl, selv fra ét svagt signal, lander i den usikre
 gruppe — det er dér arbejdet foregår. Fuld banding-forklaring i `references/design-decisions.md`.
 
