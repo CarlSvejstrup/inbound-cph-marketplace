@@ -135,16 +135,28 @@ def build_digest(terms: list, ngrams: list, dropped_below_floor: int, top: int =
         }
 
     # --- intent lenses --------------------------------------------------------------------------
+    # The "muligt off-intent" lens is a generic word-list (gratis/job/kursus/uddannelse) that is
+    # WRONG for any client whose actual offering is one of those words (e.g. DBI sells kurser — a
+    # "kursus" hit there is core traffic, not a warning). Guard: compare the lens's SHARE of total
+    # conversions against its SHARE of total cost. Off-intent traffic converts worse than its spend
+    # share implies (it eats budget without proportional results); real/core traffic converts at
+    # least proportionally. A CPA-only check fails here — DBI's course-lens CPA is 80kr vs a 64kr
+    # account average, which looks "worse" even though 261 conversions is obviously core business.
     lenses = []
     for label, tokens in INTENT_LENSES.items():
         hits = [t for t in terms if _has_token(t.get("term", ""), tokens)]
         if not hits:
             continue
+        lens_cost = sum(_num(t.get("cost_dkk")) for t in hits)
+        lens_conv = sum(_num(t.get("conversions")) for t in hits)
+        cost_share = lens_cost / total_cost if total_cost else 0
+        conv_share = lens_conv / total_conv if total_conv else 0
+        converts_well = "off-intent" in label and cost_share > 0 and conv_share >= cost_share * 0.7
         lenses.append({
-            "lens": label,
+            "lens": label if not converts_well else f"{label} — konverterer fint, nok IKKE off-intent",
             "terms": len(hits),
-            "cost_dkk": _round(sum(_num(t.get("cost_dkk")) for t in hits), 0),
-            "conv": _round(sum(_num(t.get("conversions")) for t in hits), 1),
+            "cost_dkk": _round(lens_cost, 0),
+            "conv": _round(lens_conv, 1),
             "examples": ", ".join(t.get("term", "") for t in sorted(
                 hits, key=lambda x: -_num(x.get("cost_dkk")))[:5]),
         })
@@ -174,8 +186,17 @@ def build_digest(terms: list, ngrams: list, dropped_below_floor: int, top: int =
         [t for t in terms if _num(t.get("conversions")) > 0 and t.get("already_keyword") is False],
         key=lambda t: -_num(t.get("conversions")))[:top]
 
+    zero_conv_share_pct = _round(zero_conv_cost / total_cost * 100, 0) if total_cost else 0
+    if zero_conv_share_pct > 15:
+        health = "🔴"
+    elif zero_conv_share_pct >= 5:
+        health = "🟡"
+    else:
+        health = "🟢"
+
     return {
         "headline": {
+            "health": health,
             "distinct_terms": n,
             "spend_dkk": _round(total_cost, 0),
             "conversions": _round(total_conv, 1),
@@ -183,7 +204,7 @@ def build_digest(terms: list, ngrams: list, dropped_below_floor: int, top: int =
             "clicks": _round(total_clicks, 0),
             "top10_spend_share_pct": _round(top10_cost / total_cost * 100, 0) if total_cost else 0,
             "zero_conv_spend_dkk": _round(zero_conv_cost, 0),
-            "zero_conv_spend_share_pct": _round(zero_conv_cost / total_cost * 100, 0) if total_cost else 0,
+            "zero_conv_spend_share_pct": zero_conv_share_pct,
             "zero_conv_terms": len(zero_conv),
             "dropped_below_floor": dropped_below_floor,
         },
@@ -194,56 +215,96 @@ def build_digest(terms: list, ngrams: list, dropped_below_floor: int, top: int =
         "match_type_leakage": leakage,
         "term_in_multiple_ad_groups": [_term_row_view(t) for t in multi_ag],
         "uncovered_winners": [_term_row_view(t) for t in uncovered],
+        "zero_conv_terms_list": [_term_row_view(t) for t in sorted(
+            zero_conv, key=lambda t: -_num(t.get("cost_dkk")))[:top]],
     }
 
 
 def _fmt_brief(d: dict) -> str:
     h = d["headline"]
     L = []
-    L.append("# Søgeterm-brief (læs denne — ikke de rå rækker)")
-    L.append("")
-    L.append(f"**Overblik:** {h['distinct_terms']} termer · {h['spend_dkk']} kr forbrug · "
-             f"{h['conversions']} konv · blended CPA {h['blended_cpa_dkk']} kr · "
-             f"top-10 termer = {h['top10_spend_share_pct']}% af forbruget.")
-    L.append(f"**0-konv forbrug:** {h['zero_conv_spend_dkk']} kr ({h['zero_conv_spend_share_pct']}%) "
-             f"fordelt på {h['zero_conv_terms']} termer — HUSK: 0 konv ≠ spild når folk ringer. "
-             f"Det er noget at *tale om*, ikke en dom.")
-    if h["dropped_below_floor"]:
-        L.append(f"_(Server-side filter / gulv fjernede {h['dropped_below_floor']} små rækker "
-                 f"før de ramte kontekst.)_")
-    L.append("")
 
-    def table(title, rows, cols):
+    def table(title, rows, cols, note=None):
         if not rows:
             return
-        L.append(f"## {title}")
+        L.append(f"### {title}")
+        L.append("")
+        if note:
+            L.append(note)
+            L.append("")
         L.append("| " + " | ".join(c[0] for c in cols) + " |")
         L.append("|" + "|".join("---" for _ in cols) + "|")
         for r in rows:
             L.append("| " + " | ".join(str(r.get(c[1], "")) for c in cols) + " |")
         L.append("")
 
-    table("Hvor pengene går (top forbrug)", d["top_spend_terms"],
-          [("Term", "term"), ("Kr", "cost_dkk"), ("Klik", "clicks"), ("Konv", "conv"),
-           ("CPA", "cpa_dkk"), ("Ad group", "ad_group"), ("Er kw?", "already_kw")])
-    table("⚠️ Systemiske spild-temaer (n-gram, mange termer · 0 konv) — tal om dem", d["waste_theme_candidates"],
+    # --- executive summary ------------------------------------------------------------------
+    L.append("## Søgeterm-brief (læs denne — ikke de rå rækker)")
+    L.append("")
+    L.append("```")
+    L.append(f"SØGETERM-SUNDHED: {h['health']}")
+    L.append(f"Termer gennemgået: {h['distinct_terms']}")
+    L.append(f"Forbrug: {h['spend_dkk']} kr · {h['conversions']} konv · blended CPA {h['blended_cpa_dkk']} kr")
+    L.append(f"0-konv forbrug: {h['zero_conv_spend_dkk']} kr ({h['zero_conv_spend_share_pct']}%) "
+             f"på {h['zero_conv_terms']} termer")
+    L.append(f"Top-10 termer = {h['top10_spend_share_pct']}% af forbruget")
+    L.append("```")
+    L.append("")
+    L.append("> **HUSK:** 0 konv ≠ spild når folk ringer. Intet nedenfor er en dom — det er "
+             "samtalestof, med tallet bag hvert punkt. Verificeres i dialog (aktive keywords, "
+             "AI Context, websøgning) før noget bliver en negativ eller et nyt keyword.")
+    if h["dropped_below_floor"]:
+        L.append(f"> _(Server-side filter / gulv fjernede {h['dropped_below_floor']} små rækker "
+                 f"før de ramte kontekst.)_")
+    L.append("")
+    L.append("---")
+    L.append("")
+
+    # --- waste candidates (systemic themes + raw zero-conv terms) --------------------------
+    L.append("### 🚨 Spild-kandidater (0 konv — kræver verificering, ikke en dom)")
+    L.append("")
+    L.append(f"**Samlet 0-konv forbrug: {h['zero_conv_spend_dkk']} kr**")
+    L.append("")
+    table("Systemiske spild-temaer (n-gram — mange termer deler et mønster)",
+          d["waste_theme_candidates"],
           [("N-gram", "ngram"), ("Termer", "terms"), ("Kr", "cost_dkk"), ("Konv", "conv"),
-           ("Eksempler", "examples")])
-    table("✅ Vinder-temaer (konverterer · ikke fuldt dækket) — kandidat til nye keywords", d["winner_theme_candidates"],
+           ("Eksempler", "examples")],
+          note="Blokér som phrase-match negativer, hvis mønstret bekræftes off-intent.")
+    table("Dyreste enkeltstående 0-konv-termer", d["zero_conv_terms_list"],
+          [("Term", "term"), ("Klik", "clicks"), ("Kr", "cost_dkk"), ("Ad group", "ad_group"),
+           ("Er kw?", "already_kw")])
+
+    # --- promote candidates ------------------------------------------------------------------
+    L.append("### ⭐ Kandidater til forfremmelse")
+    L.append("")
+    table("Vinder-temaer (konverterer · ikke fuldt dækket)", d["winner_theme_candidates"],
           [("N-gram", "ngram"), ("Termer", "terms"), ("Kr", "cost_dkk"), ("Konv", "conv"),
-           ("Dækket", "covered"), ("Eksempler", "examples")])
-    table("Intent-linser (neutrale grupperinger — pegepinde, ikke domme)", d["intent_lenses"],
-          [("Linse", "lens"), ("Termer", "terms"), ("Kr", "cost_dkk"), ("Konv", "conv"),
-           ("Eksempler", "examples")])
+           ("Dækket", "covered"), ("Eksempler", "examples")],
+          note="Kandidat til nye keywords — kun hvis der findes en relevant landingsside.")
+    table("Udækkede vindere (konverterer, men ikke et keyword endnu)", d["uncovered_winners"],
+          [("Term", "term"), ("Kr", "cost_dkk"), ("Konv", "conv"), ("Ad group", "ad_group")])
+
+    # --- watchlist / structure --------------------------------------------------------------
+    L.append("### 👀 Watchlist og struktur")
+    L.append("")
     table("Match-type-lækage (hvor fanger brede matches forbrug?)", d["match_type_leakage"],
           [("Match type", "match_type"), ("Termer", "terms"), ("Kr", "cost_dkk"), ("Konv", "conv")])
     table("Struktur-smell (samme term i flere ad groups)", d["term_in_multiple_ad_groups"],
           [("Term", "term"), ("Kr", "cost_dkk"), ("Konv", "conv"), ("Ad groups", "ad_group")])
-    table("Udækkede vindere (konverterer, men ikke et keyword endnu)", d["uncovered_winners"],
-          [("Term", "term"), ("Kr", "cost_dkk"), ("Konv", "conv"), ("Ad group", "ad_group")])
+    table("Intent-linser (neutrale grupperinger — pegepinde, ikke domme)", d["intent_lenses"],
+          [("Linse", "lens"), ("Termer", "terms"), ("Kr", "cost_dkk"), ("Konv", "conv"),
+           ("Eksempler", "examples")])
 
+    # --- reference: top spend --------------------------------------------------------------
+    table("📊 Hvor pengene går (top forbrug, uanset dom)", d["top_spend_terms"],
+          [("Term", "term"), ("Kr", "cost_dkk"), ("Klik", "clicks"), ("Konv", "conv"),
+           ("CPA", "cpa_dkk"), ("Ad group", "ad_group"), ("Er kw?", "already_kw")])
+
+    L.append("---")
+    L.append("")
     L.append("> Alt ovenfor er **samtalestof**, ikke beslutninger. Tag temaerne i prioriteret "
-             "rækkefølge, vis tallet, foreslå et træk, og bliv enige før noget skrives til CSV.")
+             "rækkefølge, vis tallet, foreslå et træk, og bliv enige før noget skrives til CSV "
+             "eller kontoen.")
     return "\n".join(L)
 
 
