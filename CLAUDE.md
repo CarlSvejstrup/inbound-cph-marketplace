@@ -102,7 +102,7 @@ But every skill that produces an artifact or recommendation stops at "here's the
 | `inb-ads-context-publish` | Publish per-client AI Context Docs to Drive + master client-index (vault→Drive, no Ads MCP) | Gated — Drive create (create-once) |
 | `inb-ads-client-brief` | Project-manager brief on one client + on-demand AI-context UPDATE (all on Drive): start in the master index, open the client's AI-Context file, brief on it, pull what's new since its `Sidst opdateret` (Drive docs, HubSpot, status decks), critical TILFØJ/ERSTAT/FJERN diff into the Klientoverblik, write the updated AI-Context file in place (gws) or hand back a copy-paste block | Gated — Drive file write (diff-approved, gws-or-fallback) |
 
-Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. They are reinforcing, not redundant. All Google Ads MCP use is read-only.
+Each skill's `SKILL.md` repeats the write-gate rule in its own Rules section. They are reinforcing, not redundant. Google Ads MCP reads are free; the only writes are per-action HITL-confirmed through the `ads-writer` agent (`inb-ads-campaign-build`, `inb-ads-quality-score`, `inb-ads-display-placement-audit`, `inb-ads-search-term-analyse`) — no skill writes autonomously.
 
 ---
 
