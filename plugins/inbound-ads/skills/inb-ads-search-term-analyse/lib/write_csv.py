@@ -45,7 +45,7 @@ import os
 import zipfile
 from pathlib import Path
 
-# --- limits / literals (mirror inb-ads-editor-csv-export so the two skills agree) -----------------------
+# --- limits / literals (Google Ads Editor's bulk-upload conventions) -----------------------
 ACCOUNT_LEVEL_LITERAL = "<Account-level>"   # Editor's literal for an account-level negative
 VALID_POSITIVE_MATCH = {"exact", "phrase"}  # positives never Broad/blank (Inbound hard rule)
 VALID_NEG_MATCH = {"exact", "phrase", "broad"}

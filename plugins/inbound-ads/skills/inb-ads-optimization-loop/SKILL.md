@@ -8,7 +8,7 @@ description: Kører det samlede optimerings-loop på en live Google Ads-konto ve
 Det samlede optimerings-loop for en live Google Ads-konto: én kommando diagnosticerer kontoen på
 flere dimensioner og afleverer ÉN redigerbar Excel-workbook med konkrete forslag — negatives,
 vinder-keywords at promovere, RSA-challengers. Eksperten retter workbooken, kan sende den til
-kunden, og kører så `inb-ads-editor-csv-export` for at lave Editor-CSV'erne. Alt output er på dansk.
+kunden, og importerer den derefter manuelt i Google Ads Editor. Alt output er på dansk.
 
 Dette er operate-laget (modsat `inb-ads-campaign-build`). Hvor `inb-ads-search-term-analyse` og
 `inb-ads-rsa-hygiene` hver gør ÉN diagnose, kører dette skill dem sammen + Quality Score og samler
@@ -252,11 +252,11 @@ Hver fane bærer den samme metrik-blok: `Budget brugt (DKK)` / `Impressions` / `
 CPA beregnes i builderen (`_metric_block`), så de er ens på tværs uden at skulle vedligeholdes per
 fane. Farve-koderne (begge akser) forklares med farve-blokke på "Læs mig".
 
-**Fire faner bliver aldrig til CSV:** `Alle søgetermer`, `Sprunget over`, `Vindere til gennemgang`
-og `Quality Score` matcher ingen `inb-ads-editor-csv-export`-alias, så konverteren læser dem aldrig
-— garantien for "kun overblik / kun gennemgang". Mørkeblå kolonner (yderst til venstre) på de andre
-faner er Editor-felter (konverteren beholder); lyseblå er metadata (droppes, inkl. hele
-metrik-blokken + Konfidens/Tynd data).
+**Fire faner er rene referencefaner:** `Alle søgetermer`, `Sprunget over`, `Vindere til gennemgang`
+og `Quality Score` er navngivet uden for Editors kolonne-vokabular, så en ekspert der importerer
+fra workbooken ved de aldrig skal med — garantien for "kun overblik / kun gennemgang". Mørkeblå
+kolonner (yderst til venstre) på de andre faner er Editor-felter (tages med ved import); lyseblå er
+metadata (springes over, inkl. hele metrik-blokken + Konfidens/Tynd data).
 
 ## Trin 4 — Aflever + næste skridt
 
@@ -268,8 +268,8 @@ metrik-blokken + Konfidens/Tynd data).
 2. **Kort dansk opsummering:** N negatives (X DKK spild), M vindere at promovere, K ad groups uden
    challenger, QS-flag. Ærlige forbehold: `low_confidence` hvis sat; QS-LP er et flag, ikke en
    score; konto-niveau negatives er udfoldet (se Læs mig).
-3. **Sådan bruger eksperten filen:** ret frit i workbooken → kør `inb-ads-editor-csv-export`
-   (workbook → Editor-CSV) → importér CSV'erne i Editor (Account → Import → From file) → gennemgå
+3. **Sådan bruger eksperten filen:** ret frit i workbooken → gem de relevante faner som CSV (eller
+   indtast rækkerne direkte) → importér i Editor (Account → Import → From file) → gennemgå
    grøn/gul diff → Send. Intet er skrevet til kontoen af dette skill.
 4. **`## Kilder`** — de MCP-værktøjer + evt. URLs der faktisk blev læst.
 
@@ -308,7 +308,8 @@ Navne-gotcha: modulet hedder `sweep.py`, ikke `select.py` — `select` skygger P
 `select`, som `subprocess` (i review_workbook) afhænger af, hvilket giver import-crash hvis de
 deler proces.
 
-`lib/*` er kopier harmoniseret med `inb-ads-editor-csv-export`-kontrakten (negatives taler samme
-tab-04-vokabular; de nye kolonner — Konfidens/Klik/Tynd data/Agent-note — er alle metadata som
-konverteren dropper; `Alle søgetermer` + `Sprunget over` er alias-usynlige). Retter du
-workbook-kolonnerne, opdatér også `inb-ads-editor-csv-export`-kontrakten — de er tæt koblede.
+`lib/*` er kopier harmoniseret med Editors bulk-import-vokabular (negatives taler samme
+tab-04-vokabular; de nye kolonner — Konfidens/Klik/Tynd data/Agent-note — er alle metadata en
+manuel import springer over; `Alle søgetermer` + `Sprunget over` er rene referencefaner, aldrig
+importeret). Retter du workbook-kolonnerne, hold dem konsistente med `inb-ads-search-term-analyse`s
+Editor-CSV-kontrakt (`lib/write_csv.py`) — de deler samme kolonne-vokabular.

@@ -29,11 +29,15 @@ The template the assembler renders:
 ## Vigtigste fund / flag (læs før go-live)
 {{findings_bullets}}   ← model writes 2-5 one-liners: ad-less ad groups (tab 08), over-length fields (tab 09), unconfirmed sitelink URLs omitted, snippet-header-column UNVERIFIED, tracking-gate, overlapping ad groups to pause, etc. Pull from the workbook's tab 08 + tab 09 + the input objects. If nothing notable: "Ingen blokerende fund — klar til review."
 
-## Sådan importerer du (bulk-upload til Google Ads Editor)
+## Sådan importerer du (manuelt i Google Ads Editor)
 1. Åbn **Google Ads Editor** og vælg kontoen ({{account_id}}).
-2. **Account → Import → From file** og vælg CSV-filerne (Editor importerer CSV, ikke .xlsx — denne workbook er review-laget; Editor-CSV'erne genereres fra den godkendte workbook af `inb-ads-editor-csv-export`-skillen).
+2. Editor importerer CSV, ikke .xlsx — denne workbook er review-laget. Gem de relevante faner (01-07)
+   som CSV fra Excel, eller indtast rækkerne direkte i Editor via **Account → Import → From file** per
+   entitetstype (campaigns → ad groups → keywords → ads (RSA) → assets (sitelinks/callouts/snippets) →
+   negative keywords), eller kør **Vej A** i `inb-ads-campaign-build` på den godkendte opsætning for at
+   oprette kampagnen direkte via `ads-writer` i stedet.
 3. Importér i denne rækkefølge, og kør **Check Changes** efter hver: campaigns → ad groups → keywords → ads (RSA) → assets (sitelinks/callouts/snippets) → negative keywords.
-4. **Tilknyt den delte negativliste** "{{shared_neg_name}}" (id {{shared_neg_id}}) til kampagnen — den er IKKE i nogen CSV (den påføres by-reference).
+4. **Tilknyt den delte negativliste** "{{shared_neg_name}}" (id {{shared_neg_id}}) til kampagnen — den er IKKE i nogen import (den påføres by-reference).
 5. **Manuelt efter import:** sæt sprog (Dansk), bekræft Denmark = Presence (ikke Presence-or-Interest), verificér leadgen-konverteringshandlingen.
 6. Kør **Check Changes** — løs alle røde fejl. Verificér kampagnestatus = **Paused**. Først derefter Post Changes.
 
@@ -49,8 +53,9 @@ Genereret af campaign-build assembler. Workbook = detaljen; dette = forsiden. In
   steps into this overblik so there aren't two overlapping import docs.
 - Keep findings to one-liners. If the model is writing paragraphs, it's duplicating the
   workbook — stop.
-- The import steps describe the CSV path even though v1 of the assembler emits Excel-only:
-  the CSVs come from the `inb-ads-editor-csv-export` skill off the confirmed workbook. State that
-  once (step 2), don't belabor it.
+- The import steps describe the manual Editor path even though v1 of the assembler emits
+  Excel-only: a human exports the relevant tabs to CSV (or keys them in directly) from the
+  confirmed workbook, or runs Vej A on the approved setup instead. State that once (step 2),
+  don't belabor it.
 - `campaign-state` line is always **Paused** (the valid Editor status), per the
   campaign-settings default.

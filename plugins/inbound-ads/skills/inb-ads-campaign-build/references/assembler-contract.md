@@ -10,11 +10,11 @@ The assembler is a **pure transform**: 4 JSON shapes → ONE workbook. No extern
 no writes to any account.
 
 **Excel-only (decision 2026-06-05).** The workbook is the client-confirmation artifact — often
-the Excel sent to the client for sign-off. Editor CSVs are generated LATER, from the confirmed
-Excel, by the `inb-ads-editor-csv-export` skill. The assembler's job is therefore to
-make the workbook a **lossless superset**: every field a CSV will need has a dedicated workbook
-cell. §5 below is no longer something the assembler emits — it is the converter's target schema,
-kept here so the workbook columns and the CSV columns stay traceable to each other.
+the Excel sent to the client for sign-off. The confirmed Excel is imported LATER, manually, into
+Google Ads Editor (or Vej A is run on the approved setup to create the campaign directly). The
+assembler's job is therefore to make the workbook a **lossless superset**: every field a manual
+Editor import will need has a dedicated workbook cell. §5 below documents Editor's target schema
+as a mapping reference, kept here so the workbook columns stay traceable to what Editor expects.
 
 ---
 
@@ -52,14 +52,14 @@ ad-group `Negative`) — they are load-bearing, not cosmetic.
 
 ---
 
-## 3. Workbook is a lossless superset; the CSV boundary lives in the converter
+## 3. Workbook is a lossless superset; the Editor-schema boundary is manual
 
 The workbook intentionally carries EVERYTHING — both the Editor-schema fields and the
-review-only metadata. It is the rich superset. The `inb-ads-editor-csv-export` skill is where the
-boundary is drawn: it reads the confirmed Excel and drops the workbook-only columns below,
-keeping only verified Editor headers (§5).
+review-only metadata. It is the rich superset. A human doing the Editor import reads the
+confirmed Excel and ignores the workbook-only columns below, using only the verified Editor
+headers (§5).
 
-| Object | Workbook-only metadata (converter DROPS) |
+| Object | Workbook-only metadata (not an Editor column) |
 |---|---|
 | assets | `grounded_in`, `url_source`, `header_column_unverified` |
 | negatives | `why` / `Reason`, `Category` (but `Level` + `Ad group` are KEPT — they map to Editor's Type) |
@@ -96,15 +96,16 @@ the CSV uses the explicit Match type column instead.
 
 ---
 
-## 5. Per-entity Editor CSVs — the CONVERTER's target schema (not emitted here)
+## 5. Per-entity Editor columns — the manual-import target schema (not emitted here)
 
-This is what the `inb-ads-editor-csv-export` skill produces from the confirmed Excel. Kept here so
-the workbook columns above stay traceable to the CSV columns. One CSV per entity type in v1
+This is the schema a human maps the confirmed Excel into when importing into Google Ads Editor
+(or that `ads-writer` maps into when Vej A is run on the approved setup). Kept here so the
+workbook columns above stay traceable to Editor's fields. One entity group per type in v1
 (Editor's flat namespace; entity = which cells populated). English headers auto-map on any
 install (verified answer 57747). UTF-8 (Danish æ/ø/å load-bearing). Editor imports CSV only, not
-.xlsx (answer 30564) — which is exactly why the converter exists.
+.xlsx (answer 30564) — which is why a manual export/import step remains for Vej B.
 
-Each bullet lists the CSV column → the workbook cell it reads. **Bold** = a value transform, not
+Each bullet lists the Editor column → the workbook cell it reads. **Bold** = a value transform, not
 a straight copy.
 
 - **campaigns.csv** (from tab 01): `Campaign`←Campaign, `Campaign type`←Campaign type,

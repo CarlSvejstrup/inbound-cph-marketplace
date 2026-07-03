@@ -148,8 +148,8 @@ Kør Phase 4 assembler (`references/07-assembler.md` → `scripts/assemble.py`) 
 `Kampagne overblik.md`. Arket → Drive er en gated write: vis sti + filnavn, vent på eksplicit "ja", upload
 via Drive `create_file` (Office-mode `.xlsx`, default klientmappe under
 `${user_config.inbound_root_folder_id}`). Rapportér sti/Drive-link, launch-gate-opsummering (tab 08) og
-valideringsstatus (tab 09). Næste skridt derfra: kunde-godkendelse → `inb-ads-editor-csv-export` laver
-Editor-CSV'erne, ELLER kør Vej A på den godkendte opsætning for at oprette direkte.
+valideringsstatus (tab 09). Næste skridt derfra: kunde-godkendelse → mennesket importerer workbooken
+manuelt i Google Ads Editor, ELLER kør Vej A på den godkendte opsætning for at oprette direkte.
 
 ## Safety
 

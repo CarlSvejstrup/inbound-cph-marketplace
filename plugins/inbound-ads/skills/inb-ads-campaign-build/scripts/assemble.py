@@ -6,11 +6,10 @@ rsa manifest, assets) into Ian's 10-tab review workbook, then runs validation. N
 Ads API push, no external reads/writes — it only reads local JSON and writes one .xlsx.
 
 The assembler is Excel-ONLY (decision 2026-06-05). The workbook is the client-confirmation
-artifact; Editor CSVs are generated LATER, from the confirmed Excel, by the
-`inb-ads-editor-csv-export` skill. The workbook is therefore a lossless superset — every
-field a CSV needs has a dedicated workbook cell (Max CPC, numeric daily budget, negative
-level/ad-group, per-type asset columns). The CSV = Editor-schema-only boundary now lives in
-`inb-ads-editor-csv-export`, not here.
+artifact; it is imported LATER, manually, into Google Ads Editor (or Vej A is run on the
+approved setup to create the campaign directly via `ads-writer`). The workbook is therefore a
+lossless superset — every field a manual Editor import needs has a dedicated workbook cell
+(Max CPC, numeric daily budget, negative level/ad-group, per-type asset columns).
 
 The hard field limits (headline 30 / description 90 / path 15) are Google's externally-fixed
 RSA caps, declared here as named constants. This script is self-contained: it does NOT import
@@ -80,7 +79,7 @@ SHARED_NEG_MCC = "1138360630"
 
 # --- Visual design system (client-facing: the workbook is often sent to the customer) -------
 # Inbound dark-navy header, white bold text, soft zebra banding, thin grid. Row 1 STAYS the
-# header row (the inb-ads-editor-csv-export skill reads headers from row 1) — we style cells only,
+# header row (a human maps headers from row 1 when importing into Editor) — we style cells only,
 # never insert a banner row above the data. Styling must not move the header off row 1.
 NAVY = "1F2A44"          # Inbound dark navy
 NAVY_TEXT = "FFFFFF"
@@ -614,9 +613,9 @@ def write_overview(path, strategy, structuring, rsa_manifest, assets, date, adle
         "",
         "## Sådan importerer du (bulk-upload til Google Ads Editor)",
         f"1. Åbn **Google Ads Editor**, vælg kontoen ({strategy.get('account_id','')}).",
-        "2. **Account → Import → From file** med Editor-CSV'erne. (Editor importerer CSV, ikke "
-        ".xlsx — denne workbook er review-laget; Editor-CSV'erne genereres fra den godkendte "
-        "workbook af `inb-ads-editor-csv-export`-skillen.)",
+        "2. **Account → Import → From file**, eller indtast rækkerne direkte i Editor. (Editor "
+        "importerer CSV, ikke .xlsx — denne workbook er review-laget; gem de relevante faner som "
+        "CSV, eller kør Vej A på den godkendte opsætning for at oprette direkte.)",
         "3. Importér i rækkefølge, kør **Check Changes** efter hver: campaigns → ad groups → "
         "keywords → ads (RSA) → assets → negative keywords.",
         f"4. **Tilknyt den delte negativliste** \"{shared.get('name','Generelle negative søgeord')}\" "
@@ -686,9 +685,10 @@ def main():
         "overview": overview_path or None,
         "validation_failures": failures,
         "adless_ad_groups": adless_ad_groups,
-        "note": "Excel-only. The workbook is the client-confirmation artifact; Editor CSVs are "
-                "generated later from the confirmed Excel by the inb-ads-editor-csv-export "
-                "skill. No API push. Shared negative list 6688642473 applied by reference "
+        "note": "Excel-only. The workbook is the client-confirmation artifact; it is imported "
+                "later, manually, into Google Ads Editor (or Vej A is run on the approved setup "
+                "to create the campaign directly via ads-writer). No API push from this script. "
+                "Shared negative list 6688642473 applied by reference "
                 "(tab 08 + tab 04 reference line), never enumerated.",
     }, ensure_ascii=False, indent=2))
 

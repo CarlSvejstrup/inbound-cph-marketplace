@@ -1,3 +1,29 @@
+# Session handoff — 2026-07-03 (removed inb-ads-editor-csv-export → 11 skills)
+
+## Current state (2026-07-03)
+
+- **Plugin:** one plugin, `inbound-ads`, **v3.4.0**, **11 skills**. All skills carry `inb-ads-*` slugs.
+- **Removed `inb-ads-editor-csv-export`** — no longer used (Carl's direction). It was the pure-transform
+  converter (confirmed review workbook → per-entity Google Ads Editor import CSVs), fed by
+  `inb-ads-campaign-build`'s assembler and `inb-ads-optimization-loop`'s review workbook. Roster drops
+  12 → **11**.
+- **Dependents updated to describe the remaining path directly** (no converter skill in between): a
+  confirmed workbook from `inb-ads-campaign-build` (Vej B) or `inb-ads-optimization-loop` is now either
+  imported into Google Ads Editor manually (export the relevant tabs to CSV, or key rows in by hand) or,
+  for `inb-ads-campaign-build`, run through Vej A (`ads-writer`) on the approved setup for a direct
+  account write. Updated: `inb-ads-campaign-build`'s `SKILL.md`, `references/07-assembler.md`,
+  `references/pipeline-flow.md`, `references/assembler-contract.md`, `references/kampagne-overblik-template.md`,
+  `scripts/assemble.py`; `inb-ads-optimization-loop`'s `SKILL.md`, `references/selection-spec.md`,
+  `lib/review_workbook.py`; `inb-ads-search-term-analyse`'s `lib/write_csv.py` (comment only — this skill's
+  own CSV export is unaffected and unchanged).
+- **Docs synced:** README, repo-root `CLAUDE.md`, `plugin.json` (version bump, skill count in
+  description), `docs/project-status.md` (new dated note), and this handoff.
+- **Historical note:** every dated handoff entry BELOW this one predates this removal and still names
+  `inb-ads-editor-csv-export` as part of the live roster/flow — kept verbatim as the record of the past;
+  do not retro-edit them.
+
+---
+
 # Session handoff — 2026-07-01 (campaign-build restructure: 3 shells removed → 12 skills + direct-to-Ads delivery)
 
 ## Current state (2026-07-01)

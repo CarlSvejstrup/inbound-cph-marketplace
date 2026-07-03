@@ -157,41 +157,40 @@ subsets of it. Decided 2026-06-09.
   | ⚪ GRAA | GRAENSE (borderline) |
 - The two action tabs ("Nye keywords (vindere)", "Negative keywords") are **distilled subsets** of
   this overview — every actioned term traces back to a coloured row here.
-- **NEVER becomes a CSV.** The tab is named `Alle søgetermer` — which matches NO `inb-ads-editor-csv-export`
-  alias (the converter reads keywords from `Keywords`/`Keyword`/`Nye keywords (vindere)`, negatives
-  from `Negative keywords`/`Negatives`). So it is structurally invisible to the converter. This is
-  the same isolation guarantee as the `Sprunget over`, `Vindere til gennemgang`, and `Quality Score`
-  tabs — **all four** reference tabs are alias-invisible. The round-trip test must confirm no row
-  from any of them reaches `keywords.csv` or `negatives.csv`.
+- **NEVER gets imported.** The tab is named `Alle søgetermer` — clearly separate from the two
+  action tabs (`Nye keywords (vindere)`, `Negative keywords`) an expert reads from when importing
+  into Editor. This is the same isolation guarantee as the `Sprunget over`, `Vindere til
+  gennemgang`, and `Quality Score` tabs — **all four** are reference-only tabs, never action tabs.
+  When verifying a build, confirm no row from any of them ends up in a manual Editor import.
 
 **Æ/Ø/Å is load-bearing here** — the `Gruppe` column + Danish campaign/term text (`Søgeterm`,
 `Højskole`, `Grupperejser`) must survive. `review_workbook` writes the .xlsx with correct encoding
-and `inb-ads-editor-csv-export` uses UTF-8-BOM (verified live today); keep that, and verify Danish chars
-render in the overview tab specifically.
+(verified live today); keep that, and verify Danish chars render in the overview tab specifically.
 
 ## Workbook changes (`review_workbook.py`)
 
-The overview tab above, plus both action tabs gain metadata columns (light header, converter DROPS
-them — Editor never sees them):
+The overview tab above, plus both action tabs gain metadata columns (light header — an expert
+importing into Editor skips them, Editor never sees them):
 
 - **Nye keywords (vindere):** add `Agent-note` (optional). Editor columns unchanged.
 - **Negative keywords:** add `Konfidens` (🟢/🟡/🔴 + GROEN/GUL/ROED text for accessibility) +
   `Klik` + `Impressions` + `Tynd data` + `Konfidens-justering`. The `Konfidens` cell gets the band
   colour fill. Editor columns (`Campaign / Level / Ad group / Negative keyword / Match type`)
-  unchanged — so the `inb-ads-editor-csv-export` contract is untouched (it drops everything outside the
-  Editor band).
+  unchanged, so `inb-ads-search-term-analyse`'s CSV column contract (`lib/write_csv.py`) stays
+  aligned with this tab's Editor band.
 - The filtered `≥2 conv` terms (the ones a script reason removed) go on a **SEPARATE tab named
-  `Sprunget over`** — NOT as rows on "Nye keywords (vindere)". This is a hard requirement: the
-  converter matches the keywords tab by alias (`Keywords` / `Keyword` / `Nye keywords (vindere)`),
-  and `Sprunget over` does not match any alias, so those rows can never leak into `keywords.csv`.
-  Putting them on the winners tab would import the very terms we deliberately filtered — the exact
-  silent corruption this whole change exists to prevent.
+  `Sprunget over`** — NOT as rows on "Nye keywords (vindere)". This is a hard requirement: an
+  expert importing manually reads action rows only from the named action tabs (`Nye keywords
+  (vindere)`, `Negative keywords`), and `Sprunget over` is a distinctly-named reference tab, so
+  those rows are never mistaken for action rows. Putting them on the winners tab would risk
+  importing the very terms we deliberately filtered — the exact silent corruption this whole
+  change exists to prevent.
 
-**Converter impact:** the new **columns** are all metadata (the converter reads named Editor
-columns and ignores the rest → never sees `Konfidens`/`Klik`/`Tynd data`/etc.). The Editor-bound
-columns + the `inb-ads-editor-csv-export` keep-list don't change. The one real risk is the `Sprunget over`
-content — safe ONLY because it's a separate, non-alias-matching tab. **Re-run the round-trip after
-building and confirm `keywords.csv` contains zero `Sprunget over` terms.**
+**Manual-import impact:** the new **columns** are all metadata (an expert importing reads named
+Editor columns and ignores the rest → never keys in `Konfidens`/`Klik`/`Tynd data`/etc.). The
+Editor-bound columns don't change. The one real risk is the `Sprunget over` content — safe ONLY
+because it's a separate, clearly-labelled reference tab. **Verify after building that none of its
+terms are mistaken for action rows during import.**
 
 ---
 
@@ -250,11 +249,12 @@ gets exactly one band + an independent thin-data boolean.
 2. Live DSC: re-run the real search-term pull through `sweep.py`; confirm the `≥2 conv` terms
    that "went missing" before now either appear or are named in `Sprunget over` with the matched
    keyword (this directly answers Carl's original question).
-3. Converter round-trip: build the workbook, run `inb-ads-editor-csv-export`, confirm the Editor CSVs are
-   unchanged in shape (new metadata columns dropped, negatives still correct) AND that neither
-   `keywords.csv` nor `negatives.csv` contains any row from the `Alle søgetermer` overview tab or
-   the `Sprunget over` tab (both are alias-invisible — prove it, don't assume it).
+3. Manual-import check: build the workbook, verify the action-tab Editor columns are unchanged in
+   shape (new metadata columns present but clearly separated, negatives still correct) AND that
+   neither the `Alle søgetermer` overview tab nor the `Sprunget over` tab contains a row that could
+   be mistaken for an action row (both are clearly-labelled reference tabs — prove it, don't
+   assume it).
 4. Danish chars: confirm æ/ø/å render correctly in the overview tab's `Gruppe` column + term text,
-   and survive the CSV round-trip (UTF-8 BOM).
+   and survive if exported to CSV (UTF-8 BOM, matching `inb-ads-search-term-analyse`'s convention).
 5. Overview completeness: every row on the two action tabs traces to a coloured row in
    `Alle søgetermer` (the action tabs are strict subsets of the overview).

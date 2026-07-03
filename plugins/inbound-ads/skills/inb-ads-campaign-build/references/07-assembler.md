@@ -13,10 +13,10 @@ bor i `${CLAUDE_SKILL_DIR}/references/assembler-contract.md` — læs den, den v
 ## Hård regel — Excel-only, INGEN CSV, INGEN API-push
 
 Producerer KUN workbooken (beslutning 2026-06-05). Workbooken er klient-bekræftelses-artefaktet — ofte
-den Excel der sendes til kunden for godkendelse. **Editor-CSV'er genereres SENERE**, fra den bekræftede
-Excel, af `inb-ads-editor-csv-export`-skillen. Derfor er workbooken et **tabsfrit superset**:
-hvert felt en CSV skal bruge har en dedikeret celle. `assemble.py` laver kun én lokal `.xlsx`-write (+ et
-overbliks-`.md`); den kalder ALDRIG Google Ads API'et.
+den Excel der sendes til kunden for godkendelse. Den bekræftede Excel importeres SENERE manuelt i
+Google Ads Editor (eller Vej A køres på den godkendte opsætning for at oprette direkte). Derfor er
+workbooken et **tabsfrit superset**: hvert felt Editor-importen skal bruge har en dedikeret celle.
+`assemble.py` laver kun én lokal `.xlsx`-write (+ et overbliks-`.md`); den kalder ALDRIG Google Ads API'et.
 
 ## Designprincip — fletter, opfinder ikke
 
@@ -31,9 +31,8 @@ nyt indhold. Tre ting den håndhæver (alle i reference-filen, verificeret mod I
    Max CPC (tab 02), numerisk dagsbudget (tab 01), negativ Level + Ad group (tab 04), asset-Level +
    per-type kolonner (tab 07).
 3. **Limits er Googles faste RSA-grænser (30/90/15), ikke layout-logik.** De er navngivne konstanter i
-   `assemble.py` (med kanonisk mirror i `inb-ads-rsa-copy/sheet_layout.py` FIELDS). Scriptet importerer
-   IKKE længere det andet skill — det er self-contained og bootstrapper selv openpyxl. Ændrer Google en
-   grænse: ret begge steder.
+   `assemble.py` (med kanonisk mirror i `inb-ads-rsa-copy/sheet_layout.py` FIELDS). Scriptet er
+   self-contained og bootstrapper selv openpyxl. Ændrer Google en grænse: ret begge steder.
 
 ## To hårde emit-time guards (defense-in-depth)
 
@@ -103,9 +102,9 @@ Drive via connector (`create_file`, Office-mode `.xlsx`). Default klientmappe un
 Returnér: sti til workbooken (+ Drive-link hvis uploadet); launch-gate-opsummering fra tab 08 (tracking
 verificeret, Presence-only geo, Search Partners/Display off, den delte negativliste tilknyttet by-reference
 id 6688642473, klient-negatives anvendt); validerings-status fra tab 09 (antal over-længde-felter, 0 =
-grønt); og næste skridt (manuelt, human-in-the-loop): workbooken sendes til kunden, derefter konverteres
-den til Editor-CSV'er af `inb-ads-editor-csv-export`-skillen, og mennesket importerer + enabler først når alle
-Must-pass-gates er grønne. Assembleren pusher INTET.
+grønt); og næste skridt (manuelt, human-in-the-loop): workbooken sendes til kunden, derefter importerer
+mennesket den manuelt i Google Ads Editor (eller kører Vej A på den godkendte opsætning for at oprette
+direkte) og enabler først når alle Must-pass-gates er grønne. Assembleren pusher INTET.
 
 ## Risici / noter
 
@@ -114,7 +113,7 @@ Must-pass-gates er grønne. Assembleren pusher INTET.
 - **Guards fejler LØST før write** — exit 1 = INGEN fil skrevet, by design. Ret upstream.
 - **Limits:** ret aldrig 30/90/15 her uden også at rette `inb-ads-rsa-copy/sheet_layout.py` FIELDS
   (den kanoniske mirror).
-- **Excel-only:** assembleren emitterer INGEN CSV. CSV-genereringen bor i `inb-ads-editor-csv-export`-skillen.
+- **Excel-only:** assembleren emitterer INGEN CSV. Import til Google Ads Editor sker manuelt fra workbooken.
 - **Pure transform:** ingen MCP-kald, ingen scrape, ingen API.
 
 ## Maintenance

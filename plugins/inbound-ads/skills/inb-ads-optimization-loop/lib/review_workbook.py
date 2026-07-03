@@ -2,22 +2,23 @@
 """Build the optimization-loop REVIEW WORKBOOK (.xlsx) — the editable deliverable.
 
 ARCHITECTURE (locked 2026-06-05): the loop does NOT emit Editor CSVs. It returns ONE
-Excel workbook that the ads expert edits, can send to the client, and then hands to a
-separate converter skill (the sibling inb-ads-editor-csv-export) that does workbook -> Editor CSV. This
-mirrors the assembler, which was already made Excel-only (commit eb4ebd9): "the workbook
-is a lossless superset; the converter produces the CSVs." Editor imports CSV, not .xlsx
-(Google Ads Editor answer 30564) - which is exactly why the converter exists.
+Excel workbook that the ads expert edits, can send to the client, and then imports manually
+into Google Ads Editor (exporting the relevant tabs to CSV, or keying rows in directly), or
+hands the approved setup to Vej A for a direct account write via `ads-writer`. This mirrors
+the assembler, which was already made Excel-only (commit eb4ebd9): "the workbook is a
+lossless superset." Editor imports CSV, not .xlsx (Google Ads Editor answer 30564) - which
+is exactly why a manual export/import step remains.
 
-THE COLUMN CONTRACT (this is the interface the converter is built against):
+THE COLUMN CONTRACT (this is the interface a manual Editor import is built against):
 
 Each entity tab splits its columns into two bands:
   1. EDITOR-BOUND columns - exact Google Ads Editor header spelling (answer 57747:
-     headers are English, case/space-insensitive). The converter KEEPS these.
+     headers are English, case/space-insensitive). These are the columns to import.
   2. METADATA columns - review context (reason, wasted spend, conversions, CPA, source).
-     The converter DROPS these. They never go to Editor.
+     These are skipped on import. They never go to Editor.
 
-A sentinel row/format is not needed: the converter knows the fixed Editor header set per
-entity (documented in SPEC section 3.5) and drops everything else.
+A sentinel row/format is not needed: whoever imports knows the fixed Editor header set per
+entity (documented in SPEC section 3.5) and skips everything else.
 
 ### #Original — editing EXISTING entities (the loop's distinguishing need)
 
@@ -243,7 +244,7 @@ def _reference_sheet(wb, title, headers, rows, row_fill_key=None, fill_map=None,
     """Write a REFERENCE tab (overview / sprunget-over) — never read by the converter, so it
     uses a single navy header (no editor/metadata split) and colours rows by a classification.
 
-    title MUST NOT match any inb-ads-editor-csv-export tab alias (the converter reads keywords from
+    title MUST NOT read as an action tab (an expert importing manually reads keywords from
     'Keywords'/'Nye keywords (vindere)', negatives from 'Negative keywords'/'Negatives') — these
     reference tabs are named so they are structurally invisible to it (e.g. 'Alle søgetermer',
     'Sprunget over').
@@ -620,7 +621,7 @@ def build(data, out_path):
     # on a lead-gen account is a LEAD, not proof the search intent matched the offering (someone can
     # land and sign up for something else), so an off-offering destination like 'zanzibar højskole'
     # is SURFACED + flagged for the expert, never auto-promoted into a keyword. Named so it matches
-    # NO inb-ads-editor-csv-export alias -> never becomes a CSV. The expert moves a confirmed one to the Nye
+    # so it never reads as an action tab -> never gets imported. The expert moves a confirmed one to the Nye
     # keywords tab by hand. See references/selection-spec.md (decision: flag, don't gate).
     review_winners = data.get("review_winners", [])
     if review_winners:
@@ -677,7 +678,7 @@ def build(data, out_path):
     _sheet(wb, "RSA challengers", rsa_editor_headers, ["Begrundelse"], rsa_rows)
 
     # --- Sprunget over (vindere) — >=2-conv terms a script reason filtered out (reference only) ---
-    # Named so it matches NO inb-ads-editor-csv-export alias -> never becomes a CSV. Answers "why did this
+    # Named so it never reads as an action tab -> never gets imported. Answers "why did this
     # >=2-conv term not appear as a new keyword?" with the exact covering keyword.
     skipped = data.get("skipped_winners", [])
     if skipped:
@@ -696,7 +697,7 @@ def build(data, out_path):
                           "Sprunget over fordi", "Dækket af (keyword)", "Match type"], sk_rows)
 
     # --- Alle søgetermer — full overview of every term >=5 DKK, coloured by BUCKET (reference) ---
-    # Named so it matches NO inb-ads-editor-csv-export alias -> never becomes a CSV. The action tabs above
+    # Named so it never reads as an action tab -> never gets imported. The action tabs above
     # are distilled subsets of this. Colour axis here is the classification bucket (NOT confidence).
     all_terms = data.get("all_terms", [])
     if all_terms:
@@ -715,7 +716,7 @@ def build(data, out_path):
 
     # --- Quality Score — flagged KEYWORDS (reference only, never a CSV) ---
     # QS is a first-class diagnosis but NOT a Google Ads Editor entity, so it gets a reference tab
-    # named to match NO inb-ads-editor-csv-export alias. Grain is KEYWORD (there is no native ad-group QS —
+    # named so it never reads as an action tab. Grain is KEYWORD (there is no native ad-group QS —
     # see lib/gaql/quality_score.py). The QS cell is coloured by score so the actionable cluster
     # (QS 1-2 keywords, usually with a BELOW_AVERAGE landing page) is visible at a glance. Landing
     # page is shown as the API's component LABEL, never converted into a fabricated score.

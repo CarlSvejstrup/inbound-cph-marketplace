@@ -86,5 +86,6 @@ pipeline-mode (ud over den endelige workbook→Drive write-gate i Phase 4).
 
 Ingen fase pusher til Google Ads API'et (beslutning 2026-06-03). Faserne LÆSER fra Google Ads MCP
 (konto-match, CPC, den delte negativliste) men SKRIVER intet til kontoen. Leverancen er
-review-workbooken; Editor-CSV'er genereres SENERE af `inb-ads-editor-csv-export`-skillen fra den
-klient-bekræftede Excel. Read-only MCP-kald er fine; ethvert skrive-kald er forbudt.
+review-workbooken; mennesket importerer den bekræftede Excel SENERE manuelt i Google Ads Editor
+(eller Vej A køres på den godkendte opsætning for at oprette direkte). Read-only MCP-kald er fine;
+ethvert skrive-kald er forbudt.

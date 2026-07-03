@@ -2,7 +2,26 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-07-01, after renaming `inb-ads-context-update` → `inb-ads-client-brief` (client-brief-first framing).
+Last updated: 2026-07-03, after removing `inb-ads-editor-csv-export` (no longer used).
+
+> **2026-07-03 — removed `inb-ads-editor-csv-export` (`inbound-ads` v3.4.0, current roster).** Deleted per
+> Carl's direction — no longer used. It was the pure-transform converter (confirmed review workbook →
+> per-entity Google Ads Editor import CSVs), fed by `inb-ads-campaign-build`'s assembler (Vej B) and
+> `inb-ads-optimization-loop`'s review workbook. Roster drops 12 → **11 skills**. Every dependent was
+> updated to describe the workbook's remaining path directly instead of pointing at the deleted skill: a
+> confirmed workbook is now either imported into Google Ads Editor manually (export the relevant tabs to
+> CSV, or key rows in by hand) or, for `inb-ads-campaign-build`, run through Vej A (`ads-writer`) on the
+> approved setup for a direct account write. Updated files: `inb-ads-campaign-build`'s `SKILL.md`,
+> `references/07-assembler.md`, `references/pipeline-flow.md`, `references/assembler-contract.md`,
+> `references/kampagne-overblik-template.md`, `scripts/assemble.py`; `inb-ads-optimization-loop`'s
+> `SKILL.md`, `references/selection-spec.md`, `lib/review_workbook.py`; `inb-ads-search-term-analyse`'s
+> `lib/write_csv.py` (comment only — that skill's own CSV export is unaffected). Docs synced (README,
+> repo-root `CLAUDE.md`, `plugin.json`, this file, `session-handoff.md`). Current 11-skill roster: **Build**
+> — `inb-ads-campaign-build`, `inb-ads-rsa-copy`; **Optimize** — `inb-ads-search-term-analyse`,
+> `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`, `inb-ads-display-placement-audit`; **Standalone** —
+> `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-context-publish`, `inb-ads-client-brief`,
+> `inb-ads-onboarding-analysis`. Dated notes below name the now-removed skill as part of the live
+> roster/flow as it was at the time — kept verbatim as historical record; do not retro-edit them.
 
 > **2026-07-01 — skill rename: `inb-ads-context-update` → `inb-ads-client-brief`.** Same skill, reframed so its PRIMARY job is the project-manager client brief (who the client is, recent work/agreements, current status, open threads); the on-demand AI-Context-file update is the secondary half. Directory `git mv`'d (history preserved), `name:` + description + intro rewritten to lead with the brief and carry Danish triggers ("brief mig på [kunde]", "klientoverblik på [kunde]", "hvad er nyt på [kunde]", "opdatér kontekst på [kunde]"). Live surfaces synced: `plugin.json`, `README.md`, repo-root `CLAUDE.md` (roster line + capability table), `drive-knowledge` agent, sibling `inb-ads-context-publish` cross-refs, `section-contract.md` self-ref, and the current-state block in `session-handoff.md`. Roster count unchanged at 12. NB: the dated notes below (and `session-handoff.md`'s earlier dated entries) still name `inb-ads-context-update` as it was at the time — kept verbatim as historical record; do not retro-edit them. `.claude-plugin/marketplace.json`'s plugin blurb is separately stale (still lists pre-merge slugs like `kontekst-opdater`/`ai-context-publish`) — flagged, not fixed here.
 
