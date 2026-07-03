@@ -54,13 +54,24 @@ Output JSON schema (scored.json): same placements, each with an added "score" bl
   ...original fields...,
   "score": {
     "total": 0-100,
-    "band": "high" | "unsure" | "low",
+    "band": "hard_exclusion" | "high" | "unsure" | "low",
     "signals": ["blocklist:gambling", "risky_tld:.top", ...],
-    "already_excluded": true/false
+    "already_excluded": true/false,
+    "hard_exclusion_reason": "hard_domain_list" | "hard_keyword" | "hard_foreign_tld" |
+                              "hard_non_latin_script"   (only present when band == "hard_exclusion")
+    "hard_exclusion_category": "gaming_portal" | "kids" | "mfa_quiz" | ... | the matched
+                                 keyword/TLD/script name   (only present when band == "hard_exclusion")
   }
 }
 Placements already on an existing negative list are still scored (for transparency) but
-flagged already_excluded=true — the skill must never re-propose them.
+flagged already_excluded=true — the skill must never re-propose them. already_excluded takes
+priority over hard-exclusion matching (no point re-deriving a reason for something already gone).
+
+hard_exclusion is Inbound's OWN standing exclusion list (references/hard_exclusions.tsv +
+hard_exclusion_patterns.py), sourced from their internally-used keyword/domain/TLD/script filters
+(2026-07-03). It is a separate, harder tier than the "high" score band: a hard_exclusion match
+bypasses scoring and the web-search step entirely and goes straight to "anbefales fjernet" in the
+report, because it reflects a client-confirmed rule, not this skill's own probabilistic judgment.
 """
 
 import argparse
@@ -70,7 +81,12 @@ import sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-JUNK_DOMAINS_PATH = SCRIPT_DIR.parent / "references" / "junk_domains.tsv"
+REFERENCES_DIR = SCRIPT_DIR.parent / "references"
+JUNK_DOMAINS_PATH = REFERENCES_DIR / "junk_domains.tsv"
+HARD_EXCLUSIONS_PATH = REFERENCES_DIR / "hard_exclusions.tsv"
+
+sys.path.insert(0, str(REFERENCES_DIR))
+import hard_exclusion_patterns as hard_patterns  # noqa: E402
 
 RISKY_TLDS = {
     ".top", ".xyz", ".icu", ".club", ".online", ".cfd", ".sbs",
@@ -108,13 +124,15 @@ WEIGHT_RISKY_TLD = 20
 WEIGHT_APP_NETWORK = 15        # lowered from 20 — real signal, but shouldn't alone read as "junk"
 
 
-def load_junk_domains():
+def load_domain_list(path, label, has_header=False):
     """Returns {domain: category}. Missing file degrades to empty dict, never crashes."""
-    if not JUNK_DOMAINS_PATH.exists():
-        print(f"WARNING: {JUNK_DOMAINS_PATH} not found — blocklist signal disabled", file=sys.stderr)
+    if not path.exists():
+        print(f"WARNING: {path} not found — {label} signal disabled", file=sys.stderr)
         return {}
     domains = {}
-    with open(JUNK_DOMAINS_PATH, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
+        if has_header:
+            next(f, None)
         for line in f:
             line = line.rstrip("\n")
             if not line or "\t" not in line:
@@ -122,6 +140,14 @@ def load_junk_domains():
             domain, category = line.split("\t", 1)
             domains[domain.strip().lower()] = category.strip()
     return domains
+
+
+def load_junk_domains():
+    return load_domain_list(JUNK_DOMAINS_PATH, "blocklist")
+
+
+def load_hard_exclusion_domains():
+    return load_domain_list(HARD_EXCLUSIONS_PATH, "hard-exclusion", has_header=True)
 
 
 def root_domain_candidates(domain):
@@ -151,6 +177,35 @@ def check_risky_tld(domain):
     for tld in RISKY_TLDS:
         if domain.endswith(tld):
             return tld
+    return None
+
+
+def check_hard_exclusion(domain, display_name, hard_exclusion_domains):
+    """
+    Returns a (reason_code, category) tuple if this placement matches Inbound's own standing
+    exclusion list (references/hard_exclusions.tsv + hard_exclusion_patterns.py), else None.
+    This is a CLIENT-CONFIRMED list, not this skill's own heuristic — a match here bypasses
+    scoring entirely (see band_for_score) rather than adding to a score, because Inbound has
+    already decided these categories are unwanted, independent of any individual placement's
+    performance or context.
+    """
+    for candidate in root_domain_candidates(domain):
+        if candidate in hard_exclusion_domains:
+            return ("hard_domain_list", hard_exclusion_domains[candidate])
+
+    combined = f"{domain} {display_name or ''}"
+    kw = hard_patterns.matches_keyword(combined)
+    if kw:
+        return ("hard_keyword", kw)
+
+    tld = hard_patterns.matches_foreign_tld(domain)
+    if tld:
+        return ("hard_foreign_tld", tld)
+
+    script = hard_patterns.matches_non_latin_script(combined)
+    if script:
+        return ("hard_non_latin_script", script)
+
     return None
 
 
@@ -188,7 +243,7 @@ def score_placement(p, junk_domains):
     return score, signals
 
 
-def band_for_score(score, signals, high_threshold):
+def band_for_score(score, signals, high_threshold, hard_exclusion=None):
     """
     Banding is recall-biased by design (explicit user direction, 2026-07-01): a placement with
     ANY signal at all — even a single weak one — must NOT land in "low" silently. Better a large
@@ -201,7 +256,13 @@ def band_for_score(score, signals, high_threshold):
     it silently cleared into "low" with no human ever looking at it. There is deliberately no
     "low_threshold" parameter anymore — a single flimsy signal downgrades confidence (it's
     "unsure", not "high"), it does not disappear the placement.
+
+    A hard_exclusion match (2026-07-03: Inbound's own standing exclusion list) always wins over
+    everything else, regardless of score — it is a client-confirmed rule, not a heuristic, so
+    there is nothing left to weigh it against.
     """
+    if hard_exclusion:
+        return "hard_exclusion"
     if score >= high_threshold:
         return "high"
     if not signals:
@@ -228,14 +289,21 @@ def main():
         data = json.load(f)
 
     junk_domains = load_junk_domains()
+    hard_exclusion_domains = load_hard_exclusion_domains()
     already_excluded = set(d.lower() for d in data.get("already_excluded", []))
 
     scored = []
     for p in data.get("placements", []):
         domain = (p.get("domain") or p.get("display_name") or "").lower()
-        score, signals = score_placement(p, junk_domains)
-        band = band_for_score(score, signals, args.high_threshold)
+        display_name = p.get("display_name") or ""
         is_excluded = any(candidate in already_excluded for candidate in root_domain_candidates(domain))
+
+        hard_hit = None
+        if not is_excluded:
+            hard_hit = check_hard_exclusion(domain, display_name, hard_exclusion_domains)
+
+        score, signals = score_placement(p, junk_domains)
+        band = band_for_score(score, signals, args.high_threshold, hard_exclusion=hard_hit)
 
         p_out = dict(p)
         p_out["score"] = {
@@ -244,6 +312,9 @@ def main():
             "signals": signals,
             "already_excluded": is_excluded,
         }
+        if hard_hit:
+            p_out["score"]["hard_exclusion_reason"] = hard_hit[0]
+            p_out["score"]["hard_exclusion_category"] = hard_hit[1]
         scored.append(p_out)
 
     # Rank the "unsure" band by SPEND, cost-first (2026-07-03 direction): the expert's — and the
@@ -258,6 +329,7 @@ def main():
 
     summary = {
         "total_placements": len(scored),
+        "hard_exclusion_band": sum(1 for p in scored if p["score"]["band"] == "hard_exclusion"),
         "high_band": sum(1 for p in scored if p["score"]["band"] == "high"),
         "unsure_band": len(unsure),
         "unsure_eligible_for_lookup": min(len(unsure), args.tier3_cap),
@@ -274,7 +346,8 @@ def main():
         json.dump({"summary": summary, "placements": scored}, f, indent=2, ensure_ascii=False)
 
     print(f"Scored {summary['total_placements']} placements -> {args.outfile}", file=sys.stderr)
-    print(f"  high={summary['high_band']} unsure={summary['unsure_band']} "
+    print(f"  hard_exclusion={summary['hard_exclusion_band']} high={summary['high_band']} "
+          f"unsure={summary['unsure_band']} "
           f"(eligible for lookup: {summary['unsure_eligible_for_lookup']}, "
           f"needs manual review: {summary['unsure_needs_manual_review']}) "
           f"low={summary['low_band']} already_excluded={summary['already_excluded_count']}", file=sys.stderr)

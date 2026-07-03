@@ -59,6 +59,18 @@ Høj-grænsen (70) og loftet (15-20) er parametre eksperten kan justere per kør
 denne gang"), ikke faste konstanter. Der er bevidst intet separat "lav-grænse"-parameter — "lav"
 betyder nu udelukkende "nul signaler".
 
+**Redesign 2026-07-03, del 2 — hårdt ekskluderingslag + kortere output.** Efter det første
+redesign (over) kom to yderligere justeringer, samme dag: (1) Inbound har selv en manuel
+ekskluderingsliste de bruger én-to gange om måneden på tværs af klienter (kilde: intern Doc +
+regneark) — den er nu bundlet direkte i skillet som et fjerde, hårdere bånd
+(`references/hard_exclusions.tsv` + `references/hard_exclusion_patterns.py`, se Trin 3's
+"Hårdt ekskluderingslag"), der springer scoring og websøg helt over fordi det er et
+klient-bekræftet valg, ikke en heuristik. (2) Standard-rapporten er gjort markant kortere — kun
+"anbefales fjernet" og "værd at kigge på" som tabeller med domæne/forbrug/klik/konv/kort-hvorfor,
+ingen prosa-konklusion, ingen PMax/allerede-håndteret-sektioner medmindre eksperten selv beder om
+uddybning (se Trin 5). Begrundelsen er brugsmønsteret: skillet køres én-to gange om måneden af en
+ekspert der vil se hvad der skal handles på, ikke læse en rapport.
+
 **Ingen permanent negativliste bygges af dette skill.** Blocklisten, TLD-reglerne og
 scoringslogikken bor bundlet i skillet (`references/junk_domains.tsv`), ikke skrevet til en delt
 Google Ads shared_set automatisk. Hver kørsel er selvstændig: læser 90 dages data, scorer med
@@ -189,6 +201,10 @@ python3 ${CLAUDE_SKILL_DIR}/scripts/score_placements.py \
 
 Scriptet gør præcis dette og intet mere (samme filosofi som `slim.py` i
 `inb-ads-search-term-analyse` — koden regner, modellen dømmer):
+- **Tjekker først Inbound's eget hårde ekskluderingskatalog** (`references/hard_exclusions.tsv` +
+  `references/hard_exclusion_patterns.py` — se "Hårdt ekskluderingslag" nedenfor). Et match her
+  ("hard_exclusion"-bånd) springer HELE resten af scoringen over og går direkte til "anbefales
+  fjernet" — intet websøg, ingen tvivl, fordi Inbound selv allerede har besluttet kategorien.
 - Matcher hvert domæne mod det bundlede `references/junk_domains.tsv` (~9.834 domæner, gambling +
   MFA/clickbait-proxy + scam, kilder og licens i `references/junk_domains_SOURCES.md`).
 - Flager risikable TLD'er (`.top .xyz .icu .club .online .cfd .sbs .bond .win .rest .mom .cn`).
@@ -196,7 +212,8 @@ Scriptet gør præcis dette og intet mere (samme filosofi som `slim.py` i
 - Flager al app-netværk-trafik som strukturelt risikabel (uanset det enkelte site/apps kvalitet —
   små skærme + spil-UI'er giver ved-et-uheld-klik).
 - Krydstjekker mod de allerede-ekskluderede fra Trin 2 (sætter `already_excluded: true` — foreslå
-  aldrig noget der allerede er blokeret).
+  aldrig noget der allerede er blokeret; går forud for hård-ekskludering, ingen grund til at
+  genudlede en årsag for noget der allerede er væk).
 - Sorterer den usikre gruppe efter FORBRUG (ikke score) og markerer hvilke der er inden for
   tier-3-loftet — cost-first, se "Redesign 2026-07-03" i Baggrund.
 
@@ -206,9 +223,46 @@ konverterer dårligere end Search. At score på det producerede falske positiver
 sites (bt.dk, proff.no) i en live-test. Scriptet dømmer kun sitet selv, aldrig hvordan det
 performede.
 
-Læs `scored.json`. Høj-bånd behøver intet websøg (allerede afgjort af stærke signaler). Lav-bånd
+Læs `scored.json`. Hård-ekskludering behøver intet websøg (Inbound har allerede afgjort
+kategorien). Høj-bånd behøver heller intet websøg (allerede afgjort af stærke signaler). Lav-bånd
 betyder nu udelukkende "nul signaler ramte" — intet at gennemgå, intet websøg. Al reel tvivl, selv
 fra ét enkelt svagt signal, lander i den usikre gruppe — det er dér arbejdet foregår.
+
+### Hårdt ekskluderingslag — Inbound's eget standing filter, ikke skillets heuristik
+
+Inbound har selv brugt en manuel ekskluderingsliste én til to gange om måneden på tværs af
+klienter (kilde: intern Doc + regneark, indlæst 2026-07-03). Den er bundlet i skillet som to filer:
+
+- **`references/hard_exclusions.tsv`** — 191 konkrete domæner i kategorier som gaming-portaler,
+  børneindhold, MFA-quiz/listicle/opskrift/kupon/content-farm-sites, dating-sites, sports-medier,
+  parkerede domæner. Inkluderer bevidst også store, kendte platforme (twitch.tv, roblox.com,
+  pinterest.com, medium.com, wordpress.com, wix.com, espn.com, tinder.com, dictionary.com, msn.com,
+  vimeo.com m.fl.) — det ER Inbound's eget valg, ikke en fejl. Se filens header-kommentar hvis
+  denne liste nogensinde skal genovervejes.
+- **`references/hard_exclusion_patterns.py`** — tre yderligere matchtyper fra samme kilde:
+  1. **Nøgleord** ("børn", "spil", "gaming", "game", "quiz", "kid(s/z)", "barn", ".io") —
+     contains-match, case-insensitive, mod domæne + display_name.
+  2. **Fremmede TLD'er** (~170 landekoder fra Inbound's liste) — exact-suffix match. `.dk .se .no
+     .fi .de .uk .com .net .org` er bevidst UNDTAGET denne liste (selv om nogle af dem er
+     landekoder) for ikke at gentage bt.dk/proff.no-fejlen — Nordisk/target-market-trafik er
+     forventet, ikke mistænkelig.
+  3. **Ikke-latinske skrifttegn** (11 alfabeter fra kildedokumentet: Hindi/Marathi Devanagari,
+     Arabisk, Bengali, Kyrillisk, Urdu, Japansk Hiragana/Katakana, Telugu, Koreansk Hangul, Tamil)
+     — matcher ét enkelt tegn i domæne eller display_name.
+
+Denne liste er BEVIDST adskilt fra det almindelige `junk_domains.tsv`-blocklist-signal: den
+almindelige blocklist er skillets egen, generelle heuristik (probabilistisk, går ind i scoringen).
+Det hårde lag er Inbound's EGET, klient-bekræftede standing-valg — derfor omgår det scoring helt i
+stedet for at lægge point til. Bland aldrig de to lag sammen.
+
+**Kendt, bevidst hul — "High-Cost Low-Performance":** kildearket (dateret feb. 2026) nævner også
+en kategori for dyre, høj-CPM premium-medier med lav ROI for direkte annoncører (arket navngiver
+selv NYT og CNN som eksempler) — MEN med en eksplicit note om at disse kun bør ekskluderes hvis
+kunden er budget-bevidst og IKKE kører brand-awareness-kampagner. Det er en kontekstafhængig
+afvejning, ikke et junk-signal, og hører derfor ALDRIG hjemme i det hårde lag selv hvis en konkret
+domæneliste dukker op senere — den skal i så fald ind som et separat, blødt scoringssignal (lander
+i "usikker" til et menneskeligt kald), aldrig som en automatisk fjernelse. Ingen domæneliste for
+denne kategori er modtaget endnu (2026-07-03) — byg ikke en op af gæt.
 
 **Sidste sikkerhedsnet, billigt og uden opslag:** før du skriver rapporten, kast et hurtigt blik
 over lav-bånd-listen (den skal jo vises kort i rapporten alligevel). Springer et domænenavn i
@@ -244,7 +298,7 @@ eller `"gambling_keyword_in_domain"` i `signals`, tilføj dem til websøgs-runde
 
 ## Trin 5 — Byg den rangerede rapport (i chatten, ikke .xlsx som default)
 
-**Output er en markdown-tabel i selve chat-svaret, ikke en fil.** Byg kun en `.xlsx` hvis brugeren
+**Output er markdown i selve chat-svaret, ikke en fil.** Byg kun en `.xlsx` hvis brugeren
 eksplicit beder om det (typisk fordi de vil sende den til en kunde til godkendelse — en anden
 brugssituation end den interne ekspert-gennemgang dette skill primært er til).
 
@@ -252,93 +306,91 @@ brugssituation end den interne ekspert-gennemgang dette skill primært er til).
 "criterion_id", "score" som begreb, eller navne som `zero_conv_at_spend`. De ved hvad en placering
 er, hvad gambling/klikfarme er, og hvad de vil gøre ved dem: ekskludere eller lade være. Rapporten
 skal læses som en kollegas anbefaling, ikke som et system-output — **ingen interne signalnavne,
-ingen "Score"-tal som selvstændig kolonne, ingen "unikke placering×kampagne-kombinationer"-sprog.**
-Hvis du skriver en sætning en marketingmedarbejder ville spørge "hvad betyder det?" til, omskriv den.
+ingen "Score"-tal som selvstændig kolonne.** Hvis du skriver en sætning en marketingmedarbejder
+ville spørge "hvad betyder det?" til, omskriv den.
 
-Grupér efter **hvorfor** en placering er et problem, ikke efter det interne score-bånd. Brug almindeligt
-sprog for kategorien (gambling/spil, mistænkelige småsider, pakke-sporing/støj, osv.) og lad
-score/signaler blive til den bagvedliggende BEGRUNDELSE i prosa — aldrig en synlig kolonne.
+### Standard-output er BARE, ikke det fulde skema (redesign 2026-07-03)
 
-### Fast rapport-skabelon (brug PRÆCIS disse 5 sektioner, i denne rækkefølge, altid)
-
-Dette er ikke et løst eksempel — det er den bindende struktur. Samme overskrifter, samme
-rækkefølge, samme emoji, hver gang, uanset klient eller kørsel. Konsistens på tværs af kørsler
-betyder mere end at finpudse ordlyden per gang; en ekspert der kører skillet på flere klienter skal
-kunne genkende rapporten uden at læse den forfra hver gang.
-
-**Global regel for alle 5 sektioner:** flere placering×kampagne-rækker på SAMME domæne slås sammen
-til ÉN linje i rapporten (læg forbrug sammen, nævn "flere kampagner" hvis relevant) — vis aldrig
-samme domæne to gange i samme sektion. Domænet er hvad eksperten handler på, ikke rækken.
+**Default er kort.** Eksperten kører dette skill én-to gange om måneden og vil se hvad der skal
+fjernes og hvad der er tvivlsomt — ikke en afhandling. Vis KUN to sektioner som standard:
 
 ```markdown
 ## Display-placement-audit — <klient> — <vindue>
 
-**Kort sagt:** annoncerne har vist sig på <N> forskellige steder i perioden. <M> af dem bør I
-overveje at fjerne — <kort hvorfor, fx "gambling-sider og useriøse klikfarme">. Resten er enten
-fint, eller I har allerede blokeret det.
+### 🚫 Anbefales fjernet (<N> steder, <samlet forbrug> kr)
+| Sted | Forbrug | Klik | Konv | Hvorfor |
+|---|---|---|---|---|
+| **<domæne>** | <forbrug> kr | <klik> | <konv> | <3-6 ord, fx "på Inbounds gaming-liste"> |
 
-### 🚫 Anbefales fjernet — <N> steder, <samlet forbrug> kr
-Placeringer hvor et lokalt signal ELLER et websøg gjorde konklusionen tydelig nok til at anbefale
-en handling. Grupér i almindeligt-sprog-underkategorier (gambling/spil, content-farme/klikfarme,
-useriøse apps, osv.) — ikke efter score.
+### 🤔 Værd at kigge på (<N> steder, <samlet forbrug> kr)
+| Sted | Forbrug | Klik | Konv | Hvorfor |
+|---|---|---|---|---|
+| **<domæne>** | <forbrug> kr | <klik> | <konv> | <3-6 ord, fx "risikabel endelse, ikke websøgt"> |
 
-Gambling og spil
-- **<domæne>** — <hvad det er, én linje, fx "dansk lotteri-side">. <forbrug> kr brugt, <konv> konv.
-
-Useriøse/content-farme
-- **<domæne>** — <hvad det er>. <forbrug> kr brugt, <konv> konv.
-- (Er der mange ens content-farm-fund: "+N steder til på samme mønster (`.top`/`.xyz`-endelser),
-  se den fulde liste hvis I vil have alle med i skrivningen" — men navngiv altid mindst de 3-5
-  dyreste enkeltvis, saml aldrig ALT under ét "+N til".)
-
-### 🤔 Værd at kigge på — <N> steder, <samlet forbrug> kr
-Reelt tvetydige tilfælde: et svagt signal (fx en risikabel endelse) uden et bekræftende websøg,
-enten fordi websøget var inkonklusivt ELLER fordi placeringen lå uden for opslags-loftet. Eksperten
-tager stilling, ikke skillet.
-- **<domæne>** — <kort hvorfor det er tvivlsomt, og om det blev websøgt eller ej>. <forbrug> kr.
-- (Placeringer under loftet, aldrig websøgt: saml dem i én linje "+N steder til, samme
-  navnemønster men ikke websøgt (under loft) — se fuld liste ved behov", medmindre en enkelt af
-  dem har mærkbart forbrug og fortjener sin egen linje.)
-
-### ✅ Ingen problemer fundet ELLER allerede korrekt vurderet legitimt
-To slags rækker samlet i én sektion — begge betyder "ingen handling":
-- **Normal trafik** (langt de fleste): "<N> steder havde intet mistænkeligt at bemærke — normal
-  Display-trafik, ingen handling. Samlet forbrug: <sum> kr."
-- **Bekræftede falske alarmer** (websøgt og renset): navngiv dem individuelt, aldrig kun i summen,
-  fordi de så ellers ligner et gæt: "**<domæne>** — så mistænkeligt ud pga. <hvorfor>, men et
-  websøg viste <hvad det faktisk er>. Anbefales IKKE fjernet."
-
-### ⚠️ Kan ikke fjernes automatisk (Performance Max)
-Performance Max-annoncer viser desværre ikke hvilke sider de kører på med samme detalje, og
-Google tillader ikke at blokere specifikke sider på PMax-kampagner. Vi kan ikke gøre noget ved
-dette teknisk — kun nævne det hvis noget virker påfaldende. Ingen PMax-data denne kørsel er en
-gyldig, forventet tilstand — sig det som en kendsgerning, ikke en fejl: "Performance Max indgår
-ikke i denne visning (platform-begrænsning)."
-
-### Allerede håndteret
-I har allerede blokeret <N> steder på denne konto tidligere (fx en liste kaldet "Web
-placeringer"). De optræder ikke igen ovenfor. Hvis overlap mellem jeres eksisterende
-eksklusioner og periodens faktiske trafik er lavt (de fleste blokerede domæner/kanaler dukker
-slet ikke op i perioden), sig det ligeud — det er en normal og forventet observation, ikke et
-problem: "Jeres eksisterende blokeringer og periodens trafik overlapper kun på <N> sted(er) — det
-er forventeligt, blokeringerne dækker typisk andre kanaler end dem der er aktive lige nu."
+Bekræft de <N> fjernelser for at skrive dem til kontoen, eller sig til hvis du vil justere listen
+eller se flere detaljer.
 ```
 
-**Under de 5 sektioner, altid, i denne rækkefølge:**
-1. En kort dansk konklusion i 2-4 sætninger, almindeligt sprog — de vigtigste mønstre, samlet
-   forbrug i "anbefales fjernet", og at børneindhold er et kendt blindt punkt vi ikke kan opdage
-   automatisk endnu (skriv DET som "vi kan endnu ikke opdage børneindhold automatisk", ikke som en
-   teknisk fodnote om manglende datasæt).
-2. Én sætning om hvor mange placeringer der blev slået op via websøg vs. hvor mange der ligger
-   uverificeret pga. loftet (samme tal som i "værd at kigge på", men sagt i ord: "Vi har slået de
-   <M> dyreste tvivlsomme steder op enkeltvis; resten (<K> steder, tilsammen <sum> kr) har samme
-   mistænkelige navnemønster men er ikke tjekket enkeltvis endnu.").
-3. **Eksperten redigerer her, i chatten** — fjern rækker, flyt noget fra "værd at kigge på" til
-   "fjern det", eller omvendt. Skillet foreslår; mennesket dømmer den endelige liste.
+Det er hele default-svaret. Ingen indledende "Kort sagt"-afsnit, ingen "Ingen problemer
+fundet"-sektion, ingen PMax-afsnit, ingen "Allerede håndteret"-afsnit, ingen afsluttende
+konklusion i prosa — kun de to tabeller plus én linje der beder om bekræftelse. "Hvorfor"-kolonnen
+er PRÆCIS nok til at eksperten kan handle (kategori-navn, kort begrundelse), aldrig en hel sætning.
 
-**Ingen sektion droppes, selv når den er tom.** Er der fx ingen PMax-data, eller nul allerede
-håndterede overlap, skriv sektionen alligevel med den ærlige "0/ingen"-besked (se skabelon-teksten
-ovenfor) — en manglende sektion ligner en fejl, en sektion der siger "ingen fund her" er tydelig.
+**"Anbefales fjernet" inkluderer BÅDE hard_exclusion- og high-bånd** i samme tabel — begge er
+allerede besluttede, forskellen (Inbounds egen liste vs. skillets scoring) er en implementeringsdetalje
+eksperten ikke behøver se i default-visningen. Brug "Hvorfor"-kolonnen til at antyde kilden kort
+("på Inbounds ekskl.-liste" vs. "blocklist-match") kun hvis det er nyttigt, ellers bare kategorien.
+
+**"Værd at kigge på" viser KUN dem der reelt kræver et menneskeligt blik** — dvs. `tier3_eligible`
+(blev websøgt) ELLER blocklist/gambling-keyword-hits der sprang køen (se Trin 4). Placeringer i
+"unsure" der ligger under loftet og ALDRIG blev websøgt, samles i én linje for sig i bunden af
+samme tabel: "+<K> steder til, samme mønster men ikke tjekket enkeltvis (under loft), tilsammen
+<sum> kr — spørg om fuld liste hvis relevant." Drop dem aldrig helt, men lad dem heller ikke fylde
+tabellen ud enkeltvis.
+
+**Global regel:** flere placering×kampagne-rækker på SAMME domæne slås sammen til ÉN linje (læg
+forbrug sammen) — vis aldrig samme domæne to gange.
+
+### Uddybet visning — kun når eksperten selv beder om det
+
+Triggerord: "uddyb", "mere detaljer", "hvorfor er de her", "vis mig alt", "hvad med PMax/allerede
+håndteret", eller en direkte forespørgsel om ét specifikt domæne. Byg da den fulde 5-sektions
+rapport (nedenfor) — men KUN de sektioner der faktisk blev efterspurgt, medmindre eksperten
+eksplicit vil have hele skemaet ("vis mig alt" / "uddyb hele rapporten").
+
+Den fulde skabelon, samme struktur som før redesignet, brugt on-demand:
+
+```markdown
+### 🚫 Anbefales fjernet — uddybet
+Grupér i almindeligt-sprog-underkategorier (gambling/spil, content-farme/klikfarme, Inbounds
+standing-liste-kategorier, osv.). For hver: domæne, hvad det er (1 linje), forbrug, konv, og
+KILDEN til flaget (Inbounds ekskluderingsliste vs. blocklist vs. websøgt).
+
+### 🤔 Værd at kigge på — uddybet
+For hver: hvorfor tvivlsom, blev den websøgt eller ej, og hvad websøget i så fald viste.
+
+### ✅ Ingen problemer fundet ELLER allerede korrekt vurderet legitimt
+- **Normal trafik**: "<N> steder havde intet mistænkeligt at bemærke — normal Display-trafik,
+  ingen handling. Samlet forbrug: <sum> kr."
+- **Bekræftede falske alarmer** (websøgt og renset): navngiv dem individuelt: "**<domæne>** — så
+  mistænkeligt ud pga. <hvorfor>, men et websøg viste <hvad det faktisk er>. Anbefales IKKE fjernet."
+
+### ⚠️ Kan ikke fjernes automatisk (Performance Max)
+Performance Max-annoncer viser desværre ikke hvilke sider de kører på med samme detalje, og Google
+tillader ikke at blokere specifikke sider på PMax-kampagner. Ingen PMax-data denne kørsel er en
+gyldig, forventet tilstand: "Performance Max indgår ikke i denne visning (platform-begrænsning)."
+
+### Allerede håndteret
+"Jeres eksisterende blokeringer og periodens trafik overlapper kun på <N> sted(er) — det er
+forventeligt, blokeringerne dækker typisk andre kanaler end dem der er aktive lige nu." (Lavt
+overlap er normalt, ikke et problem — sig det ligeud.)
+```
+
+De to ærlige forbehold (børneindhold ikke automatisk detekteret; ikke al gambling fanges) nævnes
+KUN i den uddybede visning, ikke i default-svaret — de er kontekst, ikke handling.
+
+**Eksperten redigerer altid i chatten** — fjern rækker, flyt noget mellem sektionerne, uanset om
+det er default- eller uddybet visning. Skillet foreslår; mennesket dømmer den endelige liste.
 
 ## Trin 6 — Bekræft, så skriv (human-in-the-loop, ingen undtagelse)
 
@@ -401,59 +453,47 @@ Lever, i almindeligt sprog (samme regel som Trin 5 — ingen interne termer):
    fra jeres Google Ads-konto (placeringsrapporten for perioden) og krydstjekket mod jeres
    eksisterende blokeringer, så I ikke får de samme forslag to gange."
 
-## Eksempel-output (fra live-verificering, DBI, kørt 2026-07-03 med det faste skabelon)
+## Eksempel-output (baseret på live-verificering, DBI, med det korte default-skabelon)
 
-Alle 5 sektioner er med, i den faste rækkefølge, også der hvor der ikke var noget at rapportere
-(Performance Max, Allerede håndteret) — det er skabelonens pointe, ikke noget der udelades for at
-holde svaret kort.
+**Default-svaret** — kun de to tabeller, ingen prosa:
 
 ```
-Display-placement-audit klar — DBI, sidste 90 dage.
+## Display-placement-audit — DBI — sidste 90 dage
 
-Kort sagt: annoncerne har vist sig på ~9.300 forskellige steder i perioden. 15 af dem bør I
-overveje at fjerne — gambling-/lotteri-sider og useriøse content-farme. Resten er enten fint,
-eller allerede blokeret.
+### 🚫 Anbefales fjernet (18 steder, ~145 kr)
+| Sted | Forbrug | Klik | Konv | Hvorfor |
+|---|---|---|---|---|
+| **nlcbplaywhelotto.com** | 0,6 kr | 0 | 0 | lotteri-side (gambling-nøgleord) |
+| **lottosociety.com** | 0 kr | 0 | 0 | lotteri-side (gambling-nøgleord) |
+| **tippetips.info** | 3,9 kr | 0 | 0 | betting-tips (gambling-nøgleord) |
+| **enjoygrid.top** | 39,5 kr | 3 | 0 | content-farm, risikabel endelse |
+| **pastimehub.top** | 14,1 kr | 1 | 0 | content-farm, risikabel endelse |
+| **poiy.online** | 10,2 kr | 1 | 0 | content-farm, risikabel endelse |
+| **promocodes.club** | 10,5 kr | 0 | 0 | content-farm, risikabel endelse |
+| **friv.com** | 8,2 kr | 2 | 0 | på Inbounds ekskl.-liste (gaming) |
+| **kizi.com** | 4,1 kr | 0 | 0 | på Inbounds ekskl.-liste (kids) |
+| **randomsite.ru** | 2,0 kr | 0 | 0 | på Inbounds ekskl.-liste (fremmed TLD) |
+| +8 steder til, samme mønster (.top/.xyz/.club-endelser), tilsammen ~53 kr | | | | |
 
-🚫 Anbefales fjernet (15 steder, ~131 kr brugt):
-Gambling og spil
-- nlcbplaywhelotto.com — lotteri-resultatside, Trinidad & Tobago. 0,6 kr, 0 konv.
-- lottosociety.com — thailandsk aktie-lotteri-side. 0 kr, 0 konv.
-- tippetips.info — norsk betting-tips-side. 3,9 kr, 0 konv.
+### 🤔 Værd at kigge på (12 steder, ~64 kr)
+| Sted | Forbrug | Klik | Konv | Hvorfor |
+|---|---|---|---|---|
+| **bestenrezepte.top** | 22 kr | 4 | 0 | risikabel endelse, websøgt — inkonklusivt |
+| +11 steder til, samme mønster men ikke tjekket enkeltvis (under loft), tilsammen ~42 kr | | | | |
 
-Useriøse content-farme/klikfarker
-- enjoygrid.top — tom content-farm-skabelon, intet reelt indhold. 39,5 kr, 0 konv.
-- pastimehub.top — samme skabelon som enjoygrid.top. 14,1 kr, 0 konv.
-- poiy.online — spundet finans-fyld-indhold på flere underdomæner. 10,2 kr, 0 konv.
-- promocodes.club — generisk rabatkode-side. 10,5 kr, 0 konv.
-- +8 steder til på samme mønster (`.top`/`.xyz`/`.club`-endelser, tomme skabelon-sider),
-  tilsammen ~53 kr — se fuld liste hvis I vil have alle med i skrivningen.
+Bekræft de 18 fjernelser for at skrive dem til kontoen, eller sig til hvis du vil justere listen
+eller se flere detaljer.
+```
 
-🤔 Værd at kigge på (38 steder, ~76 kr brugt):
+**Hvis eksperten beder om uddybning** ("uddyb 'værd at kigge på'"), tilføjes kun den efterspurgte
+sektion, fx:
+
+```
+### 🤔 Værd at kigge på — uddybet
 - bestenrezepte.top — tysk opskrifts-aggregator, lav kvalitet men ikke gambling/scam. Websøgt,
-  inkonklusivt. Jeres kald.
-- +37 steder til, samme mistænkelige navnemønster (`.online`/`.top`-endelser) men ikke websøgt
-  enkeltvis (lå under opslagsloftet, alle under 2 kr hver) — se fuld liste ved behov.
-
-✅ Ingen problemer fundet eller bekræftet legitimt:
-- ~9.250 steder havde intet mistænkeligt at bemærke — normal Display-trafik, ingen handling.
-  Samlet forbrug: 9.751 kr.
-- tipsbladet.dk — så mistænkeligt ud pga. ordet "tips" i navnet, men et websøg viste at det er et
-  etableret dansk fodboldmedie (Better Collective). Anbefales IKKE fjernet.
-- intipseleb.com — samme mønster, viste sig at være et etableret indonesisk kendismedie.
-  Anbefales IKKE fjernet.
-
-⚠️ Performance Max: ingen PMax-data i denne visning (platform-begrænsning) — ikke fordi der intet
-kører, men fordi Google Ads ikke deler placeringsdata for PMax med samme detalje.
-
-Allerede håndteret: jeres tre delte negativlister overlappede kun med periodens faktiske trafik på
-1 sted — det er forventeligt, blokeringerne dækker typisk andre kanaler end dem der er aktive lige
-nu.
-
-Vi har slået de 20 dyreste/mest mistænkelige steder op enkeltvis; resten (38 steder, ~76 kr) har
-samme mistænkelige navnemønster men er ikke tjekket enkeltvis endnu.
-
-Bekræft de 15 anbefalede fjernelser for at skrive dem til kontoen, eller sig til hvis I vil justere
-listen først.
+  inkonklusivt. Jeres kald. 22 kr, 4 klik, 0 konv.
+- +11 steder til, samme mistænkelige navnemønster (.online/.top-endelser) men ikke websøgt
+  enkeltvis (lå under opslagsloftet, alle under 3 kr hver).
 ```
 
 ## Hårde grænser
@@ -464,14 +504,18 @@ listen først.
   kørsel skrives; hvilken delt liste (hvis nogen) er et eksplicit valg eksperten tager per kørsel.
 - Pausede kampagner flages aldrig som et fund — de er bevidste hos Inbound.
 - PMax-fund skrives aldrig — kun forslag, platform-begrænsning.
-- Børneindhold-dækning er ikke påstået — intet gratis signal findes, sig det højt.
+- Børneindhold-dækning er ikke påstået udover det hårde ekskluderingslags kids-kategori — intet
+  komplet gratis signal findes, sig det højt i den uddybede visning.
 - Æ Ø Å altid i alt dansk output — aldrig ASCII-translitteration.
 - Lyv aldrig om en skrivning der ikke skete — mangler write-vejen i MCP'en, sig det og lever det
   manuelle fald-tilbage.
+- Default-rapporten er de to korte tabeller (Trin 5) — udvid aldrig til det fulde 5-sektions-skema
+  medmindre eksperten selv beder om uddybning.
 
 ## Maintenance
 
-- `scripts/score_placements.py` — den eneste deterministiske del. Matcher blocklist, TLD,
+- `scripts/score_placements.py` — den eneste deterministiske del. Tjekker først det hårde
+  ekskluderingslag (Inbounds eget standing filter, se Trin 3), derefter blocklist, TLD,
   gambling-nøgleord, app-flag, allerede-ekskluderet-tjek — bevidst KUN site-signaler, ingen
   performance-signaler (forbrug/konvertering/CTR blev fjernet 2026-07-03, se Baggrund). Ingen
   model-dømmekraft heri; ret aldrig scoringen til at "dømme" i stedet for at signalere, og tilføj
@@ -479,9 +523,17 @@ listen først.
 - `references/junk_domains.tsv` — 9.834 domæner (gambling + MFA-proxy + scam), bygget fra Blocklist
   Project + Steven Black's hosts, begge fri licens. Se `junk_domains_SOURCES.md` for fuld
   proveniens, licenser, og genopfrisknings-kommando. Statisk snapshot, ikke en live feed —
-  genopfrisk med jævne mellemrum.
+  genopfrisk med jævne mellemrum. Dette er skillets EGEN generelle heuristik.
+- `references/hard_exclusions.tsv` + `references/hard_exclusion_patterns.py` — Inbounds EGET,
+  klient-bekræftede standing ekskluderingslag (191 domæner + nøgleord + ~170 fremmede TLD'er +
+  11 ikke-latinske skriftsystemer), indlæst fra en intern Doc + regneark 2026-07-03. Omgår scoring
+  helt (se Trin 3's "Hårdt ekskluderingslag"). Opdatér disse filer direkte hvis Inbound reviderer
+  deres liste — spørg først om nye kategorier skal være hårde ekskluderinger eller almindelige
+  scoringssignaler, bland aldrig de to lag sammen uden eksplicit brugervalg (se
+  "Mainstream rows"-beslutningen 2026-07-03: hele Inbounds liste, inkl. store platforme som
+  twitch.tv/roblox.com, blev bevidst gjort til et hårdt match, ikke et scoringssignal).
 - Får Google Ads MCP'en en dedikeret negative-placement write-værktøj: opdatér Trin 6's
   platform-hul-sektion til at bruge den direkte i stedet for det manuelle fald-tilbage.
 - Bevidst ingen: automatisk delt-liste-bygning, xlsx som default-output, gæt på
-  kampagne-vs-delt-liste-niveau. Det er eksplicitte valg fra brugeren om at bevare menneskelig
-  kontrol her — automatisér dem ikke.
+  kampagne-vs-delt-liste-niveau, fuld 5-sektions-rapport som default. Det er eksplicitte valg fra
+  brugeren om at bevare menneskelig kontrol og kort output — automatisér/udvid dem ikke.
