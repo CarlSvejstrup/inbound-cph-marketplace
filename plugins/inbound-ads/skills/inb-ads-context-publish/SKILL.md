@@ -65,6 +65,16 @@ Include a `Sidst opdateret` line at top. Mark NEEDS-PICK HubSpot rows and skippe
 
 Some Drive folders are not writable by the connector (e.g. Rikke's "AI - Google ads 🤖" returned a generic internal error on every create). If a target folder rejects writes, surface it and ask for an alternative rather than keep retrying.
 
+#### Adding ONE new client to an already-published master index (the common single-client case)
+
+When the master `client-index` Doc already exists (currently `1EVC4h1KAhr8EoAGDQxU8gFxCsnv9_n9TJ5uCWVc_KjA`) and you only need to add one new client's row, you CANNOT re-create the Doc (create-once). The index is a **native Google Docs table** in a converted `.md` Doc, so:
+
+- **`insertText` at a row-boundary index does NOT work** — the connector counts indices through table cells, so any index lands *inside* a cell and splits an existing row's content (e.g. it once split a client's AI Context URL in half). **Do not use `insertText` to add a row.** If you already did and mangled a cell, repair it with `findAndReplaceInDoc` matching a fragment *within a single cell* (no `|` chars — `|` are rendered cell borders, not literal text, so any find-string containing `|` returns 0 matches).
+- **`findAndReplaceInDoc` cannot add a row either** — it can't match across cell borders. Use it only for in-cell repairs.
+- **The supported path is `editTableCell` into a pre-existing empty row at the bottom of the table.** Get the row layout from `getGoogleDocContent` (empty rows render as `|  |  |  |  |  |  |  |  |`). The table's `tableStartIndex` is the index where the header row begins (the `| Klient | ...` line). Row 0 = header, row 1 = the `| --- |` separator, rows 2..N = client rows; the first empty row is the next index. Fill all 8 columns of that row via `editTableCell` (one call per `columnIndex` 0-7): `Klient | Google Ads ID | HubSpot ID | ClickUp folder | Stage | Drive-mappe | AI Context-fil | Noter`. Then re-read to verify the row landed in one clean row with no cell split, and no existing row was overwritten.
+- **If there are no empty rows left**, do NOT try to grow the table (the connector has no insert-row tool). STOP and tell the user: "The master index table is full — please add a few empty rows at the bottom of the Doc, then I'll fill them." **Give the user the Doc link so they can do it** (e.g. `https://docs.google.com/document/d/<index-id>/edit`). Once they've added rows, fill via `editTableCell` as above.
+- Keep the row order convention loose: appending at the bottom empty rows is fine (the table is no longer strictly alphabetical once you append) — the index is a lookup table, not a sorted list. Bump the top `Sidst opdateret` line if you touch it.
+
 ## After the run (Dual-Output)
 
 Log the batch in the vault: a line in today's `daily/YYYY-MM-DD.md`, and if the IDs (HubSpot/ClickUp) were newly resolved, consider persisting them into the client notes' frontmatter (separate task) so the next run doesn't re-resolve. Note any NEEDS-PICK HubSpot rows and leftover-file cleanups in `backlog/inbound-cph.md`.
