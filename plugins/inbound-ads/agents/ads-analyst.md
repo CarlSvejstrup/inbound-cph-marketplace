@@ -6,7 +6,7 @@ description: >-
   competitive/web research. It reads Google Ads data and the web, reasons about
   it, and returns findings and recommendations. It NEVER modifies an account.
   Used by inb-ads-account-audit, inb-ads-search-term-analyse, inb-ads-rsa-hygiene,
-  inb-ads-onboarding-analysis, and the diagnostic half of inb-ads-optimization-loop.
+  inb-ads-onboarding-analysis, and inb-ads-quality-score.
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
 color: cyan

@@ -142,7 +142,7 @@
           "evidence": [
             "De fleste POOR ligger i de store geo-kampagner (IC | GSN | København / Sjælland / Jylland / Hele DK). Eksempel: ad group 'København: Taxa + København' (RSA POOR), 'København: Taxa' (AVERAGE)."
           ],
-          "pointer": "For en fuld per-annonce RSA-gennemgang (dødvægt-assets, vinkel-huller, challenger-tekster): kør inb-ads-optimization-loop / inb-ads-rsa-hygiene. Bemærk: de skills giver mest når kontoen har kørt et stykke tid , på en helt ny konto er der endnu ikke nok serverings-data.",
+          "pointer": "For en fuld per-annonce RSA-gennemgang (dødvægt-assets, vinkel-huller, challenger-tekster): kør inb-ads-rsa-hygiene / inb-ads-quality-score. Bemærk: de skills giver mest når kontoen har kørt et stykke tid , på en helt ny konto er der endnu ikke nok serverings-data.",
           "kind": "judgment"
         }
       ]

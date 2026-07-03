@@ -8,8 +8,8 @@ description: Kører Inbounds 35-punkts Analysearbejdet-tjekliste mod en ny Googl
 Gå **Analysearbejdet (Search)** igennem for en ny Google Ads-kunde og aflever en `.docx`
 opstartsrapport i kundens Drive-mappe. Dette er **onboarding-lagets** analyse-skill: en
 struktur- og hygiejne-gennemgang af en netop overdraget konto, ikke en performance-audit
-(det er `inb-ads-account-audit`) og ikke en optimering af en kørende konto (det er
-`inb-ads-optimization-loop`).
+(det er `inb-ads-account-audit`) og ikke en dyb enkelt-dimensions optimering af en kørende
+konto (det er `inb-ads-search-term-analyse` / `inb-ads-rsa-hygiene` / `inb-ads-quality-score`).
 
 Read-only mod kontoen, altid — ingen mutate, intet API-push. Den eneste eksterne write er
 .docx'en til Drive, gated bag eksplicit bekræftelse. Dommen er struktur/hygiejne, ikke
@@ -136,7 +136,7 @@ Hver sub-agent får: `customer_id`, analysegrundlaget, de relevante punkter + GA
   keywords) må sub-agenten fylde det valgfrie `details`-felt (længere dansk prosa: fordelinger,
   per-ad-group-opdeling, eksempler). Hvor en fuld gennemgang sprænger en opstartsrapport (fx
   per-annonce RSA-hygiejne på hundredvis af annoncer), sæt et `pointer`-felt der henviser til det
-  rette dybde-skill (`inb-ads-optimization-loop` / `inb-ads-rsa-hygiene`), med forbeholdet at de
+  rette dybde-skill (`inb-ads-rsa-hygiene` / `inb-ads-search-term-analyse` / `inb-ads-quality-score`), med forbeholdet at de
   kræver kørselshistorik. `pointer` erstatter ikke et reelt fund — giv altid top-N det værste
   først (fx "5 ad groups på POOR: [navne]"), dernæst pointeren.
 - (d) returnere præcis denne form (det `build_docx.py` læser — `details`/`evidence`/`pointer` er
@@ -148,7 +148,7 @@ Hver sub-agent får: `customer_id`, analysegrundlaget, de relevante punkter + GA
               "finding": "<kort dansk konstatering m. tal>",
               "details": "<valgfri længere prosa: fordeling, per-ad-group, eksempler>",
               "evidence": ["Kampagne 'IC | GSN | Hele DK' › ad group 'Aalborg' › headline 'Bestil taxi til Aaborg' → skal være 'Aalborg'"],
-              "pointer": "<valgfri: for fuld dybde kør inb-ads-optimization-loop (kræver kørselshistorik)>"}]}
+              "pointer": "<valgfri: for fuld dybde kør inb-ads-rsa-hygiene / inb-ads-quality-score (kræver kørselshistorik)>"}]}
   ```
   (`kind` er påkrævet — `lookup` eller `judgment`. Et lookup-punkt ser sådan ud:
   `{"n": 1, "punkt": "Sitelinks: min. 4 på hver kampagne", "status": "ok", "kind": "lookup", "finding": "..."}`.)
@@ -216,7 +216,7 @@ kolonnen er altid tom og udfyldes manuelt.
    vigtigste 3 fund i klartekst.
 3. **Næste skridt:** de kritiske/forbedrings-punkter er råstoffet til den grundlæggende
    optimeringsplan kunden præsenteres for (ClickUps "Det kundevendte"). For en fuld
-   per-annonce RSA-gennemgang: henvis til `inb-ads-optimization-loop` / `inb-ads-rsa-hygiene`
+   per-annonce RSA-gennemgang: henvis til `inb-ads-rsa-hygiene` / `inb-ads-search-term-analyse` / `inb-ads-quality-score`
    (kræver kørselshistorik).
 4. **`## Datakilder`** — de MCP-værktøjer + evt. URLs der faktisk blev læst.
 

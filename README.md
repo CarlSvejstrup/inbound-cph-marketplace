@@ -3,7 +3,7 @@
 Claude Code / Cowork plugin marketplace for Inbound CPH's Google Ads work. Ships **one plugin, `inbound-ads`**, installed per user and updated via `/plugin update`. Its skills cover the full lifecycle, grouped into three jobs:
 
 - **Build a NEW campaign** — `inb-ads-campaign-build` (orchestrator) + `inb-ads-rsa-copy`. `inb-ads-campaign-build` runs the Phase 1→4 pipeline (a subagent per phase reference) and by default **creates the campaign directly in the account** via the `ads-writer` agent — HITL-gated per action, started paused (recommended) or active per the user's choice. The 10-tab Excel review workbook is now **opt-in** (when the client must approve the setup first). The phases live only as references inside `inb-ads-campaign-build`.
-- **Optimize a LIVE account** — `inb-ads-search-term-analyse` (merged from the former `soegeterm-analyse` + `search-term`), `inb-ads-rsa-hygiene`, `inb-ads-optimization-loop`, `inb-ads-display-placement-audit` (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining + the whole diagnose-to-workbook loop + GDN placement junk-audit).
+- **Optimize a LIVE account** — `inb-ads-search-term-analyse` (merged from the former `soegeterm-analyse` + `search-term`), `inb-ads-rsa-hygiene`, `inb-ads-quality-score`, `inb-ads-display-placement-audit` (post-launch RSA asset-hygiene + search-terms analysis / negative-keyword mining + Quality Score deep-dive + GDN placement junk-audit).
 - **Standalone deliverables** — `inb-ads-account-audit`, `inb-ads-change-log`, `inb-ads-context-publish`, `inb-ads-client-brief`, `inb-ads-onboarding-analysis`.
 
 All skills share one operating contract (`CLAUDE.md`). Every external write is **human-in-the-loop, confirmed per action** — no skill writes to a Google Ads account autonomously. Direct Google Ads writes are allowed only through the `ads-writer` agent behind the write-guardrail hook; `inb-ads-campaign-build` now creates campaigns directly this way, and the opt-in review-workbook path remains for when a human prefers to review the setup before it's created.
@@ -36,7 +36,7 @@ The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@in
 |---|---|
 | `inb-ads-search-term-analyse` | Search-terms-report analysis → one colour-coded `.xlsx` with live FILTER action-sheets (Negativ/Vinder), or the conversational variant that surfaces the interesting findings, talks them through, and writes the agreed negatives/new keywords straight into Google Ads Editor import CSVs (merged from the former `soegeterm-analyse` + `search-term`) |
 | `inb-ads-rsa-hygiene` | Post-launch RSA asset-hygiene diagnosis (champion-challenger coverage, dead-weight assets) → gap-brief fed back into `inb-ads-rsa-copy` |
-| `inb-ads-optimization-loop` | The whole diagnose-to-workbook loop in one go: search-terms + asset-hygiene + Quality Score → one editable Excel review workbook |
+| `inb-ads-quality-score` | Actionable Quality Score deep-dive: pull QS at keyword grain, cluster the worst keywords, map each weak component to its lever (creative → RSA rewrite, expected CTR → keyword/structure, landing page → flag), and write confirmed bid/keyword fixes via `ads-writer` (LP/creative fixes recommend-only) |
 | `inb-ads-display-placement-audit` | Scores Display Network placements 0-100 for junk risk (gambling, MFA/clickbait, low-quality apps) via a bundled free blocklist + account signals → ranked in-chat report, then writes confirmed negative placements directly via `ads-writer` |
 
 ### Standalone deliverables

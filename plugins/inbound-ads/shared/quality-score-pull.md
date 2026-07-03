@@ -24,7 +24,7 @@ The tool wraps the underlying `keyword_view` query internally; you do not write 
 - **As the MCP tool's `date_range=` argument: VALID.** `get_quality_score_audit(customer_id, date_range="LAST_90_DAYS")` works: the tool resolves the window internally. This is what `inb-ads-account-audit` and `inb-ads-onboarding-analysis` pass ("LAST_90_DAYS altid").
 - **As a raw GAQL `DURING` literal: INVALID.** If you drop to hand-written GAQL, `DURING LAST_90_DAYS` raises `INVALID_VALUE_WITH_DURING_OPERATOR` (verified live 2026-06-05). The valid raw-GAQL literals stop at `LAST_30_DAYS`; for 90 days you must compute a concrete `BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'` window.
 
-Rule: prefer the MCP tool and pass `LAST_90_DAYS` (QS wants volume, so a 90-day window beats 30). Only if you fall back to raw GAQL, never emit the bare `LAST_90_DAYS` literal; compute the `BETWEEN` dates instead. The `date_range_arg()` helper in `inb-ads-optimization-loop/lib/gaql/quality_score.py` enforces the strict raw-GAQL rule (it rejects `LAST_90_DAYS` and turns a `(start, end)` tuple into a `BETWEEN` clause); the `inb-ads-quality-score` skill may bundle its own copy of that module.
+Rule: prefer the MCP tool and pass `LAST_90_DAYS` (QS wants volume, so a 90-day window beats 30). Only if you fall back to raw GAQL, never emit the bare `LAST_90_DAYS` literal; compute the `BETWEEN` dates instead. The `date_range_arg()` helper bundled in `inb-ads-quality-score/lib/quality_score.py` enforces the strict raw-GAQL rule (it rejects `LAST_90_DAYS` and turns a `(start, end)` tuple into a `BETWEEN` clause).
 
 ## Grain: QS is a KEYWORD score; landing page is a FLAG, not a score
 

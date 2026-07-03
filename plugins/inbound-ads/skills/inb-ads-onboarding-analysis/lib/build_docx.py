@@ -9,7 +9,7 @@ opstarts-tjekliste. Decided with Carl 2026-06-10.
 
 WHY A BUNDLED BUILDER (not the generic docx skill): Cowork plugins are self-contained.
 This script self-bootstraps python-docx and runs on any machine with Python 3 + pip, same
-pattern as inb-ads-optimization-loop/lib/review_workbook.py (openpyxl).
+pattern as inb-ads-rsa-hygiene/build-sheet.py (openpyxl).
 
 INPUT: a findings JSON (--in) with this shape (see SKILL.md Trin 4 for how it's filled):
 {
@@ -34,7 +34,7 @@ INPUT: a findings JSON (--in) with this shape (see SKILL.md Trin 4 for how it's 
          "evidence": [                         # verbatim location list — rendered as a "Hvor:" block
            "Kampagne 'IC | GSN | Hele DK' › ad group 'Aalborg' › RSA #447... › headline 'Bestil taxi til Aaborg' (skal være Aalborg)"
          ],
-         "pointer": "for fuld RSA-gennemgang: kør inb-ads-optimization-loop (kræver at kontoen har kørt et stykke tid)."}
+         "pointer": "for fuld RSA-gennemgang: kør inb-ads-rsa-hygiene (kræver at kontoen har kørt et stykke tid)."}
       ]
     }
   ],

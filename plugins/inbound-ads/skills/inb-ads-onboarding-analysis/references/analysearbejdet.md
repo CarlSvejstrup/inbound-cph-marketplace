@@ -15,7 +15,7 @@ en stavefejl" → hvor? Når et punkt peger på noget konkret (en stavefejl, en 
 group, en kampagne med forkert indstilling), fang HVOR i et `evidence`-array: **kampagne › ad group
 › annonce/asset › den nøjagtige streng**. GAQL'en henter allerede `campaign.name`/`ad_group.name`
 til de fleste punkter , brug dem. For tunge moduler (C, G) brug også `details` til dybde og `pointer`
-til at henvise videre til `inb-ads-optimization-loop` når en fuld gennemgang sprænger opstartsrapporten
+til at henvise videre til `inb-ads-rsa-hygiene` / `inb-ads-search-term-analyse` når en fuld gennemgang sprænger opstartsrapporten
 (se SKILL.md Trin 3 c2/c3 for den fulde kontrakt).
 
 **`kind` pr. punkt , lookup vs. judgment (autoritativ liste , kopiér herfra).** Hvert punkt er enten
@@ -34,7 +34,7 @@ på hvert punkt efter denne liste:
 (Besluttet med Carl 2026-06-10. Grænsen: kan svaret aflæses direkte fra en GAQL-værdi = lookup;
 kræver det et fagligt skøn = judgment.)
 
-**Significance-disciplin (samme som inb-ads-optimization-loop):** Inbounds konti er små danske annoncører. På
+**Significance-disciplin (samme som inb-ads-rsa-hygiene):** Inbounds konti er små danske annoncører. På
 en frisk opstart er der ofte SLET ingen historik (kontoen er lige overdraget). Døm aldrig en asset
 på CTR/CVR ved opstart — opstartsanalysen er en **struktur- og hygiejne-gennemgang**, ikke en
 performance-dom. Hvor et punkt kræver data der ikke findes endnu, skriv `Mangler data (ny konto)`
