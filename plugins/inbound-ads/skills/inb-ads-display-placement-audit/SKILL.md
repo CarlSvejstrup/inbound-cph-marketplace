@@ -206,7 +206,7 @@ Dette skill er referencen for Inbounds **report house style** (dybere forfatter-
 `inbound-skill-creator`): kort-som-standard, uddyb-på-forespørgsel, ingen plumbing, verdikt + handling
 først. De to sektions-ikoner her (🚫 anbefales fjernet, 🤔 værd at kigge på) er skillets egne
 handlings-etiketter;
-statusfarver ellers følger house-vokaben (🟢/🟠/🔴/🔵/⚪). Behold denne korte to-tabel-default — udvid
+statusfarver ellers følger house-vokaben (🟢/🟠/🔴/🔵/⚪). Behold denne korte to-tabel-default, og udvid
 aldrig til det fulde skema uden at brugeren beder om det.
 
 **Uddybet visning — kun on-demand.** Triggerord: "uddyb", "mere detaljer", "hvorfor er de her", "vis

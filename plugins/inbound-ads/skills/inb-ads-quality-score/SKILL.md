@@ -88,7 +88,7 @@ Følger Inbounds **report house style** (beskrevet inline her; dybere forfatter-
 tilbyd dybden frem for at dumpe. Den faste skabelon nedenfor ER house-style-spinen for dette skill
 (BLUF-overblik → handlinger delt i to spande → fund sorteret efter cost → forbehold i bunden). Kan
 leveres "i chatten" (default, skabelonen nedenfor) eller "som side" (delbar artifact fra
-`../../shared/report-template.html`) hvis brugeren vil dele den — spørg kun hvis det ikke er oplyst.
+`../../shared/report-template.html`) hvis brugeren vil dele den. Spørg kun hvis det ikke er oplyst.
 
 Kun tabeller. QS-cellen farvekodes på sin egen skala: 🔴 1-3 · 🟡 4-6 · 🟢 7-10 (QS-tal, ikke
 status-pill). Klynge-rækkens status-pill følger house-vokaben (🔴 koster penge nu · 🟠 hold øje ·

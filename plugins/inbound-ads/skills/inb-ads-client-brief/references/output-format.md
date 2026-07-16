@@ -5,7 +5,7 @@
 > dybere forfatter-vejledning ligger i `inbound-skill-creator`; og den delte artifact-skabelon ligger i
 > `../../shared/report-template.html`. Denne fil er client-brief's egen, rigere udgave af kontrakten
 > (den har GATE-zonen til AI-kontekst-diffen + watermark-logikken, som de rene diagnostik-skills ikke
-> har) — så client-brief bruger DENNE fil, ikke en inline-blok. `brief-template.html` (denne mappe) er
+> har), så client-brief bruger DENNE fil, ikke en inline-blok. `brief-template.html` (denne mappe) er
 > client-brief-varianten af den delte `../../shared/report-template.html`.
 
 Denne fil styrer **kun præsentationen af Output #1 (projektleder-overblikket)**. Den rører ikke data-fan-out'en (Trin 0.5-2), diff-klassifikationen (Trin 4), eller den gatede skrivning (Trin 6) — de er format-uafhængige og kører altid ens. Briefet kan leveres i to formater, valgt af brugeren i Trin 0:

@@ -168,7 +168,7 @@ forfatter-vejledning i `inbound-skill-creator`) i komprimeret form: en **verdikt
 (status-chip + hvor mange ad groups uden challenger,
 hvor mange dødvægt-assets, de vigtigste vinkel-huller), derefter **fundene** (vigtigst først, hvert med
 et kort "betyder"), det **ærlige forbehold** (punkt 3) og **datakilder** i bunden. Skjul plumbing
-(GAQL, view-navne, ASCII-enums som `DOEDVAEGT` — arket viser den danske form). Status-pills: 🟢 ok ·
+(GAQL, view-navne, ASCII-enums som `DOEDVAEGT`; arket viser den danske form). Status-pills: 🟢 ok ·
 🟠 hold øje (fx kun 1 RSA) · ⚪ neutral. Eksemplet nedenfor viser den korte form. Æ Ø Å altid.
 
 ## Eksempel-output
