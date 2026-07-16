@@ -75,6 +75,3 @@ When the master `client-index` Doc already exists (currently `1EVC4h1KAhr8EoAGDQ
 - **If there are no empty rows left**, do NOT try to grow the table (the connector has no insert-row tool). STOP and tell the user: "The master index table is full — please add a few empty rows at the bottom of the Doc, then I'll fill them." **Give the user the Doc link so they can do it** (e.g. `https://docs.google.com/document/d/<index-id>/edit`). Once they've added rows, fill via `editTableCell` as above.
 - Keep the row order convention loose: appending at the bottom empty rows is fine (the table is no longer strictly alphabetical once you append) — the index is a lookup table, not a sorted list. Bump the top `Sidst opdateret` line if you touch it.
 
-## After the run (Dual-Output)
-
-Log the batch in the vault: a line in today's `daily/YYYY-MM-DD.md`, and if the IDs (HubSpot/ClickUp) were newly resolved, consider persisting them into the client notes' frontmatter (separate task) so the next run doesn't re-resolve. Note any NEEDS-PICK HubSpot rows and leftover-file cleanups in `backlog/inbound-cph.md`.
