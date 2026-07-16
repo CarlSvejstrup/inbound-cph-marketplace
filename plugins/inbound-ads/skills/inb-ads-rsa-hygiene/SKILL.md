@@ -162,6 +162,15 @@ Lever:
 5. Næste skridt (manuelt, human-in-the-loop): brugeren beslutter hvilke assets der skæres/bygges; skillet rører aldrig kontoen.
 6. Datakilder: Google Ads MCP (`run_custom_gaql`, `ad_group_ad_asset_view` + `ad_group_ad`), vindue brugt.
 
+**Form på in-chat-opsummeringen (punkt 2-6):** dette skill leverer en `.xlsx` som primært output, men
+den korte opsummering i chatten følger Inbounds **report house style** (beskrevet inline her; dybere
+forfatter-vejledning i `inbound-skill-creator`) i komprimeret form: en **verdikt-linje først**
+(status-chip + hvor mange ad groups uden challenger,
+hvor mange dødvægt-assets, de vigtigste vinkel-huller), derefter **fundene** (vigtigst først, hvert med
+et kort "betyder"), det **ærlige forbehold** (punkt 3) og **datakilder** i bunden. Skjul plumbing
+(GAQL, view-navne, ASCII-enums som `DOEDVAEGT` — arket viser den danske form). Status-pills: 🟢 ok ·
+🟠 hold øje (fx kun 1 RSA) · ⚪ neutral. Eksemplet nedenfor viser den korte form. Æ Ø Å altid.
+
 ## Eksempel-output
 
 ```

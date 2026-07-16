@@ -202,6 +202,13 @@ måneden og vil se hvad der skal handles på, ikke læse en afhandling:
 Afslut med én linje der beder om bekræftelse. **Global dedup:** samme domæne over flere kampagner
 slås sammen til én linje (læg forbrug sammen) — vis aldrig samme domæne to gange.
 
+Dette skill er referencen for Inbounds **report house style** (dybere forfatter-vejledning i
+`inbound-skill-creator`): kort-som-standard, uddyb-på-forespørgsel, ingen plumbing, verdikt + handling
+først. De to sektions-ikoner her (🚫 anbefales fjernet, 🤔 værd at kigge på) er skillets egne
+handlings-etiketter;
+statusfarver ellers følger house-vokaben (🟢/🟠/🔴/🔵/⚪). Behold denne korte to-tabel-default — udvid
+aldrig til det fulde skema uden at brugeren beder om det.
+
 **Uddybet visning — kun on-demand.** Triggerord: "uddyb", "mere detaljer", "hvorfor er de her", "vis
 mig alt", "hvad med PMax/allerede håndteret", eller forespørgsel om ét specifikt domæne. Byg da den
 fulde 5-sektions-rapport (anbefales fjernet uddybet / værd at kigge på uddybet / ingen problemer +

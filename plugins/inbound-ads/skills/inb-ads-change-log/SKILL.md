@@ -172,3 +172,14 @@ Afslut med:
 2. **Ærligt resumé:** distinkte handlinger pr. konto (ikke rå event-tal), berørte vs. uberørte konti, og perioden eksplicit.
 3. **`## Datakilder`**: MCP-værktøjer kaldt (`get_change_history` / `run_custom_gaql` mod `change_event`, Drive `search_files` + `read_file_content`), konto-ID'er, og det konkrete dato-vindue.
 4. **30-dages note:** mind om at alt før vinduet ikke kan hentes - kør skemalagt (ugentligt/dagligt) for at fange ændringer før de falder ud.
+
+**Form på chat-svaret (IKKE selve changelog-blokkene):** de kopiér-klare blokke skal blive ved med at
+være **formatmatchede til klientens egen log** (Trin 5) - dét er en hård regel og røres ikke af noget
+her. Men teksten *rundt om* dem i chatten følger Inbounds **report house style** (beskrevet inline her;
+dybere forfatter-vejledning i `inbound-skill-creator`) i komprimeret form: led med en **verdikt-linje**
+(status-chip + "N ændringer i perioden, netto-effekt")
+foran blokkene, og lever det ærlige resumé (punkt 2) og datakilder (punkt 3) som en skanbar footer.
+Skjul plumbing (`change_event`-felter, resource-type-enums) - oversæt til handlinger i menneskesprog,
+som skillet allerede gør. Status-pills på resuméet: 🟢 ren kørsel · 🟠 delvis (kilde fejlede) ·
+🔵 info. Dette skill er som standard **kun i chatten** (udkast til copy-paste); ingen artifact-variant.
+Æ Ø Å altid.

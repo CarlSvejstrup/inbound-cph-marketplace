@@ -112,6 +112,32 @@ Læs `references/apply.md` for mekanikken bag spor A (live MCP), B (CSV) og C (E
 `decisions.json`-formatet. Skriv kun det der stod på den godkendte liste. Afslut med en kort
 opsummering og `## Kilder`.
 
+## Output-format (hvordan indsigts-briefen præsenteres)
+
+Trin 5-briefen (og den afsluttende opsummering i Trin 7) følger Inbounds **report house style** (den
+er beskrevet fuldt ud her — ingen ekstern fil nødvendig; forfattere kan læse den dybere vejledning i
+`inbound-skill-creator`). Led med svaret, gør det skanbart, skjul plumbing (GAQL, `cost_micros`,
+view-navne). To formater: spørg én gang "som side eller i chatten?" (eller brug det brugeren allerede
+sagde) — "side" bygger en delbar artifact-side i Inbound-husstil (skabelon:
+`../../shared/report-template.html`); "i chatten" er struktureret Markdown. Chat er en fin default
+her, da fundene alligevel skal diskuteres.
+
+Zonerne, i rækkefølge (udelad dem der er tomme):
+
+1. **BLUF** — status-chip + "Kort sagt" (1-2 sætninger: største spild-tema + største udækkede vinder)
+   + meta (konto, vindue, "trak X termer, tærskel Y").
+2. **Hvad kræver handling** — de foreslåede negatives og nye keywords som handlinger (verbum først:
+   "**Bloker** …", "**Opret** exact-keyword …"), hver med den lille begrundelse. Recommend-only indtil
+   Trin 6-godkendelsen, så del gerne "klar til at tilføje" fra "værd at drøfte".
+3. **Fund** — top spild-temaer og udækkede vindere, vigtigst først, som en lille tabel
+   (`Søgeterm/tema | Klik | Konv | CPA | Anbefaling`). Hvert tema parret med *"Betyder:"* (så-hvad i
+   kroner/CPA). Navngiv N-cuttet ("top 13 af 240 termer — sig til for resten"), dump aldrig hele listen.
+4. *(Kontekst-zonen udelades typisk her.)*
+5. *(Gaten:)* selve godkendelsen (Trin 6) sker altid i chatten, aldrig i en artifact.
+6. **Datagrundlag** — footer: vindue, tærskel, "trak X termer", hvilke MCP-kald (kort, ikke en logliste).
+
+Status-pills: 🟢 ren/ok · 🟠 hold øje · 🔴 tydeligt spild · 🔵 info · ⚪ neutral. Æ Ø Å altid.
+
 ## lib/
 
 - **`digest.py`** — orkestratoren: tager det rå pull og printer den kompakte indsigts-brief (Trin 4).
