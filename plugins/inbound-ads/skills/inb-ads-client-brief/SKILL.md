@@ -7,8 +7,8 @@ description: "Giver et projektleder-overblik over én Google Ads-klient: hvem de
 
 Lever et projektleder-overblik over én Google Ads-klient — og kan i samme kørsel opdatere klientens AI-kontekst on-demand. To outputs, ét smæk:
 
-1. **Projektleder-overblik** (chat, hovedformålet): hvem klienten er, hvad der for nylig er lavet/aftalt, aktuel status, åbne tråde. Som en projektleder der lige er kommet op i fart på kunden.
-2. **Opdateret AI-kontekst** (on-demand, klientens AI-Context-fil på Drive): træk alt nyt siden sidste opdatering ind, herunder hvad der skal **fjernes/erstattes** — ikke kun tilføjes.
+1. **Projektleder-overblik** (hovedformålet): hvem klienten er, hvad der for nylig er lavet/aftalt, aktuel status, åbne tråde. Som en projektleder der lige er kommet op i fart på kunden. Leveres i ét af to formater brugeren vælger i Trin 0 — en delbar visuel **side** (claude.ai-artifact, default) eller struktureret tekst **i chatten** — begge med samme scanbare zone-struktur (`references/output-format.md`).
+2. **Opdateret AI-kontekst** (on-demand, klientens AI-Context-fil på Drive): træk alt nyt siden sidste opdatering ind, herunder hvad der skal **fjernes/erstattes** — ikke kun tilføjes. Sker altid conversationelt i chatten, uanset briefets format.
 
 Overblikket er altid gratis at levere; selve fil-opdateringen sker kun når der er noget nyt at flette ind, og altid efter godkendelse. Makker til `inb-ads-context-publish` (som publicerer en klients AI-Context-fil første gang). Dette skill briefer på filen bagefter og vedligeholder den. Læs `references/` for de dybe kontrakter; denne fil er den kørbare overflade.
 
@@ -36,6 +36,16 @@ To linjer i AI-Context-filen selv fungerer som watermarks — ingen separat tids
    - **Partial-success:** fejlede en kilde (HubSpot 403, Drive socket-drop), så ryk IKKE linjen frem — notér i stedet per-kilde as-of i Klientoverblik-introlinjen, så næste kørsel henter hullet.
    - Mangler linjen (ældre format): behandl hele filen som siden-gulv, sig antagelsen højt, tilføj linjen ved skrivning.
 2. **`Seneste rapport læst: <titel> [id: <fil-id>]`** — separat watermark for rapport-ingestion (rapporter kommer månedligt, ikke løbende). Matcher den nyeste deck i rapport-mappen → allerede indlæst, spring den dyre konvertering over (Trin 2 C + `references/report-ingestion.md`). Mangler linjen → nyeste deck er altid ny. Opdateres i samme gated skrivning som Klientoverblik (Trin 6).
+
+## Trin 0 — Vælg output-format (allerførst)
+
+Før al dataindhentning: spørg brugeren hvordan briefet skal leveres, med `AskUserQuestion`. Ét enkelt valg, i ord teamet forstår (ikke "artifact"/"HTML"/"Markdown"):
+
+- **Spørgsmål:** "Hvordan vil du have briefet på <klient>?"
+- **Rapport (side)** *(default, markér "Anbefalet")* — "En delbar, visuel side du kan åbne og scanne. God før et møde."
+- **Rapport (i chatten)** — "Briefet skrevet direkte her i chatten. Hurtigst, og nemt at kopiere ind i noter."
+
+Springer brugeren allerede formatet i sin besked ("brief mig på X **som side**" / "**i chatten**"), så spring spørgsmålet over og brug det. Ellers spørg hver gang — det er ét klik, ingen reel friktion. Formatet styrer KUN Trin 3-præsentationen; alt andet (fan-out, diff, gated skrivning) er format-uafhængigt. Hele kontrakten for begge formater ligger i `references/output-format.md` — læs den før du renderer i Trin 3.
 
 ## Trin 0.5 — Start i indekset (obligatorisk indgang)
 
@@ -69,16 +79,16 @@ Dispatch samtidigt (ét message, flere tool-kald), hver med de resolvede ID'er +
 
 Hver subagents partial/ren-status fødes ind i watermark-reglen (Trin 6). Alt read-only.
 
-## Trin 3 — Projektleder-overblik (OUTPUT #1, kun chat, FØR diff'en)
+## Trin 3 — Projektleder-overblik (OUTPUT #1, FØR diff'en)
 
-Syntetisér de tre subagenters fund. Sektioner, dansk:
-- **Hvem de er.** 2-3 linjer fra AI-Context-filens Klientoverblik > Overblik (klient, marked, specialist, tier, budget, kontakt).
-- **Hvor vi står.** Vigtigste hårde rammer + mål + åbne håndtag fra den nuværende Klientoverblik.
-- **Hvad er nyt siden `<Sidst opdateret>`.** Per kilde: Drive (N dok.), HubSpot (N mails/noter), Rapporter (nyeste deck + kernebudskab, eller "ingen nyere rapport fundet").
-- **Åbne tråde & håndtag lige nu.** Ubesvarede mails, ventende aftaler, håndtag fra rapporten, deadlines.
-- **Datagrundlag & huller.** Hvilke kilder blev læst/fejlede + tidsvinduet.
+Syntetisér de tre subagenters fund til briefet og render det i **det format brugeren valgte i Trin 0**. Den fulde præsentations-kontrakt (zone-struktur, husstil, begge formater) ligger i `references/output-format.md` — følg den. Syntese, ikke et dump; hvert nyt-fund parres med et "Betyder:" (så-hvad), handlinger står øverst med ejer/deadline, og kildeteknik (delvis/watermark/as-of) hører i datagrundlag-footeren, ikke i selve briefet.
 
-Syntese, ikke et dump. Sig derefter: "Herunder er mine forslag til at opdatere selve AI-konteksten" → diff'en.
+Zonerne (fælles for begge formater, i læse-prioritet): **BLUF/header** (hvem + status-chip + "Kort sagt"-verdikt + meta) → **Hvad kræver handling** (Beslutning / Handlinger / Venter på, adskilt, ikke prosa) → **Hvad er nyt** (per kilde, med freshness-pill + "Betyder:") → **Hvem de er & hvor vi står** (komprimeret durable kontekst) → *(gaten, Trin 4-5)* → **Datagrundlag & kilder** (footer).
+
+- **Rapport (side):** byg HTML'en fra `references/brief-template.html` (kopiér den, behold `<style>` + den indlejrede Manrope-font uændret, erstat kun indholdet), skriv til en scratchpad-`.html`, og publicér med `Artifact`-værktøjet. Giv linket i chatten med en kort intro. Se `references/output-format.md` § Format A for levering + font-reglen (CSP blokerer font-CDN → Manrope skal være inlinet).
+- **Rapport (i chatten):** skriv zonerne som struktureret Markdown direkte i svaret. Se `references/output-format.md` § Format B for skabelonen.
+
+**Diffen (Trin 4-6) sker ALTID i chatten** uanset format — også når briefet blev en side. En artifact kan ikke godkende eller skrive noget, og human-in-the-loop på writes er en hard regel. Efter briefet (linket eller Markdown), sig: "Herunder er mine forslag til at opdatere selve AI-konteksten" → diff'en i chatten.
 
 ## Trin 4 — Diff: TILFØJ / ERSTAT / FJERN
 
@@ -119,6 +129,9 @@ Afslut med:
 
 ## Regler
 
+- **Format vælges i Trin 0**, styrer kun Trin 3-præsentationen. Zone-struktur + begge formaters kontrakt: `references/output-format.md`. Side-formatet kopierer `references/brief-template.html` (Inbound-husstil, Manrope inlinet — link aldrig et font-CDN i en artifact, CSP blokerer det).
+- **Brief og gate er to dokumenter.** Briefet (læse) er adskilt fra kontekst-diffen (beslut-og-skriv). Diffens godkendelse + `findAndReplaceInDoc`-skrivning sker ALTID i chatten, aldrig på en artifact-side.
 - **30-dages loft** på Ads `change_event` (`lookback_days` ≤ 29); tomt vindue = "ingen ændringer i perioden", aldrig "inaktiv".
 - **Pausede kampagner er bevidste** — flag aldrig som negativt fund.
-- Ingen emojis. Ingen tankestreger (komma/kolon). Marker manglende/utroværdige data; opfind aldrig kontekst.
+- Ingen tankestreger (komma/kolon). Marker manglende/utroværdige data; opfind aldrig kontekst. Real Æ Ø Å (aldrig aa/oe/ae), også i HTML-siden — grep før publicering.
+- Emojis kun som status-pills i chat-formatet (🟢 🟠 🔵 ⚪ + ord); ellers ingen emojis. Side-formatet bruger SVG-ikoner, ikke emoji.
