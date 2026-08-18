@@ -98,7 +98,7 @@ But every skill that produces an artifact or recommendation stops at "here's the
 | Skill | Purpose | Writes? |
 |---|---|---|
 | `inb-ads-account-audit` | Full paid-search audit → HTML slide deck + PDF | Gated — file/Drive save |
-| `inb-ads-change-log` | Change-history → format-matched changelog draft | Gated — Drive paste |
+| `inb-ads-change-log` | Change-history → short bulleted entry written into the client's changelog Doc | Gated — Drive Doc write (`findAndReplaceInDoc`, anchor-replace, copy-paste fallback) |
 | `inb-ads-context-publish` | Publish per-client AI Context Docs to Drive + master client-index (vault→Drive, no Ads MCP) | Gated — Drive create (create-once) |
 | `inb-ads-client-brief` | Project-manager brief on one client + on-demand AI-context UPDATE (all on Drive): start in the master index, open the client's AI-Context file, brief on it, pull what's new since its `Sidst opdateret` (Drive docs, HubSpot, status decks), critical TILFØJ/ERSTAT/FJERN diff into the Klientoverblik, write the updated AI-Context file in place (gws) or hand back a copy-paste block | Gated — Drive file write (diff-approved, gws-or-fallback) |
 

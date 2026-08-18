@@ -23,13 +23,25 @@ Both converge on per-client changelog entries. Per-person is just a different en
 
 3. **The user filter works server-side.** Verified with a negative test: filtering Capio (100% Caroline) for Rikke's email returned empty, while Caroline's filter returned her rows. So "what did person X do" is a genuine GAQL query, not client-side guessing. Confirmed it correctly excludes client-made and agency-made changes (Light-Point was edited by the client's own login that week; it stayed out of Rikke's digest).
 
-## Why draft-to-paste, not write-back
+## Why it writes back (and how)
 
-The Google Drive connector exposes `create_file` (new file only - no `fileId` to target an existing doc) and `copy_file`. There is **no append/update/insert tool** for Drive (only Slack canvas has one). So in-place append to the existing changelog Doc is impossible through current tooling.
+An earlier version of this skill delivered a copy-paste block, on the belief that the Drive tooling could only create new files. That was wrong for the Inbound Google Drive MCP (`mcp__acc7a973-...`), which exposes **`findAndReplaceInDoc`** - the same surgical inline write that `inb-ads-client-brief` already uses to maintain the AI-Context Docs. So the skill writes the entry directly into the client's changelog Doc, and copy-paste is now only the fallback.
 
-Even if a write-back existed, `read_file_content` returns "a natural language representation" whose format is explicitly not stable, so you can't safely round-trip a formatted Doc through read → reconstruct → overwrite without flattening it. Draft-to-paste sidesteps both problems and is fully human-in-the-loop compliant: the heavy lifting is automated, the human pastes.
+Two constraints shape the mechanics:
 
-If the connector ever gains an append/update tool, Trin 6 upgrades to the gated four-step write (show target doc + block, wait for explicit approval, write, confirm). The contract is written so that's a localized change.
+1. **Native Google Doc only.** `findAndReplaceInDoc` cannot edit a raw `.md`, a `.docx`, or a Sheet. Trin 4 therefore verifies the mimetype before committing to a write, and falls back to copy-paste when the changelog isn't a native Doc. This is the same correctness dependency documented in `../../shared/ai-context-file-contract.md`.
+
+2. **Replace, never insert.** `findAndReplaceInDoc` has no insert operation, so an insertion is expressed as replacing a unique anchor with "the new block + that anchor". The anchor ladder in Trin 6 (current month header → topmost month header → existing date line → title) covers the real shapes these Docs take, and every anchor is `dryRun`-verified to match exactly once before the real write. A non-unique anchor is the one way this could corrupt a log, so it is gated twice: unique-match verification, then the human's `ja`.
+
+### Why not `insertText`
+
+The connector *does* expose `insertText`, which inserts at an arbitrary position and would express the insertion directly instead of as an anchor replacement. It is deliberately not used: it takes a computed 1-based **index** into the Doc, and index arithmetic against a live client log is the failure mode that silently lands an entry mid-paragraph. The anchor-replace path is uglier to read but has no arithmetic in it at all — you name text that exists, and the tool finds it. Same reasoning excludes `updateGoogleDoc` (replaces the entire doc, i.e. deletes the log) and `updateDocFromMarkdown` (`replace` does the same; `append` lands at the END, but the changelog is reverse-chronological).
+
+### Native bullets, applied after placement
+
+The written entry uses real Google Docs bullets, not literal `- ` hyphens, because a hyphen typed into a Doc stays a hyphen and reads as sloppy next to the specialist's own formatting. `createParagraphBullets` does this natively and is also index-free — it targets paragraphs by `textToFind`. So the write is two calls: place the block as plain lines, then bulletize the action lines (never the date line or month header). Bulletizing is a formatting step on already-correct text, so a failure there is reported and left alone rather than triggering a rollback or the copy-paste fallback.
+
+The old objection about `read_file_content` returning unstable "natural language representation" doesn't apply here, because nothing is round-tripped. The Doc is read only to learn its format and locate an anchor; the write touches that anchor and leaves the rest of the Doc untouched.
 
 ## Why format-match instead of a clean template
 
@@ -37,7 +49,7 @@ The changelog is a living human doc with an established style (reverse-chronolog
 
 ## Doc resolution is the risk surface
 
-There is no single canonical changelog location - across clients it's been seen inside Paid Search, under the legacy "Google/Bing Ads" name, under "#4 - Google Ads", and at folder top-level. The skill can't read the vault's `changelog_file` IDs (it runs in Cowork, not the vault), so it resolves by searching the client folder for the doc by name pattern, and **confirms the resolved doc (name + ID + path) with the human before drafting**. A misresolved doc is the failure mode that would corrupt a client's log, so the gate shows the target, not just the entry.
+There is no single canonical changelog location - across clients it's been seen inside Paid Search, under the legacy "Google/Bing Ads" name, under "#4 - Google Ads", and at folder top-level. The skill can't read the vault's `changelog_file` IDs (it runs in Cowork, not the vault), so it resolves by searching the client folder for the doc by name pattern, and **confirms the resolved doc (name + ID + path) with the human before writing**. A misresolved doc is the failure mode that would corrupt a client's log, so the gate shows the target Doc and the exact anchor being replaced, not just the entry.
 
 ## Scope discipline
 

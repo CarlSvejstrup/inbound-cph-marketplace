@@ -1,15 +1,15 @@
 ---
 name: inb-ads-change-log
-description: Genererer en formatmatchet changelog-tekst til klientens Drive-optimeringslog ud fra Google Ads' egen ændringshistorik (change_event), enten per kunde eller per specialist på tværs af dennes konti, og leverer den read-only som en tekstblok til copy-paste frem for at skrive direkte til Drive.
+description: Skriver en kort, punktopstillet changelog-indførsel direkte ind i klientens Drive-optimeringslog via gated findAndReplaceInDoc, bygget på Google Ads' egen ændringshistorik (change_event), enten per kunde eller per specialist på tværs af dennes konti.
 ---
 
 # inb-ads-change-log
 
-Byg en changelog-tekst direkte fra Google Ads' indbyggede ændringshistorik (`change_event`-ressourcen, samme data som **Værktøjer → Ændringshistorik** i UI'et), klar til at sætte ind i klientens optimeringslog/changelog på Drive.
+Byg en kort, punktopstillet changelog-indførsel direkte fra Google Ads' indbyggede ændringshistorik (`change_event`-ressourcen, samme data som **Værktøjer → Ændringshistorik** i UI'et), og skriv den ind i klientens optimeringslog/changelog på Drive.
 
 Skillet automatiserer den faktuelle halvdel af changelog-arbejdet (hvad blev ændret, hvornår, af hvem). Mennesket tilføjer kun **hvorfor**.
 
-Read-only mod Google Ads. Skillet henter og formaterer, men skriver hverken til kontoen eller til Drive (se Trin 0) - det leverer en tekstblok mennesket selv indsætter.
+Read-only mod Google Ads. Skillet **skriver derimod direkte ind i changelog-Doc'et på Drive** via `findAndReplaceInDoc`, gated bag én eksplicit bekræftelse (se Trin 0 og Trin 6).
 
 Fuld designbegrundelse: `SPEC.md` i denne mappe. Denne fil er den kørbare kontrakt.
 
@@ -23,7 +23,7 @@ To begreber:
 - **change_event** = Google Ads' egen revisionslog over hver skrivning til kontoen (oprettet/opdateret/fjernet ressource, hvilke felter, hvornår, af hvilken bruger-email). Kontoens log, ikke teamets.
 - **changelog / optimeringslog** = Doc'et på Drive hvor specialisten skriver hvad de lavede *og hvorfor*, plus off-platform arbejde (mails, møder, sheets). Menneskets arbejdslog.
 
-`change_event` er en delmængde af changelog'ens konto-mutérende del, i finere kornstørrelse og uden "hvorfor". Skillet udkaster den faktuelle del fra `change_event` i changelog'ens eget format og lader mennesket fylde hvorfor + off-platform.
+`change_event` er en delmængde af changelog'ens konto-mutérende del, i finere kornstørrelse og uden "hvorfor". Skillet skriver den faktuelle del fra `change_event` ind i changelog'en i dens eget format og efterlader en `Hvorfor:`-bullet mennesket fylder ud, plus plads til off-platform arbejde.
 
 To hårde grænser fra API'et, som skal siges højt i outputtet:
 1. **30-dages loft.** `change_event` rækker kun ~30 dage tilbage. `lookback_days` skal være ≤ 29 (30 kaster `START_DATE_TOO_OLD`). Tom periode = "ingen ændringer i vinduet", ikke "konto inaktiv". Det er det eneste sted API'et er ringere end changelog'en (som har fuld historik) - skillet er derfor et kør-på-skema-værktøj: snapshot før ændringerne falder ud af vinduet.
@@ -31,13 +31,21 @@ To hårde grænser fra API'et, som skal siges højt i outputtet:
 
 ## Trin 0 - Kontekst og skrivegrænse
 
-Klientmapper findes på Drive via `search_files` scoped til klientmappen under `${user_config.inbound_root_folder_id}` (navnemønster + placering varierer per klient - se Trin 4). Enhver ekstern write er gated bag eksplicit bekræftelse (vis hvad og hvor, vent på `ja`, skriv så) - men dette skill skriver ikke selv. Alt på dansk medmindre brugeren skriver engelsk.
+Klientmapper findes på Drive via `search` scoped til klientmappen under `${user_config.inbound_root_folder_id}` (navnemønster + placering varierer per klient - se Trin 4). Alt på dansk medmindre brugeren skriver engelsk.
 
-**Værktøjsgrænse der afgør leveringsformen:** Drive-connectoren kan kun oprette nye filer (`create_file`), ikke appende til eller redigere et eksisterende Doc. Skillet kan derfor ikke selv skrive ind i den eksisterende changelog. Leveringsformen er:
+**Skrivegrænse.** Skillet skriver ind i klientens eksisterende changelog-Doc med to inline-værktøjer på den Inbound Google Drive MCP (`mcp__acc7a973-...`), begge **indeks-frie**:
 
-> **Udkast → mennesket indsætter.** Skillet producerer den præcise tekstblok (formatmatchet til changelog'en) + dokumentets navn/ID/sti, så specialisten åbner Doc'et og sætter blokken ind øverst under den aktuelle måned.
+- **`findAndReplaceInDoc`** placerer blokken (samme surgiske vej som `inb-ads-client-brief` bruger på AI-Context-filen).
+- **`createParagraphBullets`** med `textToFind` gør de indsatte linjer til **native Google Docs-bullets**.
 
-Fuldt i tråd med human-in-the-loop: alt det tunge (hente, filtrere, kollapse bulk, formatere) er automatiseret, kun det sidste tastetryk er menneskets. Hvis Drive-connectoren en dag får et append/update-værktøj, kan Trin 6 opgraderes til en gated skrivning (vis target-Doc + blok, vent på eksplicit `ja`, skriv, bekræft tilbage) - indtil da: udkast-til-indsæt.
+Connectoren har også `insertText`, men det kræver et beregnet 1-baseret **indeks** i Doc'et. Brug det ikke her: forkert indekstælling lander tekst midt i et afsnit i en levende klientlog, og de to værktøjer ovenfor løser opgaven uden indeksregning. Samme grund til at `updateGoogleDoc` og `updateDocFromMarkdown` er forbudte - `replace` sletter hele loggen, og `append` lander nederst, mens changelog'en er omvendt kronologisk.
+
+To konsekvenser, som styrer Trin 4 og Trin 6:
+
+- **Doc'et skal være et native Google Doc.** `findAndReplaceInDoc` kan ikke redigere en rå `.md` eller en `.docx`. Er changelog'en ikke et native Doc, falder skillet tilbage til copy-paste-levering og siger det højt (Trin 6, fallback).
+- **`findAndReplaceInDoc` kan ikke indsætte, kun erstatte.** Ny tekst foldes derfor ind i en erstatning af et **unikt anker**: erstat ankeret med "ankeret + den nye blok". Det er bevidst valgt frem for `insertText`, netop for at undgå indeksregning. Ankervalg i Trin 6.
+
+**Human-in-the-loop er hård:** vis target-Doc (navn + ID + link) plus den præcise blok, vent på et eksplicit `ja`, skriv så, og bekræft tilbage. Ét gate-spørgsmål per Doc, ikke per linje. Skriv aldrig et Doc du ikke har vist. Opret aldrig en dublet-fil for at "rette" en fejlet skrivning.
 
 Alt mod Google Ads er read-only.
 
@@ -115,71 +123,131 @@ Lav rå events om til den slags linjer et menneske ville skrive i changelog'en. 
 3. **Grupper per dag**, nyeste dag øverst. Slå små relaterede handlinger på samme kampagne/dag sammen ("budgetjustering på 7 kampagner" frem for 7 linjer).
 4. **Spring konti uden aktivitet over** (PER PERSON: nævn dem kort i chat-resuméet, men lav ingen changelog-blok for dem).
 
+### Kortheds-reglerne (hårde - de afgør outputtets kvalitet)
+
+Changelog'en skal kunne skimmes på ti sekunder. Derfor:
+
+- **Én bullet = én handling = én linje.** Aldrig prosa, aldrig to sætninger i samme bullet, aldrig en bullet der fortsætter på næste linje. (Bullets bliver native Docs-bullets i Trin 6; her handler det kun om indholdet.)
+- **Max 6 bullets per dato.** Er der flere, rul de mindste sammen til én ("øvrige justeringer: bud på 12 keywords, 3 assets skiftet").
+- **Max ~10 ord per bullet.** Start med et udsagnsord i datid (Tilføjede, Justerede, Pausede, Fjernede, Redigerede). Ingen indledende fyld ("Jeg har i dag...", "Der blev...").
+- **Ét kampagnenavn per bullet, forkortet.** Er navnet langt, klip til det genkendelige led (`NEW IC | GSN | Generic | LGOLCRM | SE` → `GSN Generic SE`). Er handlingen på tværs af flere, skriv antallet ("på 4 kampagner") frem for at liste dem.
+- **Ingen tal uden betydning.** Behold antal der viser omfang (557 negative ord), drop dem der ikke gør (event-ID'er, micros, ressourcenavne).
+- **Ingen plumbing.** Aldrig `change_event`-feltnavne, enums (`CAMPAIGN_CRITERION`), ressource-stier eller `amountMicros` i den skrevne blok.
+
 ## Trin 4 - Find changelog-dokumentet (per kunde)
 
 For hver konto med aktivitet: find klientens changelog/optimeringslog-Doc på Drive via connectoren. Navnemønstret og placeringen varierer per klient: "Optimeringslog", "changelog", "[Klient] Google Ads log", ofte inde i en **Paid Search**-mappe, men også under den ældre "Google/Bing Ads", "#4 - Google Ads", eller på klientmappens topniveau.
 
-1. `search_files` efter navnemønster (`optimeringslog`, `changelog`, `ads log`) scoped til klientmappen under `${user_config.inbound_root_folder_id}`.
-2. Hvis flere kandidater eller ingen sikker match: vis kandidaterne (navn + ID + mappesti) og bed mennesket bekræfte hvilket Doc før du udkaster. Et fejl-resolvet Doc korrumperer klientens log.
-3. `read_file_content` på det bekræftede Doc for at aflæse dets format (måneds-headers, datoformat) og hvor "øverst under aktuelle måned" er, så blokken matcher.
+1. `search` efter navnemønster (`optimeringslog`, `changelog`, `ads log`) scoped til klientmappen under `${user_config.inbound_root_folder_id}`. Prioritér AI Context-filens changelog-link (Trin 0.5) som første kandidat.
+2. Hvis flere kandidater eller ingen sikker match: vis kandidaterne (navn + ID + mappesti + sidst ændret) og bed mennesket bekræfte hvilket Doc, **før** du skriver. Et fejl-resolvet Doc korrumperer klientens log.
+3. **Verificér filtypen.** `findAndReplaceInDoc` virker kun på et native Google Doc (`application/vnd.google-apps.document`). Læs mimetype fra søgeresultatet, eller kald `getDocumentInfo` på ID'et. Er det en `.docx`, en rå `.md` eller et Sheet: skriv ikke - gå til Trin 6's fallback (copy-paste) og sig hvorfor.
+4. `readGoogleDoc` på det bekræftede Doc for at aflæse:
+   - **formatet**: måneds-header-stil, datoformat, og om loggens eksisterende handlingslinjer bruger native bullets (og i så fald hvilket preset - match det i Trin 6, ellers `BULLET_DISC_CIRCLE_SQUARE`);
+   - **ankeret**: den præcise tekst der markerer "øverst under aktuelle måned" (se Trin 6);
+   - **dubletter**: står dagens dato allerede i loggen? Så udvid den eksisterende dato-blok i stedet for at lave en ny.
 
 ### Fejlfinding - changelog-Doc'et
 
 - **Flere changelog-docs (gammel + ny):** klienter migrerer ofte fra en ældre log ("Google/Bing Ads") til en nyere ("Optimeringslog") - begge kan stadig ligge i mappen. Skriv aldrig blindt i den nyeste. Vis begge kandidater (navn + ID + sti + sidst ændret) og bed mennesket bekræfte den aktive, før du udkaster. Prioritér AI Context-filens changelog-link som den kanoniske, hvis den peger på én.
 - **Søgning giver ingen match:** udvid navnemønstret (`log`, `optimering`, `historik`) og søg bredere i klientmappen inkl. undermapper. Stadig intet: sig det, lever udkastet uden target-Doc (blokken er brugbar i sig selv), og bed mennesket pege på det rigtige Doc eller bekræfte at ingen log findes endnu. Opfind aldrig et Doc-ID.
 
-## Trin 5 - Formatmatch (ikke et nyt format)
+## Trin 5 - Formatmatch (kort + punktopstillet)
 
-Match changelog'ens eksisterende stil (verificeret fra Capio-loggen som kanonisk eksempel):
+Match changelog'ens eksisterende stil (verificeret fra Capio-loggen som kanonisk eksempel), og hold blokken kort:
+
 - Omvendt kronologisk, nyeste øverst.
-- **Måneds-header**: `## Juni 2026`. Hvis ny måned siden sidste indførsel: lav headeren.
-- **Datolinje**: `DD.MM.YYYY` (f.eks. `04.06.2026`), derunder punktopstilling med handlingerne.
-- Dansk, kort, faktuelt. Ingen emojis, ingen tankestreger (brug komma/kolon).
-- **`_Hvorfor:_`-placeholder** til sidst i hver dato-blok, fordi API'et ikke kender hvorfor: `  - _Hvorfor: (udfyld - API'et fanger kun hvad, ikke hvorfor)_`.
+- **Måneds-header**: `Juni 2026`. Findes headeren for den aktuelle måned ikke i Doc'et, skal den med i blokken (se ankervalg i Trin 6).
+- **Datolinje**: `DD.MM.YYYY` (fx `04.06.2026`), derunder **kun punktopstilling** - én bullet per handling, jf. kortheds-reglerne i Trin 3.
+- **Bullets bliver native Google Docs-bullets**, ikke bogstavelige bindestreger. Selve indsættelsen sker som rene tekstlinjer (én handling per linje, uden `- ` foran); bagefter gør `createParagraphBullets` dem til rigtige bullets (Trin 6, trin 3). Skriv derfor ALDRIG `- ` i `replaceText` - så ender du med en bindestreg *inde i* en native bullet.
+- Dansk, kort, faktuelt. Ingen emojis, ingen tankestreger (brug komma/kolon). Æ Ø Å skrives som rigtige bogstaver, aldrig `ae`/`oe`/`aa`.
+- **`Hvorfor:`-bullet** til sidst i hver dato-blok, fordi API'et ikke kender hvorfor: linjen `Hvorfor: (udfyld)`, bulletiseret sammen med de øvrige. Én bullet, ikke en sektion.
 - I PER KUNDE med flere forfattere: annotér ikke-primær forfatter i parentes på datolinjen ("(Rikke)"), som changelog'en gør.
+- **Ingen indledning, ingen opsummering, ingen note om værktøjet inde i Doc'et.** Alt meta (30-dages loft, datakilder, optælling) hører i chatten, ikke i klientens log.
 
-Eksempel på en udkastet blok (Lime SE, Rikke, uge):
+Teksten du indsætter (rene linjer, ingen bindestreger - Lime SE, Rikke, uge):
 
 ```
-## Juni 2026
-
 03.06.2026 (Rikke)
-  - Tilføjede negativ-keyword-liste (557 ord) til NEW IC | GSN | Generic | LGOLCRM | SE
-  - Justerede budget på 4 kampagner
-  - _Hvorfor: (udfyld - API'et fanger kun hvad, ikke hvorfor)_
+Tilføjede negativ-liste (557 ord) til GSN Generic SE
+Justerede budget på 4 kampagner
+Pausede GSN Brand SE
+Hvorfor: (udfyld)
 ```
 
-## Trin 6 - Lever udkast(ene) (ingen skrivning - mennesket indsætter)
+Sådan ser det ud i Doc'et efter bulletiseringen (datolinjen forbliver almindelig tekst, de fire handlingslinjer bliver native bullets):
 
-Connectoren kan ikke appende til et eksisterende Doc (Trin 0), så skillet skriver ikke. I stedet:
+```
+03.06.2026 (Rikke)
+  • Tilføjede negativ-liste (557 ord) til GSN Generic SE
+  • Justerede budget på 4 kampagner
+  • Pausede GSN Brand SE
+  • Hvorfor: (udfyld)
+```
 
-**PER KUNDE** - ét udkast:
-1. Vis det resolvede changelog-Doc: navn + ID + mappesti.
-2. Vis den formatmatchede tekstblok i en kodeblok, klar til at kopiere.
-3. Sig: *"Indsæt denne blok øverst under [måned] i changelog'en. Jeg kan ikke skrive til Doc'et selv (connectoren understøtter det ikke), så det er et copy-paste."*
+## Trin 6 - Skriv blokken ind i changelog-Doc'et (gated, KUN findAndReplaceInDoc)
 
-**PER PERSON** - fan-out, ét udkast per berørt kunde:
-1. List alle berørte kunder med deres resolvede changelog-Doc (navn + ID + sti).
-2. Per kunde: den formatmatchede blok i sin egen kodeblok.
-3. Et samlet chat-resumé øverst: "[Person] rørte N konti i [periode]: [liste]. Ingen aktivitet på: [liste]." plus den ærlige optælling (distinkte handlinger, ikke rå events).
+Skrivningen sker i to indeks-frie kald på den Inbound Google Drive MCP (`mcp__acc7a973-...`): først **`findAndReplaceInDoc`** der placerer teksten, så **`createParagraphBullets`** der gør handlingslinjerne til native bullets. Brug hverken `insertText` (kræver indeksregning), `updateGoogleDoc` eller `updateDocFromMarkdown` (sletter loggen hhv. lander nederst).
 
-Hvis Drive-connectoren senere får et append/update-værktøj: opgradér til en gated skrivning (vis target-Doc + blok, vent på eksplicit `ja`, skriv, bekræft tilbage). Vis altid hvert target-Doc - skriv aldrig et Doc der ikke er vist.
+`findAndReplaceInDoc` kan ikke indsætte, kun erstatte, så placeringen bliver **en erstatning af et unikt anker**: `findText` = ankeret, `replaceText` = "den nye blok + ankeret" (blokken skal øverst, så den kommer *før* ankeret).
+
+### Ankervalg (i denne rækkefølge)
+
+1. **Måneds-headeren for den aktuelle måned findes** → anker = headerlinjen.
+   `findText`: `Juni 2026`
+   `replaceText`: `Juni 2026\n\n<ny blok>`
+2. **Måneden findes ikke** (ny måned siden sidste indførsel) → anker = den nuværende øverste måneds-header, og den nye måned lægges foran.
+   `findText`: `Maj 2026`
+   `replaceText`: `Juni 2026\n\n<ny blok>\n\nMaj 2026`
+3. **Dagens dato står allerede i loggen** → anker = den eksisterende datolinje, og de nye bullets lægges *efter* den (udvid blokken frem for at lave en dublet-dato).
+   `findText`: `03.06.2026 (Rikke)`
+   `replaceText`: `03.06.2026 (Rikke)\n<nye bullets>`
+4. **Doc'et er tomt eller har ingen brugbar struktur** → anker = dokumentets titel-/overskriftslinje, blokken lægges under den. Er der intet unikt anker overhovedet: gå til fallback.
+
+Ankeret skal matche **præcis én gang**. Kør altid `findAndReplaceInDoc` med `dryRun=true` først og læs antal matches: 0 → vælg et andet anker; >1 → udvid `findText` med omkringliggende kontekst til det er unikt. Skriv aldrig på et anker du ikke har dry-run'et.
+
+### Skrivesekvensen (efter godkendelse)
+
+1. **`findAndReplaceInDoc`** med `dryRun=true` på ankeret. Bekræft præcis ét match.
+2. **`findAndReplaceInDoc`** rigtigt: `findText` = ankeret, `replaceText` = blokken (rene linjer, ingen `- `) + ankeret, jf. ankervalget ovenfor.
+3. **`createParagraphBullets`** per indsat handlingslinje: `textToFind` = linjens egen tekst (den er unik nok - den er lige skrevet), `bulletPreset` = det preset resten af loggen bruger, ellers `BULLET_DISC_CIRCLE_SQUARE`. **Bulletisér kun handlingslinjerne + `Hvorfor:`-linjen** - datolinjen og måneds-headeren skal forblive almindelig tekst.
+4. **Verificér** med `readGoogleDoc` at blokken står ét sted, under den rigtige måned, med bullets. Gør den ikke det, sig det ordret - ryd aldrig op med et nyt gæt-kald.
+
+Fejler trin 3 (bulletiseringen), er teksten allerede skrevet og korrekt placeret: sig at bullets ikke kunne påføres, og lad blokken stå som rene linjer. Rul aldrig trin 2 tilbage for at "prøve igen".
+
+### Gaten (obligatorisk, ét spørgsmål per Doc)
+
+Vis, før du skriver:
+1. **Target-Doc**: navn + ID + link + mappesti.
+2. **Ankeret** du erstatter, og hvor blokken lander ("øverst under Juni 2026").
+3. **Den præcise blok** i en kodeblok, vist som den kommer til at se ud i Doc'et (dvs. med bullets, jf. Trin 5's andet eksempel) - ikke som de rene indsættelseslinjer. Mennesket skal kunne genkende resultatet, ikke mekanikken.
+4. Spørg: *"Skriver jeg denne blok ind i [Doc-navn]? (ja/nej)"*
+
+Skriv først på et eksplicit `ja`. Derefter: kør skrivesekvensen ovenfor, og **bekræft tilbage** med link til Doc'et og antal erstatninger. Fejler kaldet, sig det ordret og skift til fallback - lav aldrig en ny fil, og forsøg aldrig et bredere `findText` uden at spørge igen.
+
+### PER PERSON - fan-out
+
+Ét Doc, ét anker, én gate, én skrivning **per berørt kunde**. Kør dem sekventielt og bekræft hver for sig; batch aldrig flere Docs bag ét `ja`. Kunder uden aktivitet får ingen skrivning og nævnes kun i chat-resuméet.
+
+### Fallback - copy-paste (når skrivning ikke er mulig)
+
+Falder tilbage til udkast-til-indsæt hvis: Doc'et ikke er et native Google Doc, intet unikt anker kan findes, `findAndReplaceInDoc` fejler, changelog-Doc'et slet ikke kan resolves, eller mennesket svarer nej. Så: lever blokken i en kodeblok - her MED `- ` foran hver handlingslinje, så den er brugbar som copy-paste - sig hvorfor der ikke blev skrevet, og hvor den skal indsættes. Blokken er brugbar i sig selv.
+
+(En fejlet bulletisering er derimod ikke en fallback-grund: teksten står rigtigt, kun formateringen mangler.)
 
 ## Trin 7 - Output
 
 Afslut med:
-1. **Udkast(ene)** som ovenfor (per kunde, eller fan-out per person).
+1. **Skrive-udfald:** hvilke Docs der blev skrevet (navn + link + antal erstatninger), og hvilke der faldt tilbage til copy-paste og hvorfor.
 2. **Ærligt resumé:** distinkte handlinger pr. konto (ikke rå event-tal), berørte vs. uberørte konti, og perioden eksplicit.
-3. **`## Datakilder`**: MCP-værktøjer kaldt (`get_change_history` / `run_custom_gaql` mod `change_event`, Drive `search_files` + `read_file_content`), konto-ID'er, og det konkrete dato-vindue.
+3. **`## Datakilder`**: MCP-værktøjer kaldt (`get_change_history` / `run_custom_gaql` mod `change_event`, Drive `search` + `readGoogleDoc` + `findAndReplaceInDoc` + `createParagraphBullets`), konto-ID'er, og det konkrete dato-vindue.
 4. **30-dages note:** mind om at alt før vinduet ikke kan hentes - kør skemalagt (ugentligt/dagligt) for at fange ændringer før de falder ud.
 
-**Form på chat-svaret (IKKE selve changelog-blokkene):** de kopiér-klare blokke skal blive ved med at
-være **formatmatchede til klientens egen log** (Trin 5) - dét er en hård regel og røres ikke af noget
-her. Men teksten *rundt om* dem i chatten følger Inbounds **report house style** (beskrevet inline her;
-dybere forfatter-vejledning i `inbound-skill-creator`) i komprimeret form: led med en **verdikt-linje**
-(status-chip + "N ændringer i perioden, netto-effekt")
-foran blokkene, og lever det ærlige resumé (punkt 2) og datakilder (punkt 3) som en skanbar footer.
-Skjul plumbing (`change_event`-felter, resource-type-enums) - oversæt til handlinger i menneskesprog,
-som skillet allerede gør. Status-pills på resuméet: 🟢 ren kørsel · 🟠 delvis (kilde fejlede) ·
-🔵 info. Dette skill er som standard **kun i chatten** (udkast til copy-paste); ingen artifact-variant.
-Æ Ø Å altid.
+**Form på chat-svaret (IKKE selve changelog-blokkene):** de skrevne blokke skal blive ved med at være
+**formatmatchede til klientens egen log** (Trin 5) - dét er en hård regel og røres ikke af noget her. Men
+teksten *rundt om* dem i chatten følger Inbounds **report house style** (beskrevet inline her; dybere
+forfatter-vejledning i `inbound-skill-creator`) i komprimeret form: led med en **verdikt-linje**
+(status-chip + "N ændringer i perioden, netto-effekt") foran blokken, og lever resumé (punkt 2) og
+datakilder (punkt 3) som en skanbar footer. Skjul plumbing (`change_event`-felter, resource-type-enums)
+- oversæt til handlinger i menneskesprog, som skillet allerede gør. Status-pills på resuméet:
+🟢 skrevet · 🟠 delvis (kilde fejlede, eller copy-paste-fallback) · 🔵 info. Dette skill er som standard
+**kun i chatten** (gate + bekræftelse); ingen artifact-variant. Æ Ø Å altid.

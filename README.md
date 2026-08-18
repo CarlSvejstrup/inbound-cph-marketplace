@@ -44,7 +44,7 @@ The marketplace is named `inbound-cph`, so the install syntax is `inbound-ads@in
 | Skill | Purpose |
 |---|---|
 | `inb-ads-account-audit` | Full paid-search audit → polished HTML slide deck + rendered PDF report |
-| `inb-ads-change-log` | Build a changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → format-matched draft to paste into the client's Drive changelog |
+| `inb-ads-change-log` | Build a short, bulleted changelog/optimeringslog entry from Google Ads' own change history (per client, or per specialist across their accounts) → written into the client's Drive changelog Doc via gated `findAndReplaceInDoc` (copy-paste fallback) |
 | `inb-ads-context-publish` | Publish per-client AI Context Docs to Drive + maintain the master client-index (vault→Drive, no Ads MCP; create-once) |
 | `inb-ads-client-brief` | Project-manager brief on one client (who they are, recent work, status, open threads) + on-demand AI-context update, all on Drive: pull what's new since the file's `Sidst opdateret` (Drive docs, HubSpot, status decks) with HITL-gated TILFØJ/ERSTAT/FJERN, write the updated file in place |
 | `inb-ads-onboarding-analysis` | New-client onboarding: the 35-point ClickUp Analysearbejdet account review → a `.docx` checklist report in the client's Drive folder |

@@ -2,7 +2,35 @@
 
 Single source of truth for what's shipped vs what's open. Update at the end of every substantive session.
 
-Last updated: 2026-07-03, after removing `inb-ads-editor-csv-export` (no longer used).
+Last updated: 2026-08-18, after giving `inb-ads-change-log` a direct Drive write path.
+
+> **2026-08-18 — `inb-ads-change-log` writes back to the changelog Doc (`inbound-ads` v3.7.0).** Per
+> Carl's direction, the skill no longer stops at a copy-paste block: it now writes the entry straight into
+> the client's changelog/optimeringslog Doc via gated **`findAndReplaceInDoc`** on the Inbound Google Drive
+> MCP, the same surgical inline path `inb-ads-client-brief` already uses on the AI-Context Docs. The old
+> "the connector can only create new files" rationale in `SPEC.md` was simply wrong for this MCP and was
+> rewritten. Because the tool cannot insert, only replace, Trin 6 defines an **anchor ladder** (current
+> month header → topmost month header → an existing date line → the title) and folds the insertion into a
+> replacement of "anchor + new block"; every anchor is `dryRun`-verified to match exactly once before the
+> real write, then gated behind one explicit `ja` per Doc (per-customer: one write; per-person: sequential,
+> one gate per client, never batched). Trin 4 now verifies the target is a **native Google Doc** —
+> `findAndReplaceInDoc` cannot edit a `.docx`, a raw `.md`, or a Sheet — and copy-paste survives as the
+> explicit fallback for a non-native Doc, a non-unique anchor, a failed call, an unresolvable Doc, or a
+> `nej`. **Native bullets:** the entry is inserted as plain lines and then bulletized with
+> **`createParagraphBullets`** (`textToFind`, also index-free) so the action lines become real Google Docs
+> bullets instead of literal `- ` hyphens; the date line and month header stay plain text. `insertText` is
+> deliberately NOT used despite existing on the connector — it needs a computed 1-based index, and index
+> arithmetic against a live client log is what silently lands an entry mid-paragraph; the two chosen tools
+> need no arithmetic at all. `updateGoogleDoc` / `updateDocFromMarkdown` stay banned (replace deletes the
+> log; append lands at the bottom of a reverse-chronological doc). A failed bulletize is reported and left
+> alone, not rolled back and not a fallback trigger, since the text is already correctly placed. Second change: the written entry is now **short and strictly bulleted**. Trin 3 gained hard
+> brevity rules (one action per bullet, max 6 bullets per date, ~10 words per bullet, past-tense verb
+> first, shortened campaign names, counts only where they show scope, no `change_event` plumbing in the
+> Doc) and Trin 5 dropped the `##`-prefixed month header and the italic `_Hvorfor:_` block for a plain
+> month line and a single `- Hvorfor: (udfyld)` bullet. All meta (30-day ceiling, data sources, honest
+> counts) stays in chat, never in the client's log. Files: `skills/inb-ads-change-log/SKILL.md` (Trin
+> 0/3/4/5/6/7 + description), `skills/inb-ads-change-log/SPEC.md`, repo-root `CLAUDE.md` capability table.
+> Roster unchanged at 11 skills.
 
 > **2026-07-03 — removed `inb-ads-editor-csv-export` (`inbound-ads` v3.4.0, current roster).** Deleted per
 > Carl's direction — no longer used. It was the pure-transform converter (confirmed review workbook →
